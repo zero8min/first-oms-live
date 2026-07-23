@@ -37,6 +37,14 @@ table{width:100%;border-collapse:collapse;font-size:13px}th,td{padding:9px 8px;b
 .formGrid{display:grid;grid-template-columns:1fr 1fr;gap:10px}.formGrid .full{grid-column:1/-1}.modalBox label{display:block;margin:8px 0 6px;font-size:13px;font-weight:800}
 @media(max-width:650px){.formGrid{grid-template-columns:1fr}.formGrid .full{grid-column:auto}}
 
+
+.paymentSelect{min-width:105px;padding:8px;border-radius:9px;font-weight:800}
+.popupBack{display:none;position:fixed;inset:0;background:#000b;z-index:300;align-items:center;justify-content:center;padding:16px}
+.popupBack.show{display:flex}
+.popupBox{width:min(520px,100%);max-height:94vh;overflow:auto;background:#20232d;border:1px solid var(--line);border-radius:18px;padding:16px}
+.smsConfirmMessage{white-space:pre-wrap;background:#11141c;border:1px solid var(--line);border-radius:12px;padding:12px;line-height:1.6;font-size:13px}
+.customerMatch{font-size:12px;margin-top:7px;min-height:18px}
+
 @media(max-width:950px){.grid,.grid3{grid-template-columns:1fr}nav{overflow:auto}.receipt{width:100%}}
 @media print{header,nav,.no-print{display:none!important}body{background:white}.page{display:none!important}.page.printing{display:block!important}.card{border:0;box-shadow:none}.receipt{page-break-after:always;width:360px;margin:0 auto}}
 </style>
@@ -57,6 +65,11 @@ table{width:100%;border-collapse:collapse;font-size:13px}th,td{padding:9px 8px;b
 </nav>
 <main>
 <section id="control" class="page active">
+  <div class="row no-print" style="margin-bottom:12px">
+    <button class="btn bad" onclick="startNewBroadcast()">● 방송 시작 · 오늘 테스트 초기화</button>
+    <span class="badge b-info" id="broadcastStatus">방송 대기</span>
+    <span class="muted">고객DB·상품번호 기억·기본설정은 유지됩니다.</span>
+  </div>
   <div class="grid3">
     <div class="kpi ok">정상접수<b id="kOk">0</b></div>
     <div class="kpi warn">확인필요<b id="kWarn">0</b></div>
@@ -91,11 +104,11 @@ table{width:100%;border-collapse:collapse;font-size:13px}th,td{padding:9px 8px;b
       <hr style="border-color:#2b2f3c;margin:16px 0">
       <h3>댓글/주문 비상 입력</h3>
       <div class="row">
-        <input id="cNick" placeholder="닉네임">
+        <input id="cNick" placeholder="닉네임" oninput="previewCustomerMatch()" onblur="applyCustomerMatch()">
         <input id="cText" class="grow" placeholder="예: 1번 2개 / 1개 추가 / 전체취소 / 2개로 변경 / 선물이요">
         <button class="btn ok" onclick="processComment()">접수</button>
       </div>
-      <p class="muted">원문은 삭제되지 않고 주문 로그와 원본댓글에 이중 저장됩니다.</p>
+      <div id="customerMatchInfo" class="customerMatch muted">닉네임을 입력하면 고객DB와 자동 대조합니다.</div><p class="muted">원문은 삭제되지 않고 주문 로그와 원본댓글에 이중 저장됩니다.</p>
     </div>
   </div><br>
   <div class="grid">
@@ -127,7 +140,7 @@ table{width:100%;border-collapse:collapse;font-size:13px}th,td{padding:9px 8px;b
       <button class="btn gold" onclick="printSelectedReceipts()">선택 정산서 출력</button>
     </div>
     <p class="muted">영수증형 정산서이며, 계좌·카카오채널 QR·상품·배송비·총액이 자동 반영됩니다.</p>
-    <div class="tableWrap"><table><thead><tr><th><input type="checkbox" onchange="selectAll('settleChecks',this.checked)"></th><th>주문닉네임</th><th>이름</th><th>연락처</th><th>주소</th><th>상품수</th><th>상품금액</th><th>배송비</th><th>총액</th><th>정보</th><th>정산서</th></tr></thead><tbody id="settleBody"></tbody></table></div>
+    <div class="tableWrap"><table><thead><tr><th><input type="checkbox" onchange="selectAll('settleChecks',this.checked)"></th><th>주문닉네임</th><th>이름</th><th>연락처</th><th>주소</th><th>상품수</th><th>상품금액</th><th>배송비</th><th>총액</th><th>입금여부</th><th>정보</th><th>정산서</th><th>문자대기</th></tr></thead><tbody id="settleBody"></tbody></table></div>
   </div>
   <div id="receiptArea" style="display:flex;flex-wrap:wrap;gap:15px;margin-top:16px"></div>
 </section>
@@ -221,6 +234,31 @@ table{width:100%;border-collapse:collapse;font-size:13px}th,td{padding:9px 8px;b
   </div>
 </section>
 </main>
+
+<div id="receiptPopup" class="popupBack" onclick="if(event.target===this)closeReceiptPopup()">
+ <div class="popupBox">
+  <div class="row"><h2 class="grow">정산서 상세보기</h2>
+   <button class="btn gold" onclick="printCurrentReceiptOnly()">정산서만 인쇄</button>
+   <button class="btn" onclick="closeReceiptPopup()">닫기</button>
+  </div>
+  <div id="receiptPopupContent"></div>
+ </div>
+</div>
+
+<div id="smsConfirmPopup" class="popupBack" onclick="if(event.target===this)closeSmsConfirm()">
+ <div class="popupBox">
+  <div class="row"><h2 class="grow">문자 전송 최종확인</h2><button class="btn" onclick="closeSmsConfirm()">닫기</button></div>
+  <div id="smsConfirmReceipt"></div>
+  <h3>실제 발송 내용</h3>
+  <div id="smsConfirmMessage" class="smsConfirmMessage"></div>
+  <label style="display:block;margin:14px 0"><input type="checkbox" id="smsFinalCheck"> 수신번호와 정산 내용을 확인했습니다.</label>
+  <div class="row" style="justify-content:flex-end">
+   <button class="btn" onclick="closeSmsConfirm()">취소</button>
+   <button class="btn ok" id="smsFinalSendButton" onclick="confirmAndSendSms()">확인 후 바로 전송</button>
+  </div>
+ </div>
+</div>
+
 <div id="customerModal" class="modalBack" onclick="if(event.target===this)closeCustomerModal()">
 <div class="modalBox"><div class="row"><h2 class="grow" id="customerModalTitle">고객정보 추가</h2><button class="btn" onclick="closeCustomerModal()">닫기</button></div>
 <input type="hidden" id="mOriginalNickname">
@@ -237,7 +275,7 @@ table{width:100%;border-collapse:collapse;font-size:13px}th,td{padding:9px 8px;b
 
 <script>
 const KEY='firstoms_emergency_v2';
-let state={products:[],productCatalog:{},orders:[],raw:[],customers:{},settings:{bank:'',account:'',holder:'',shippingFee:4000,kakaoUrl:'http://pf.kakao.com/_DEPfX',smsUrl:'',commentApi:'',joinUrl:'',smsApi:'',smsSender:''},currentProductId:null};
+let state={products:[],productCatalog:{},orders:[],raw:[],customers:{},paymentStatus:{},smsQueue:[],smsPreviewImages:{},settings:{bank:'',account:'',holder:'',shippingFee:4000,kakaoUrl:'http://pf.kakao.com/_DEPfX',smsUrl:'',commentApi:'',joinUrl:'',smsApi:'',smsSender:''},currentProductId:null,broadcastStartedAt:null,currentReceiptCustomer:null};
 function now(){return new Date().toLocaleTimeString('ko-KR',{hour12:false})}
 function uid(){return Date.now().toString(36)+Math.random().toString(36).slice(2,7)}
 function money(n){return Number(n||0).toLocaleString('ko-KR')+'원'}
@@ -280,7 +318,36 @@ function addStock(){let p=cur(),q=+extraQty.value;if(!p||q<=0)return alert('현�
 function closeProduct(){let p=cur();if(!p)return;p.active=false;log('상품마감',p.name);save();renderAll()}
 function log(type,text){state.raw.push({id:uid(),time:now(),type,text});save()}
 function parseQty(t){let m=t.match(/(\d+)\s*(?:개|ea|EA|x|X)?/);return m?+m[1]:1}
-function processComment(){let nick=cNick.value.trim(),text=cText.value.trim();if(!nick||!text)return alert('닉네임과 댓글을 입력해 주세요.');state.raw.push({id:uid(),time:now(),type:'원본댓글',text:nick+' : '+text});let p=cur();let lower=text.toLowerCase();let status='ok',kind='주문',qty=parseQty(text);
+function normalizeCustomerText(v){return String(v||'').replace(/\s+/g,'').toLowerCase()}
+function findCustomerKey(v){
+ const q=normalizeCustomerText(v);if(!q)return '';
+ const keys=Object.keys(state.customers||{});
+ return keys.find(k=>normalizeCustomerText(k)===q)
+  ||keys.find(k=>normalizeCustomerText(state.customers[k]?.nickname)===q)
+  ||keys.find(k=>normalizeCustomerText(state.customers[k]?.name)===q)||'';
+}
+function previewCustomerMatch(){
+ const key=findCustomerKey(cNick.value),box=document.getElementById('customerMatchInfo');
+ if(!box)return;
+ if(key){const c=state.customers[key];box.style.color='#7ee2a8';box.textContent=`고객정보 자동연결: ${c.name||key} · ${c.phone||'연락처 없음'} · ${[c.address,c.detailAddress].filter(Boolean).join(' ')||'주소 없음'}`}
+ else{box.style.color='';box.textContent='일치 고객 없음 · 정산 전 고객정보 확인이 필요합니다.'}
+}
+function applyCustomerMatch(){const key=findCustomerKey(cNick.value);if(key)cNick.value=key;previewCustomerMatch()}
+function startNewBroadcast(){
+ if(!confirm('테스트 주문·정산·문자대기 내역을 초기화하고 새 방송을 시작할까요?\\n고객DB와 상품번호 기억은 유지됩니다.'))return;
+ state.products=[];state.orders=[];state.raw=[];state.currentProductId=null;
+ state.paymentStatus={};state.smsQueue=[];state.smsPreviewImages={};state.currentReceiptCustomer=null;
+ state.broadcastStartedAt=new Date().toISOString();
+ localStorage.removeItem('firstoms_video');
+ youtubeUrl.value='';videoFrame.src='';
+ pNo.value='';pName.value='';pPrice.value='';pLimit.value='';pMax.value='';extraQty.value='';
+ cNick.value='';cText.value='';receiptArea.innerHTML='';packingArea.innerHTML='';smsPreviewArea.innerHTML='';
+ save();renderAll();
+ broadcastStatus.textContent='방송 진행 중 · '+new Date().toLocaleTimeString('ko-KR',{hour:'2-digit',minute:'2-digit'});
+ broadcastStatus.className='badge b-ok';
+ alert('새 방송을 시작했습니다. 기존 테스트 주문·정산·문자대기 내역을 초기화했습니다.');
+}
+function processComment(){let nick=cNick.value.trim(),text=cText.value.trim();if(!nick||!text)return alert('닉네임과 댓글을 입력해 주세요.');let matched=findCustomerKey(nick);if(matched){nick=matched;cNick.value=matched;}state.raw.push({id:uid(),time:now(),type:'원본댓글',text:nick+' : '+text});let p=cur();let lower=text.toLowerCase();let status='ok',kind='주문',qty=parseQty(text);
  if(!p){status='warn';kind='확인필요'}
  else if(/전체취소|전부취소/.test(text)){state.orders.filter(o=>o.nick===nick&&o.status==='ok').forEach(o=>o.status='cancel');status='cancel';kind='전체취소';qty=0}
  else if(/취소/.test(text)){let last=[...state.orders].reverse().find(o=>o.nick===nick&&o.productId===p.id&&o.status==='ok');if(last){last.status='cancel';p.sold=Math.max(0,p.sold-last.qty)}status='cancel';kind='취소';qty=0}
@@ -303,26 +370,56 @@ function renderAll(){let p=cur();currentProduct.innerHTML=p?`<b>#${esc(p.no)} ${
  orderBody.innerHTML=[...state.orders].reverse().map(o=>`<tr><td><span class="badge ${o.status==='ok'?'b-ok':o.status==='cancel'?'b-bad':'b-warn'}">${o.status==='ok'?'정상접수':o.status}</span></td><td>${o.time}</td><td>${esc(o.nick)}${o.gift?'<br><span class="badge b-info">선물</span>':''}</td><td>${esc(o.product)}</td><td>${o.qty}</td><td>${money(o.billable?o.qty*o.price:0)}</td><td>${esc(o.raw)}</td><td><button class="btn" onclick="editOrder('${o.id}')">수정</button></td></tr>`).join('');
  rawLog.innerHTML=[...state.raw].reverse().map(x=>`<div>[${x.time}] <b>${esc(x.type)}</b> ${esc(x.text)}</div>`).join('');
  renderSettlement();renderShipping();renderCustomerDb();renderSmsRoom()}
+function paymentOf(n){return (state.paymentStatus&&state.paymentStatus[n])||'미입금'}
+function setPaymentStatus(n,v){state.paymentStatus=state.paymentStatus||{};state.paymentStatus[n]=v;save();renderSettlement()}
+function moveCustomerToSms(n){
+ if(paymentOf(n)!=='입금')return alert('입금 완료 고객만 문자 대기실로 이동할 수 있습니다.');
+ const g=grouped().find(x=>x.payer===n);if(!g)return alert('정산 내역이 없습니다.');
+ const fee=+state.settings.shippingFee||0,c=customer(n);
+ state.smsQueue=state.smsQueue||[];
+ const old=state.smsQueue.find(x=>x.nickname===n);
+ const item={nickname:n,phone:c.phone||'',amount:g.amount+fee,status:old?.status||'대기',sentAt:old?.sentAt||''};
+ if(old)Object.assign(old,item);else state.smsQueue.push(item);
+ save();renderSmsRoom();alert(n+' 고객을 문자 대기실로 이동했습니다.');
+}
 function renderSettlement(){
  let gs=grouped();
  settleBody.innerHTML=gs.map(g=>{
    let c=customer(g.payer),fee=+state.settings.shippingFee||0,total=g.amount+fee;
-   let fullAddr=[c.postalCode,c.address,c.detailAddress].filter(Boolean).join(' ');
+   let fullAddr=[c.postalCode,c.address,c.detailAddress].filter(Boolean).join(' '),ps=paymentOf(g.payer);
    return `<tr>
     <td><input class="settleChecks" type="checkbox" value="${esc(g.payer)}"></td>
-    <td><b>${esc(g.payer)}</b></td>
-    <td>${esc(c.name||'미입력')}</td>
-    <td>${esc(c.phone||'미입력')}</td>
-    <td>${esc(fullAddr||'미입력')}</td>
+    <td><b>${esc(g.payer)}</b>${c.phone&&c.address?'<br><span class="badge b-ok">고객DB 자동연결</span>':'<br><span class="badge b-warn">정보확인</span>'}</td>
+    <td>${esc(c.name||'미입력')}</td><td>${esc(c.phone||'미입력')}</td><td>${esc(fullAddr||'미입력')}</td>
     <td>${g.items.length}</td><td>${money(g.amount)}</td><td>${money(fee)}</td><td><b>${money(total)}</b></td>
+    <td><select class="paymentSelect" onchange="setPaymentStatus('${esc(g.payer)}',this.value)">
+      <option value="미입금" ${ps==='미입금'?'selected':''}>미입금</option>
+      <option value="입금" ${ps==='입금'?'selected':''}>입금</option>
+      <option value="보류" ${ps==='보류'?'selected':''}>보류</option>
+    </select></td>
     <td><button class="btn" onclick="editInfo('${esc(g.payer)}')">수정</button></td>
-    <td><button class="btn info" onclick="showReceipt('${esc(g.payer)}')">보기</button></td>
+    <td><button class="btn info" onclick="showReceipt('${esc(g.payer)}')">팝업 보기</button></td>
+    <td><button class="btn ${ps==='입금'?'ok':'warn'}" onclick="moveCustomerToSms('${esc(g.payer)}')">문자 대기실 이동</button></td>
    </tr>`
  }).join('')
 }
 async function editInfo(n){openCustomerModal(n)}
-function receiptHtml(n){let g=grouped().find(x=>x.payer===n);if(!g)return '';let fee=+state.settings.shippingFee||0;let total=g.amount+fee;let rows=g.items.filter(x=>x.billable).map(o=>`<tr><td>${esc(o.product)} × ${o.qty}</td><td style="text-align:right">${money(o.qty*o.price)}</td></tr>`).join('');return `<div class="receipt" data-customer="${esc(n)}"><h2>땡라이브 정산서</h2><div style="text-align:center;font-size:12px">FIRST OMS</div><div class="dash"></div><div>주문닉네임: <b>${esc(n)}</b></div><div>성함: ${esc((customer(n).name)||'')}</div><div>연락처: ${esc((customer(n).phone)||'')}</div><div>주소: ${esc([customer(n).postalCode,customer(n).address,customer(n).detailAddress].filter(Boolean).join(' '))}</div><div class="dash"></div><table>${rows}</table><div class="dash"></div><div>상품금액 <span style="float:right">${money(g.amount)}</span></div><div>배송비 <span style="float:right">${money(fee)}</span></div><div class="dash"></div><div class="sum">총 ${money(total)}</div><div class="dash"></div><div style="font-size:12px">입금계좌: ${esc(state.settings.bank)} ${esc(state.settings.account)}<br>예금주: ${esc(state.settings.holder)}</div><div class="qr"><canvas class="qrCanvas" data-url="${esc(state.settings.kakaoUrl||location.href)}"></canvas><div style="font-size:11px">카카오채널 문의</div></div></div>`}
-function showReceipt(n){receiptArea.innerHTML=receiptHtml(n);drawQrs()}
+function receiptHtml(n){let g=grouped().find(x=>x.payer===n);if(!g)return '';let fee=+state.settings.shippingFee||0;let total=g.amount+fee;let rows=g.items.filter(x=>x.billable).map(o=>`<tr><td>${esc(o.product)} × ${o.qty}</td><td style="text-align:right">${money(o.qty*o.price)}</td></tr>`).join('');return `<div class="receipt" data-customer="${esc(n)}"><h2>땡라이브 정산서</h2><div style="text-align:center;font-size:12px">FIRST OMS</div><div class="dash"></div><div>주문닉네임: <b>${esc(n)}</b></div><div>입금상태: <b>${esc(paymentOf(n))}</b></div><div>성함: ${esc((customer(n).name)||'')}</div><div>연락처: ${esc((customer(n).phone)||'')}</div><div>주소: ${esc([customer(n).postalCode,customer(n).address,customer(n).detailAddress].filter(Boolean).join(' '))}</div><div class="dash"></div><table>${rows}</table><div class="dash"></div><div>상품금액 <span style="float:right">${money(g.amount)}</span></div><div>배송비 <span style="float:right">${money(fee)}</span></div><div class="dash"></div><div class="sum">총 ${money(total)}</div><div class="dash"></div><div style="font-size:12px">입금계좌: ${esc(state.settings.bank)} ${esc(state.settings.account)}<br>예금주: ${esc(state.settings.holder)}</div><div class="qr"><canvas class="qrCanvas" data-url="${esc(state.settings.kakaoUrl||location.href)}"></canvas><div style="font-size:11px">카카오채널 문의</div></div></div>`}
+function showReceipt(n){
+ state.currentReceiptCustomer=n;receiptPopupContent.innerHTML=receiptHtml(n);
+ receiptPopup.classList.add('show');setTimeout(drawQrs,50)
+}
+function closeReceiptPopup(){receiptPopup.classList.remove('show')}
+function printWindowWithReceipts(title,body){
+ const w=window.open('','_blank','width=560,height=800');
+ if(!w)return alert('팝업이 차단되었습니다. 브라우저에서 팝업을 허용해 주세요.');
+ w.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>${title}</title>
+ <style>body{margin:0;padding:18px;background:#fff;font-family:Arial,sans-serif}.receipt{width:360px;margin:0 auto 20px;background:#fff;color:#111;padding:22px;page-break-after:always}.receipt h2{text-align:center}.dash{border-top:1px dashed #444;margin:10px 0}.receipt table{width:100%;font-size:12px}.receipt td{padding:5px 0}.sum{font-size:18px;font-weight:900;text-align:right}.qr{text-align:center;margin-top:12px}@media print{body{padding:0}.receipt{margin:0 auto}}</style>
+ </head><body>${body}<script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.4/build/qrcode.min.js"><\/script>
+ <script>window.onload=function(){document.querySelectorAll('.qrCanvas').forEach(function(c){if(window.QRCode)QRCode.toCanvas(c,c.dataset.url,{width:110,margin:1},function(){});});setTimeout(function(){window.print()},600)};<\/script></body></html>`);
+ w.document.close()
+}
+function printCurrentReceiptOnly(){const n=state.currentReceiptCustomer;if(!n)return alert('정산서를 먼저 열어주세요.');printWindowWithReceipts('정산서_'+n,receiptHtml(n))}
 function drawQrs(){document.querySelectorAll('.qrCanvas').forEach(c=>{if(window.QRCode)QRCode.toCanvas(c,c.dataset.url,{width:110,margin:1},()=>{});else{let x=c.getContext('2d');x.fillStyle='#fff';x.fillRect(0,0,110,110);x.fillStyle='#000';x.fillText('QR 연결 필요',10,55)}})}
 function selected(cls){return [...document.querySelectorAll('.'+cls+':checked')].map(x=>x.value)}
 function selectAll(cls,v){document.querySelectorAll('.'+cls).forEach(x=>x.checked=v)}
@@ -330,7 +427,7 @@ function csvDownload(name,rows){if(!rows.length)return alert('저장할 데이�
 function exportSelectedExcel(){let ns=selected('settleChecks');if(!ns.length)return alert('고객을 선택해 주세요.');let rows=[['고객','상품','수량','단가','금액','배송비','총액','은행','계좌번호','예금주']];grouped().filter(g=>ns.includes(g.payer)).forEach(g=>g.items.filter(o=>o.billable).forEach((o,i)=>rows.push([g.payer,o.product,o.qty,o.price,o.qty*o.price,i?0:+state.settings.shippingFee,(i?0:g.amount+(+state.settings.shippingFee||0)),state.settings.bank,state.settings.account,state.settings.holder])));downloadExcelOrCsv('땡라이브_선택정산.xlsx','정산',rows)}
 function downloadExcelOrCsv(name,sheet,rows){if(window.XLSX){let wb=XLSX.utils.book_new(),ws=XLSX.utils.aoa_to_sheet(rows);XLSX.utils.book_append_sheet(wb,ws,sheet);XLSX.writeFile(wb,name)}else csvDownload(name.replace('.xlsx','.csv'),rows)}
 async function saveSelectedImages(){let ns=selected('settleChecks');if(!ns.length)return alert('고객을 선택해 주세요.');for(let n of ns){receiptArea.innerHTML=receiptHtml(n);drawQrs();await new Promise(r=>setTimeout(r,100));let el=receiptArea.querySelector('.receipt');if(window.html2canvas){let canvas=await html2canvas(el,{scale:2,backgroundColor:'#fff'});let a=document.createElement('a');a.download='정산서_'+n+'.png';a.href=canvas.toDataURL('image/png');a.click()}else alert('이미지 저장 라이브러리를 불러오지 못했습니다. 인터넷 연결 후 다시 시도해 주세요.')}renderAll()}
-function printSelectedReceipts(){let ns=selected('settleChecks');if(!ns.length)return alert('고객을 선택해 주세요.');receiptArea.innerHTML=ns.map(receiptHtml).join('');drawQrs();document.querySelectorAll('.page').forEach(x=>x.classList.remove('printing'));settle.classList.add('printing');setTimeout(()=>window.print(),200)}
+function printSelectedReceipts(){let ns=selected('settleChecks');if(!ns.length)return alert('고객을 선택해 주세요.');printWindowWithReceipts('선택 정산서 출력',ns.map(receiptHtml).join(''))}
 function renderShipping(){let receivers={};activeOrders().forEach(o=>{let r=o.receiver||o.nick;if(!receivers[r])receivers[r]={receiver:r,payer:o.payer||o.nick,items:[]};receivers[r].items.push(o)});shipBody.innerHTML=Object.values(receivers).map(g=>{let c=customer(g.receiver);return `<tr><td><input class="shipChecks" type="checkbox" value="${esc(g.receiver)}"></td><td><b>${esc(g.receiver)}</b>${g.payer!==g.receiver?`<br><span class="badge b-info">선물: 결제 ${esc(g.payer)}</span>`:''}<br><input value="${esc(c.name)}" onchange="updateCustomer('${esc(g.receiver)}','name',this.value)" placeholder="받는 분"></td><td><input value="${esc(c.phone)}" onchange="updateCustomer('${esc(g.receiver)}','phone',this.value)" placeholder="연락처"></td><td><input value="${esc(c.address)}" onchange="updateCustomer('${esc(g.receiver)}','address',this.value)" placeholder="주소"></td><td>${g.items.map(o=>esc(o.product)+' × '+o.qty).join('<br>')}</td><td><span class="badge b-warn">대기</span></td></tr>`}).join('')}
 function shippingRows(ns){let rows=[['받는분','전화번호','주소','상품명/수량','배송메모','주문자']];let rec={};activeOrders().forEach(o=>{let r=o.receiver||o.nick;if(!rec[r])rec[r]={receiver:r,payer:o.payer||o.nick,items:[]};rec[r].items.push(o)});Object.values(rec).filter(g=>ns.includes(g.receiver)).forEach(g=>{let c=customer(g.receiver);rows.push([c.name||g.receiver,c.phone,[c.postalCode,c.address,c.detailAddress].filter(Boolean).join(' '),g.items.map(o=>o.product+' '+o.qty+'개').join(' / '),c.memo,g.payer])});return rows}
 function exportShippingExcel(){let ns=selected('shipChecks');if(!ns.length)return alert('고객을 선택해 주세요.');downloadExcelOrCsv('CJ_택배파일접수.xlsx','택배접수',shippingRows(ns))}
@@ -451,73 +548,95 @@ async function deleteSelectedCustomers(){
  for(const n of ns){try{await fetch('/api/customers/'+encodeURIComponent(n),{method:'DELETE'})}catch(e){}}
 }
 function buildSmsQueue(){
- state.smsQueue=grouped().map(g=>{
-   const c=customer(g.payer),fee=+state.settings.shippingFee||0;
-   const old=(state.smsQueue||[]).find(x=>x.nickname===g.payer)||{};
-   return {nickname:g.payer,phone:c.phone||old.phone||'',amount:g.amount+fee,checked:old.checked||false,status:old.status||'대기',sentAt:old.sentAt||''}
+ const paid=grouped().filter(g=>paymentOf(g.payer)==='입금');
+ state.smsQueue=state.smsQueue||[];
+ paid.forEach(g=>{
+   const c=customer(g.payer),fee=+state.settings.shippingFee||0,old=state.smsQueue.find(x=>x.nickname===g.payer);
+   const item={nickname:g.payer,phone:c.phone||old?.phone||'',amount:g.amount+fee,status:old?.status||'대기',sentAt:old?.sentAt||''};
+   if(old)Object.assign(old,item);else state.smsQueue.push(item)
  });
  save();renderSmsRoom();
+ if(!paid.length)alert('입금 완료로 선택된 고객이 없습니다.')
 }
-let smsUnsentOnly=false;
+let smsUnsentOnly=false,smsPendingIndex=-1;
 function toggleUnsentOnly(){smsUnsentOnly=!smsUnsentOnly;renderSmsRoom()}
 function renderSmsRoom(){
  if(!document.getElementById('smsBody'))return;
- const q=state.smsQueue||[], view=smsUnsentOnly?q.filter(x=>x.status!=='전송완료'):q;
+ const q=state.smsQueue||[],view=smsUnsentOnly?q.filter(x=>x.status!=='전송완료'):q;
  smsQueueCount.textContent='대기 '+q.filter(x=>x.status!=='전송완료').length+'명';
  smsBody.innerHTML=view.map(x=>{const i=q.indexOf(x);return `<tr>
  <td><input class="smsChecks" type="checkbox" value="${esc(x.nickname)}"></td>
  <td><b>${esc(x.nickname)}</b><br><span class="muted">${esc(customer(x.nickname).name||'미가입/수기')}</span></td>
  <td><input value="${esc(x.phone||'')}" placeholder="010-0000-0000" onchange="updateSmsPhone(${i},this.value)"></td>
- <td>${money(x.amount)}</td><td><button class="btn info" onclick="previewSmsReceipt('${esc(x.nickname)}')">이미지 확인</button></td>
- <td><label><input type="checkbox" ${x.checked?'checked':''} onchange="toggleSmsChecked(${i},this.checked)"> 확인완료</label></td>
- <td><button class="btn ok" onclick="sendSmsReceipt(${i})">전송</button></td>
- <td><span class="badge ${x.status==='전송완료'?'b-ok':x.status==='미전송'?'b-bad':'b-warn'}">${esc(x.status||'대기')}</span></td></tr>`}).join('');
+ <td><b>${money(x.amount)}</b></td>
+ <td><button class="btn info" onclick="showSmsReceiptDetail(${i})">정산서 상세보기</button></td>
+ <td><button class="btn ok" onclick="openSmsConfirm(${i})">문자전송</button></td>
+ <td><span class="badge ${x.status==='전송완료'?'b-ok':x.status==='미전송'||x.status==='전송실패'?'b-bad':'b-warn'}">${esc(x.status||'대기')}</span>${x.sentAt?'<br><span class="muted">'+esc(x.sentAt)+'</span>':''}</td>
+ </tr>`}).join('')
 }
 function updateSmsPhone(i,v){
- state.smsQueue[i].phone=v;
- const n=state.smsQueue[i].nickname;
- if(state.customers[n])state.customers[n].phone=v;
- save();renderCustomerDb();renderSettlement();renderShipping();
+ state.smsQueue[i].phone=v.replace(/[^0-9]/g,'');
+ const n=state.smsQueue[i].nickname;if(state.customers[n])state.customers[n].phone=v;
+ save();renderCustomerDb();renderSettlement();renderShipping()
 }
-function toggleSmsChecked(i,v){state.smsQueue[i].checked=v;save()}
-async function previewSmsReceipt(n){
- smsPreviewArea.innerHTML=receiptHtml(n);drawQrs();
- if(window.html2canvas){
-   await new Promise(r=>setTimeout(r,120));
-   const el=smsPreviewArea.querySelector('.receipt');
-   const canvas=await html2canvas(el,{scale:2,backgroundColor:'#fff'});
-   state.smsPreviewImages=state.smsPreviewImages||{};
-   state.smsPreviewImages[n]=canvas.toDataURL('image/png');
-   save();
+function showSmsReceiptDetail(i){const x=state.smsQueue[i];if(x)showReceipt(x.nickname)}
+function smsMessageFor(n){
+ const g=grouped().find(x=>x.payer===n),c=customer(n),fee=+state.settings.shippingFee||0;
+ if(!g)return '';
+ const items=g.items.filter(x=>x.billable).map(o=>`${o.product} ${o.qty}개 ${money(o.qty*o.price)}`).join('\n');
+ return `[땡라이브 정산서]\n${c.name||n}(${n})님\n${items}\n상품금액 ${money(g.amount)}\n배송비 ${money(fee)}\n총 결제금액 ${money(g.amount+fee)}\n입금계좌 ${state.settings.bank||''} ${state.settings.account||''} ${state.settings.holder||''}\n문의 ${state.settings.kakaoUrl||''}`;
+}
+function openSmsConfirm(i){
+ const x=state.smsQueue[i];if(!x)return;
+ if(!x.phone)return alert('고객 연락처가 없습니다. 고객정보 또는 연락처를 먼저 입력해 주세요.');
+ smsPendingIndex=i;smsConfirmReceipt.innerHTML=receiptHtml(x.nickname);
+ smsConfirmMessage.textContent=`수신번호: ${x.phone}\n\n${smsMessageFor(x.nickname)}`;
+ smsFinalCheck.checked=false;smsFinalSendButton.disabled=false;smsFinalSendButton.textContent='확인 후 바로 전송';
+ smsConfirmPopup.classList.add('show');setTimeout(drawQrs,50)
+}
+function closeSmsConfirm(){smsConfirmPopup.classList.remove('show');smsPendingIndex=-1}
+async function confirmAndSendSms(){
+ if(smsPendingIndex<0)return;
+ if(!smsFinalCheck.checked)return alert('수신번호와 정산 내용을 확인한 뒤 체크해 주세요.');
+ smsFinalSendButton.disabled=true;smsFinalSendButton.textContent='전송 중...';
+ const ok=await sendSmsReceipt(smsPendingIndex,true);
+ if(ok){closeSmsConfirm();alert('문자를 실제 발송 요청했습니다.')}else{
+   smsFinalSendButton.disabled=false;smsFinalSendButton.textContent='다시 전송';
  }
- alert('정산서 이미지를 확인했습니다. 확인완료 체크 후 전송하세요.');
 }
 async function sendSmsReceipt(i,quiet=false){
  const x=state.smsQueue[i];if(!x)return false;
- if(!x.phone||!x.checked){x.status='미전송';save();renderSmsRoom();if(!quiet)alert(!x.phone?'연락처가 없어 미전송 처리했습니다.':'이미지 확인이 안 되어 미전송 처리했습니다.');return false}
+ const phone=String(x.phone||'').replace(/[^0-9]/g,'');
+ if(phone.length<10){x.status='미전송';save();renderSmsRoom();if(!quiet)alert('올바른 연락처가 없어 미전송 처리했습니다.');return false}
  try{
-  if(state.settings.smsApi){
-   const r=await fetch(state.settings.smsApi,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({to:x.phone,from:state.settings.smsSender||'',message:`[땡라이브 정산서] ${x.nickname}님 총 ${money(x.amount)}`,image:(state.smsPreviewImages||{})[x.nickname]||''})});
-   if(!r.ok)throw new Error();x.status='전송완료';
-  }else{x.status='미전송';if(state.settings.smsUrl)window.open(state.settings.smsUrl,'_blank')}
- }catch(e){x.status='미전송'}
- save();renderSmsRoom();return x.status==='전송완료';
+   const r=await fetch('/api/sms/send',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({to:phone,text:smsMessageFor(x.nickname),nickname:x.nickname})});
+   let result={};try{result=await r.json()}catch(e){}
+   if(!r.ok||!result.ok)throw new Error(result.error||('전송 오류 '+r.status));
+   x.status='전송완료';x.sentAt=new Date().toLocaleString('ko-KR');x.solapi=result.result||{};
+   save();renderSmsRoom();return true
+ }catch(e){
+   x.status='전송실패';x.lastError=e.message;save();renderSmsRoom();
+   if(!quiet)alert('문자 전송 실패: '+e.message);else alert('문자 전송 실패: '+e.message);
+   return false
+ }
 }
 async function sendSelectedSms(){
  const ns=selected('smsChecks');if(!ns.length)return alert('전송할 고객을 선택해 주세요.');
+ if(!confirm(ns.length+'명의 저장된 연락처로 정산서 문자를 바로 전송할까요?'))return;
  let ok=0,fail=0;for(const n of ns){const i=(state.smsQueue||[]).findIndex(x=>x.nickname===n);(await sendSmsReceipt(i,true))?ok++:fail++}
- alert(`선택전송 결과: 성공 ${ok}명 / 미전송 ${fail}명`);
+ alert(`선택전송 결과: 성공 ${ok}명 / 실패 ${fail}명`)
 }
 async function sendAllSms(){
- const q=state.smsQueue||[];if(!q.length)return alert('고객을 먼저 불러오세요.');
- let ok=0,fail=0;for(let i=0;i<q.length;i++){(await sendSmsReceipt(i,true))?ok++:fail++}
- alert(`일괄전송 결과: 성공 ${ok}명 / 미전송 ${fail}명`);
+ const q=(state.smsQueue||[]).filter(x=>x.status!=='전송완료');if(!q.length)return alert('전송 대기 고객이 없습니다.');
+ if(!confirm(q.length+'명의 저장된 연락처로 정산서 문자를 일괄 전송할까요?'))return;
+ let ok=0,fail=0;for(const x of q){const i=state.smsQueue.indexOf(x);(await sendSmsReceipt(i,true))?ok++:fail++}
+ alert(`일괄전송 결과: 성공 ${ok}명 / 실패 ${fail}명`)
 }
 
 function exportRaw(){let rows=[['시간','유형','원문'],...state.raw.map(x=>[x.time,x.type,x.text])];downloadExcelOrCsv('원본댓글_이중저장.xlsx','원본댓글',rows)}
 function exportBackup(){let b=new Blob([JSON.stringify(state,null,2)],{type:'application/json'}),a=document.createElement('a');a.href=URL.createObjectURL(b);a.download='FIRST_OMS_전체백업_'+Date.now()+'.json';a.click()}
 function saveSettings(){state.settings={...state.settings,bank:bank.value,account:account.value,holder:holder.value,shippingFee:+shippingFee.value||0,kakaoUrl:kakaoUrl.value,smsUrl:smsUrl.value,commentApi:commentApi.value,joinUrl:joinUrl.value,smsApi:smsApi.value,smsSender:smsSender.value};save();alert('계좌·배송비·링크가 저장되었습니다.')}
-function applySettings(){bank.value=state.settings.bank||'';account.value=state.settings.account||'';holder.value=state.settings.holder||'';shippingFee.value=state.settings.shippingFee??4000;kakaoUrl.value=state.settings.kakaoUrl||'';smsUrl.value=state.settings.smsUrl||'';commentApi.value=state.settings.commentApi||'';joinUrl.value=state.settings.joinUrl||((location.protocol.startsWith('http'))?location.origin+'/join.html':'');smsApi.value=state.settings.smsApi||'';smsSender.value=state.settings.smsSender||'';youtubeUrl.value=localStorage.getItem('firstoms_video')||''}
+function applySettings(){state.settings.smsApi='/api/sms/send';bank.value=state.settings.bank||'';account.value=state.settings.account||'';holder.value=state.settings.holder||'';shippingFee.value=state.settings.shippingFee??4000;kakaoUrl.value=state.settings.kakaoUrl||'';smsUrl.value=state.settings.smsUrl||'';commentApi.value=state.settings.commentApi||'';joinUrl.value=state.settings.joinUrl||((location.protocol.startsWith('http'))?location.origin+'/join.html':'');smsApi.value='/api/sms/send';smsSender.value=state.settings.smsSender||'Render 환경변수 사용';youtubeUrl.value=localStorage.getItem('firstoms_video')||''}
 function connectCommentApi(){state.settings.commentApi=commentApi.value;save();alert(commentApi.value?'댓글 API 주소 저장 완료. 실제 서버가 같은 형식으로 댓글을 보내야 자동수집됩니다.':'주소를 입력해 주세요.')}
 function copyJoinUrl(){
  let u=joinUrl.value||((location.protocol.startsWith('http'))?location.origin+'/join.html':'join.html');
