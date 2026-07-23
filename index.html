@@ -111,7 +111,7 @@ table{width:100%;border-collapse:collapse;font-size:13px}th,td{padding:9px 8px;b
         <button class="btn gold" onclick="registerProduct()">상품등록·구간시작</button>
         <input id="extraQty" type="number" style="width:130px" placeholder="추가수량">
         <button class="btn warn" onclick="addStock()">추가수량 반영</button>
-        <button class="btn bad" onclick="closeProduct()">상품마감</button>
+        <button class="btn bad" onclick="closeProduct()">상품마감</button><span id="youtubeSendStatus" class="badge b-warn">유튜브 전송 대기</span>
       </div>
       <div id="currentProduct" class="help" style="margin-top:12px">현재 등록 상품 없음</div><p class="muted">상품번호만 입력하면 이전 등록 상품명·가격·인당 최대수량이 자동으로 불러와집니다. 한정수량은 매 방송마다 새로 입력합니다.</p>
       <hr style="border-color:#2b2f3c;margin:16px 0">
@@ -447,10 +447,63 @@ function rememberProduct(p){
    updatedAt:new Date().toISOString()
  };
 }
-function registerProduct(){let p={id:uid(),no:pNo.value.trim()||String(state.products.length+1),name:pName.value.trim(),price:+pPrice.value,limit:+pLimit.value,max:+pMax.value,sold:0,active:true,createdAt:Date.now()};if(!p.name||!p.price)return alert('상품명과 가격을 입력해 주세요.');state.products.push(p);rememberProduct(p);state.currentProductId=p.id;log('상품등록','#'+p.no+' '+p.name+' / '+money(p.price));save();renderAll()}
+async function postYoutubeMessage(text){
+ const id=videoId(youtubeUrl.value);
+ if(!id)throw new Error('유튜브 라이브 주소를 먼저 입력하고 영상 연결을 눌러주세요.');
+ const r=await fetch('/api/youtube/message',{
+   method:'POST',headers:{'Content-Type':'application/json'},
+   body:JSON.stringify({videoId:id,text})
+ });
+ const j=await r.json();
+ if(!r.ok||!j.ok)throw new Error(j.error||('유튜브 전송 오류 '+r.status));
+ return j
+}
+function productYoutubeText(p){
+ const parts=[`#${p.no} ${p.name} - ${money(p.price)}`];
+ if(p.limit>0)parts.push(`한정 ${p.limit}개`);
+ if(p.max>0)parts.push(`인당 최대 ${p.max}개`);
+ return parts.join(' · ');
+}
+async function registerProduct(){
+ let p={id:uid(),no:pNo.value.trim()||String(state.products.length+1),name:pName.value.trim(),price:+pPrice.value,limit:+pLimit.value,max:+pMax.value,sold:0,active:true,createdAt:Date.now()};
+ if(!p.name||!p.price)return alert('상품명과 가격을 입력해 주세요.');
+ state.products.push(p);rememberProduct(p);state.currentProductId=p.id;
+ log('상품등록','#'+p.no+' '+p.name+' / '+money(p.price));save();renderAll();
+ youtubeSendStatus.textContent='유튜브 전송 중';youtubeSendStatus.className='badge b-info';
+ try{
+   await postYoutubeMessage(productYoutubeText(p));
+   youtubeSendStatus.textContent='유튜브 댓글 등록 완료';youtubeSendStatus.className='badge b-ok';
+ }catch(e){
+   youtubeSendStatus.textContent='유튜브 전송 실패';youtubeSendStatus.className='badge b-bad';
+   alert('상품은 방송실에 등록됐지만 유튜브 댓글 전송은 실패했습니다.\\n'+e.message+'\\n\\n먼저 유튜브 계정 연결을 눌러 승인해 주세요.');
+ }
+}
 function cur(){return state.products.find(p=>p.id===state.currentProductId)}
-function addStock(){let p=cur(),q=+extraQty.value;if(!p||q<=0)return alert('현재 상품과 추가수량을 확인해 주세요.');p.limit+=q;log('추가수량',p.name+' +'+q+'개');save();renderAll()}
-function closeProduct(){let p=cur();if(!p)return;p.active=false;log('상품마감',p.name);save();renderAll()}
+async function addStock(){
+ let p=cur(),q=+extraQty.value;
+ if(!p||q<=0)return alert('현재 상품과 추가수량을 확인해 주세요.');
+ p.limit+=q;log('추가수량',p.name+' +'+q+'개');save();renderAll();
+ try{
+   youtubeSendStatus.textContent='추가수량 전송 중';youtubeSendStatus.className='badge b-info';
+   await postYoutubeMessage(`#${p.no} ${p.name} 추가수량 ${q}개 · 총 한정 ${p.limit}개`);
+   youtubeSendStatus.textContent='추가수량 댓글 완료';youtubeSendStatus.className='badge b-ok';
+ }catch(e){
+   youtubeSendStatus.textContent='추가수량 전송 실패';youtubeSendStatus.className='badge b-bad';
+   alert(e.message);
+ }
+}
+async function closeProduct(){
+ let p=cur();if(!p)return;
+ p.active=false;log('상품마감',p.name);save();renderAll();
+ try{
+   youtubeSendStatus.textContent='마감댓글 전송 중';youtubeSendStatus.className='badge b-info';
+   await postYoutubeMessage(`--마감되었습니다-- #${p.no} ${p.name}`);
+   youtubeSendStatus.textContent='마감댓글 완료';youtubeSendStatus.className='badge b-ok';
+ }catch(e){
+   youtubeSendStatus.textContent='마감댓글 실패';youtubeSendStatus.className='badge b-bad';
+   alert(e.message);
+ }
+}
 function log(type,text){state.raw.push({id:uid(),time:now(),type,text});save()}
 function parseQty(t){let m=t.match(/(\d+)\s*(?:개|ea|EA|x|X)?/);return m?+m[1]:1}
 function normalizeCustomerText(v){return String(v||'').replace(/\s+/g,'').toLowerCase()}

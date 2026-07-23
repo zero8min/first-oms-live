@@ -75,6 +75,23 @@ async function youtubeApi(pathname,params={}){
  }
  return j
 }
+async function youtubeApiPost(pathname,params={},bodyData={}){
+ const token=await youtubeToken();
+ if(!token)throw new Error('유튜브 계정 연결이 필요합니다. API 키만으로는 댓글 작성이 불가능합니다.');
+ const q=new URLSearchParams(params);
+ const r=await fetch('https://www.googleapis.com/youtube/v3/'+pathname+'?'+q.toString(),{
+  method:'POST',
+  headers:{Authorization:'Bearer '+token,'Content-Type':'application/json'},
+  body:JSON.stringify(bodyData)
+ });
+ const j=await r.json();
+ if(!r.ok){
+  const msg=j?.error?.message||j?.error?.errors?.[0]?.reason||('YouTube API '+r.status);
+  const err=new Error(msg);err.status=r.status;throw err
+ }
+ return j
+}
+
 async function liveChatIdForVideo(videoId){
  const j=await youtubeApi('videos',{part:'liveStreamingDetails',id:videoId});
  const item=j.items&&j.items[0];
@@ -124,6 +141,30 @@ const server=http.createServer((req,res)=>{
    }catch(e){res.writeHead(400,{'Content-Type':'text/html; charset=utf-8'});return res.end('<meta charset="utf-8"><h2>유튜브 연결 실패</h2><pre>'+String(e.message).replace(/[&<>]/g,s=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[s]))+'</pre>')}
   })()
  }
+
+ if(u.pathname==='/api/youtube/message'&&req.method==='POST'){
+  return readBody(req).then(async body=>{
+   try{
+    const data=JSON.parse(body||'{}');
+    const videoId=String(data.videoId||'').trim();
+    const text=String(data.text||'').trim();
+    if(!videoId||!text)return json(res,400,{ok:false,error:'방송 ID 또는 댓글 내용이 없습니다.'});
+    const liveChatId=await liveChatIdForVideo(videoId);
+    const result=await youtubeApiPost('liveChat/messages',{part:'snippet'},{
+      snippet:{
+        liveChatId,
+        type:'textMessageEvent',
+        textMessageDetails:{messageText:text.slice(0,200)}
+      }
+    });
+    return json(res,200,{ok:true,id:result.id||'',text});
+   }catch(e){
+    const status=e.status===401||/계정 연결/.test(e.message)?401:500;
+    return json(res,status,{ok:false,error:e.message});
+   }
+  }).catch(e=>json(res,400,{ok:false,error:e.message}))
+ }
+
  if(u.pathname==='/api/youtube/comments'&&req.method==='GET'){
   return (async()=>{
    try{
