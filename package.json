@@ -1,0 +1,8 @@
+{
+  "name": "first-oms-ddaenglive-emergency",
+  "version": "4.1.0",
+  "private": true,
+  "scripts": {
+    "start": "node server.js"
+  }
+}

@@ -1,0 +1,127 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>땡라이브 가입필수</title>
+<style>
+*{box-sizing:border-box}body{margin:0;background:linear-gradient(160deg,#eaf9fb,#dbeef4);font-family:Arial,"Noto Sans KR",sans-serif;color:#182027}
+.wrap{max-width:520px;margin:auto;padding:24px 16px}.card{background:#fff;border-radius:24px;padding:24px;box-shadow:0 18px 55px #4f718233}
+.logo{text-align:center;font-weight:900;font-size:24px}.logo b{color:#b18452}.sub{text-align:center;color:#66727d;margin:8px 0 20px}
+label{font-weight:800;font-size:14px;display:block;margin:14px 0 6px}input,textarea{width:100%;padding:14px;border:1px solid #cfd9df;border-radius:13px;font:inherit}
+.row{display:grid;grid-template-columns:130px 1fr;gap:8px}.agree{display:flex;gap:9px;align-items:flex-start;margin:16px 0;font-size:13px}.agree input{width:20px}
+button{width:100%;border:0;border-radius:15px;padding:16px;background:#ffe000;font-weight:900;font-size:17px;cursor:pointer}.notice{background:#f5f8fa;padding:12px;border-radius:12px;font-size:13px;color:#58636c}.success{display:none;text-align:center;padding:30px 5px}.success h2{color:#118753}
+.postcodeLayer{display:none;position:fixed;inset:0;background:#0008;z-index:9999;padding:18px;align-items:center;justify-content:center}
+.postcodeLayer.show{display:flex}
+.postcodeBox{width:min(520px,100%);height:min(680px,88vh);background:#fff;border-radius:18px;overflow:hidden;box-shadow:0 25px 80px #0008}
+.postcodeHead{height:48px;display:flex;align-items:center;padding:0 12px;border-bottom:1px solid #ddd;font-weight:900}
+.postcodeHead button{margin-left:auto;width:auto;padding:8px 12px;border-radius:10px;background:#17202a;color:#fff;font-size:13px}
+#postcodeEmbed{width:100%;height:calc(100% - 48px)}
+</style>
+</head>
+<body><div class="wrap"><div class="card">
+<div id="formBox">
+ <div class="logo">땡라이브 × FIRST <b>OMS</b></div>
+ <div class="sub">처음 한 번만 등록하면 주문·정산·배송이 빨라집니다.</div>
+ <div id="runStatus" class="notice">방송에서 사용하는 닉네임을 정확하게 입력해 주세요. 주문 댓글과 고객정보를 연결하는 기준입니다.</div>
+ <label>성함 *</label><input id="name" autocomplete="name" placeholder="받는 분 성함">
+ <label>방송 주문 닉네임 *</label><input id="nickname" placeholder="유튜브에서 사용하는 닉네임">
+ <label>연락처 *</label><input id="phone" inputmode="tel" autocomplete="tel" placeholder="010-0000-0000">
+ <label>주소 *</label>
+ <div class="row"><input id="postalCode" placeholder="우편번호"><button type="button" style="padding:12px;font-size:14px;background:#17202a;color:#fff" onclick="findAddress()">주소검색</button></div>
+ <input id="address" style="margin-top:8px" placeholder="기본주소 (검색이 안 되면 직접 입력 가능)">
+ <input id="detailAddress" style="margin-top:8px" placeholder="상세주소"><div id="addressStatus" style="font-size:12px;color:#118753;margin-top:6px"></div>
+ <label>배송메모</label><input id="memo" placeholder="문 앞, 연락 후 배송 등">
+ <div class="agree"><input id="agree" type="checkbox"><span>주문·정산·배송 처리를 위한 개인정보 수집 및 이용에 동의합니다.</span></div>
+ <button onclick="submitJoin()">가입 완료</button><button type="button" style="margin-top:10px;background:#17202a;color:#fff" onclick="testServerConnection()">서버 연결 확인</button>
+</div>
+<div id="success" class="success"><h2>가입이 완료되었습니다</h2><p>이제 방송에서 등록하신 닉네임으로 주문해 주세요.</p><button onclick="location.href='http://pf.kakao.com/_DEPfX'">땡라이브 채널로 돌아가기</button></div>
+</div></div>
+
+<div id="postcodeLayer" class="postcodeLayer">
+  <div class="postcodeBox">
+    <div class="postcodeHead">주소검색
+      <button type="button" onclick="closePostcode()">닫기</button>
+    </div>
+    <div id="postcodeEmbed"></div>
+  </div>
+</div>
+
+<script src="https://t1.daumcdn.net/mapjsapi/bundle/postcode/prod/postcode.v2.js"></script>
+<script>
+function el(id){return document.getElementById(id)}
+function closePostcode(){
+ const layer=el('postcodeLayer');
+ layer.classList.remove('show');
+ el('postcodeEmbed').innerHTML='';
+}
+function findAddress(){
+ const postal=el('postalCode'),base=el('address'),detail=el('detailAddress');
+ if(!window.daum||!window.daum.Postcode){
+   return alert('주소검색을 불러오지 못했습니다. 인터넷 연결을 확인하거나 기본주소를 직접 입력해 주세요.');
+ }
+ const layer=el('postcodeLayer');
+ const embed=el('postcodeEmbed');
+ layer.classList.add('show');
+ embed.innerHTML='';
+ try{
+   const postcode=new window.daum.Postcode({
+     oncomplete:function(d){
+       postal.value=d.zonecode||'';
+       base.value=d.roadAddress||d.jibunAddress||'';
+       const st=el('addressStatus');
+       if(st)st.textContent='주소 선택 완료 · 상세주소를 입력해 주세요.';
+       closePostcode();
+       setTimeout(function(){
+         detail.focus();
+         detail.scrollIntoView({behavior:'smooth',block:'center'});
+       },100);
+     },
+     onresize:function(size){
+       embed.style.height=Math.min(size.height||600,620)+'px';
+     },
+     width:'100%',
+     height:'100%'
+   });
+   postcode.embed(embed);
+ }catch(e){
+   console.error(e);
+   closePostcode();
+   alert('주소검색 실행 중 오류가 발생했습니다. 기본주소를 직접 입력해 주세요.');
+ }
+}
+async function submitJoin(){
+ const data={name:el('name').value.trim(),nickname:el('nickname').value.trim(),phone:el('phone').value.trim(),postalCode:el('postalCode').value.trim(),address:el('address').value.trim(),detailAddress:el('detailAddress').value.trim(),memo:el('memo').value.trim(),joinedAt:new Date().toLocaleString('ko-KR'),source:'가입폼'};
+ if(!data.name||!data.nickname||!data.phone||!data.address)return alert('성함, 닉네임, 연락처, 기본주소를 모두 입력해 주세요.');
+ if(!el('agree').checked)return alert('개인정보 수집 및 이용에 동의해 주세요.');
+ try{
+  const r=await fetch('/api/customers',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)});
+  if(!r.ok)throw new Error('서버 오류 '+r.status);
+  el('formBox').style.display='none';el('success').style.display='block';
+ }catch(e){alert('가입정보 저장 실패: '+e.message+'\\n실행하기.command로 서버를 켠 뒤 localhost 주소에서 접속해 주세요.')}
+}
+async function testServerConnection(){
+ try{
+   const r=await fetch('/api/health',{cache:'no-store'});
+   if(!r.ok)throw new Error('HTTP '+r.status);
+   const j=await r.json();
+   alert(j.ok?'서버 연결이 정상입니다. 가입 완료 버튼을 눌러주세요.':'서버 연결을 확인해 주세요.');
+ }catch(e){
+   alert('서버가 연결되지 않았습니다. join.html을 직접 열지 말고 실행하기.command로 실행해 주세요.');
+ }
+}
+window.addEventListener('keydown',function(e){
+ if(e.key==='Escape')closePostcode();
+});
+window.addEventListener('DOMContentLoaded',function(){
+ const s=document.getElementById('runStatus');
+ if(location.protocol==='file:'){
+   s.style.background='#fff2cc';
+   s.style.color='#7a5200';
+   s.innerHTML='<b>현재 파일 직접 실행 중</b><br>주소검색·고객DB 자동연동을 위해 폴더의 <b>실행하기.command</b>를 실행하고 <b>http://localhost:3000/join.html</b>로 접속하세요. 기본주소는 직접 입력할 수 있습니다.';
+ }else{
+   s.style.background='#e9fff1';
+   s.style.color='#166534';
+   s.innerHTML='<b>서버 연결 모드</b><br>가입 완료 시 관리자 고객DB와 정산실에 자동 반영됩니다.';
+ }
+});
+</script></body></html>
