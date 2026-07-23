@@ -47,6 +47,11 @@ table{width:100%;border-collapse:collapse;font-size:13px}th,td{padding:9px 8px;b
 
 @media(max-width:950px){.grid,.grid3{grid-template-columns:1fr}nav{overflow:auto}.receipt{width:100%}}
 @media print{header,nav,.no-print{display:none!important}body{background:white}.page{display:none!important}.page.printing{display:block!important}.card{border:0;box-shadow:none}.receipt{page-break-after:always;width:360px;margin:0 auto}}
+.liveCommentBox{height:270px;overflow:auto;border:1px solid #363b4a;border-radius:12px;background:#0d0f15;padding:8px;margin-bottom:10px}
+.liveCommentItem{display:grid;grid-template-columns:90px 150px 1fr 76px;gap:8px;align-items:center;padding:9px 8px;border-bottom:1px solid #242936;font-size:14px}
+.liveCommentItem:last-child{border-bottom:0}.liveCommentTime{color:#8d95a8}.liveCommentNick{font-weight:800;color:#ffd26f;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.liveCommentText{color:#f4f6fb;word-break:break-word}.liveCommentPick{padding:6px 9px;border:0;border-radius:8px;cursor:pointer;font-weight:800}
+.liveCommentEmpty{padding:90px 15px;text-align:center;color:#8d95a8}
+@media(max-width:800px){.liveCommentItem{grid-template-columns:70px 110px 1fr}.liveCommentPick{grid-column:3}}
 </style>
 </head>
 <body>
@@ -82,12 +87,7 @@ table{width:100%;border-collapse:collapse;font-size:13px}th,td{padding:9px 8px;b
         <input id="youtubeUrl" class="grow" placeholder="유튜브 영상/라이브 URL">
         <button class="btn info" onclick="loadVideo()">영상 연결</button>
       </div><br>
-      <div class="videoChatGrid">
-        <div class="videoWrap"><iframe id="videoFrame" allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen></iframe></div>
-        <div id="chatContainer" class="chatEmpty">
-          유튜브 라이브 링크를 입력하고 영상 연결을 누르면<br>이곳에 실시간 채팅이 표시됩니다.
-        </div>
-      </div>
+      <div class="videoWrap"><iframe id="videoFrame" allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen></iframe></div>
       <div class="row" style="margin-top:10px">
         <span id="chatStatus" class="badge b-warn">채팅 대기</span>
         <button class="btn gold" onclick="connectYoutubeAccount()">유튜브 계정 연결</button>
@@ -115,7 +115,10 @@ table{width:100%;border-collapse:collapse;font-size:13px}th,td{padding:9px 8px;b
       </div>
       <div id="currentProduct" class="help" style="margin-top:12px">현재 등록 상품 없음</div><p class="muted">상품번호만 입력하면 이전 등록 상품명·가격·인당 최대수량이 자동으로 불러와집니다. 한정수량은 매 방송마다 새로 입력합니다.</p>
       <hr style="border-color:#2b2f3c;margin:16px 0">
-      <h3>댓글/주문 비상 입력</h3>
+      <h3>유튜브 실시간 댓글 · 주문 비상 입력</h3>
+      <div id="liveCommentFeed" class="liveCommentBox">
+        <div class="liveCommentEmpty">댓글 자동수집 시작을 누르면<br>유튜브 댓글이 여기에 바로 표시됩니다.</div>
+      </div>
       <div class="row">
         <input id="cNick" placeholder="닉네임" oninput="previewCustomerMatch()" onblur="applyCustomerMatch()">
         <input id="cText" class="grow" placeholder="예: 1번 2개 / 1개 추가 / 전체취소 / 2개로 변경 / 선물이요">
@@ -288,7 +291,7 @@ table{width:100%;border-collapse:collapse;font-size:13px}th,td{padding:9px 8px;b
 
 <script>
 const KEY='firstoms_emergency_v2';
-let state={products:[],productCatalog:{},orders:[],raw:[],customers:{},paymentStatus:{},smsQueue:[],smsPreviewImages:{},settings:{bank:'',account:'',holder:'',shippingFee:4000,kakaoUrl:'http://pf.kakao.com/_DEPfX',smsUrl:'',commentApi:'',joinUrl:'',smsApi:'',smsSender:''},currentProductId:null,broadcastStartedAt:null,currentReceiptCustomer:null,youtubeSeen:{},youtubeNextPageToken:'',youtubePolling:false};
+let state={products:[],productCatalog:{},orders:[],raw:[],customers:{},paymentStatus:{},smsQueue:[],smsPreviewImages:{},settings:{bank:'',account:'',holder:'',shippingFee:4000,kakaoUrl:'http://pf.kakao.com/_DEPfX',smsUrl:'',commentApi:'',joinUrl:'',smsApi:'',smsSender:''},currentProductId:null,broadcastStartedAt:null,currentReceiptCustomer:null,youtubeSeen:{},youtubeNextPageToken:'',youtubePolling:false,youtubeLiveComments:[]};
 function now(){return new Date().toLocaleTimeString('ko-KR',{hour12:false})}
 function uid(){return Date.now().toString(36)+Math.random().toString(36).slice(2,7)}
 function money(n){return Number(n||0).toLocaleString('ko-KR')+'원'}
@@ -307,19 +310,12 @@ function youtubeEmbedDomain(){
  const h=location.hostname||'localhost';
  return h==='127.0.0.1'?'localhost':h;
 }
-function loadYoutubeChat(id){
- const domain=youtubeEmbedDomain();
- chatContainer.className='chatWrap';
- chatContainer.innerHTML=`<iframe id="youtubeChatFrame" src="https://www.youtube.com/live_chat?v=${encodeURIComponent(id)}&embed_domain=${encodeURIComponent(domain)}" allow="clipboard-write"></iframe>`;
- chatStatus.textContent='실시간 채팅 연결 중';
- chatStatus.className='badge b-info';
- setTimeout(()=>{chatStatus.textContent='실시간 채팅 보기';chatStatus.className='badge b-ok'},1200);
-}
+function loadYoutubeChat(id){}
 function loadVideo(){
  let id=videoId(youtubeUrl.value);
  if(!id)return alert('유튜브 라이브 주소를 확인해 주세요.');
  videoFrame.src='https://www.youtube.com/embed/'+id+'?autoplay=1';
- loadYoutubeChat(id);
+ 
  localStorage.setItem('firstoms_video',youtubeUrl.value)
 }
 function openYoutubeChatWindow(){
@@ -354,19 +350,40 @@ async function checkYoutubeStatus(){
  }catch(e){}
  return false;
 }
+function escapeHtml(v){return String(v??'').replace(/[&<>"']/g,s=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[s]))}
+function pickYoutubeComment(id){
+ const m=(state.youtubeLiveComments||[]).find(x=>x.id===id);if(!m)return;
+ cNick.value=m.author||'';cText.value=m.text||'';
+ previewCustomerMatch();cText.focus();
+}
+function renderYoutubeLiveComments(){
+ const box=document.getElementById('liveCommentFeed');if(!box)return;
+ const rows=(state.youtubeLiveComments||[]).slice(-100).reverse();
+ if(!rows.length){box.innerHTML='<div class="liveCommentEmpty">댓글 자동수집 시작을 누르면<br>유튜브 댓글이 여기에 바로 표시됩니다.</div>';return}
+ box.innerHTML=rows.map(m=>`<div class="liveCommentItem">
+  <span class="liveCommentTime">${escapeHtml((m.publishedAt||'').slice(11,19)||m.time||'')}</span>
+  <span class="liveCommentNick">${escapeHtml(m.author||'유튜브고객')}</span>
+  <span class="liveCommentText">${escapeHtml(m.text||'')}</span>
+  <button class="liveCommentPick" onclick="pickYoutubeComment('${m.id}')">선택</button>
+ </div>`).join('');
+}
 function ingestYoutubeMessage(m){
  state.youtubeSeen=state.youtubeSeen||{};
  if(state.youtubeSeen[m.id])return;
  state.youtubeSeen[m.id]=Date.now();
  const nick=m.author||'유튜브고객',text=m.text||'';
  if(!text)return;
- if(youtubeAutoOrder.checked){
+ state.youtubeLiveComments=state.youtubeLiveComments||[];
+ state.youtubeLiveComments.push({...m,time:now()});
+ if(state.youtubeLiveComments.length>200)state.youtubeLiveComments=state.youtubeLiveComments.slice(-200);
+ state.raw.push({id:uid(),time:now(),type:'유튜브댓글',text:nick+' : '+text});
+ renderYoutubeLiveComments();
+ // 채널 소유자/관리자가 쓴 상품 안내 댓글은 주문으로 잡지 않음
+ if(youtubeAutoOrder.checked && !m.isOwner && !m.isModerator){
    cNick.value=nick;cText.value=text;
    processComment();
- }else{
-   state.raw.push({id:uid(),time:now(),type:'유튜브댓글',text:nick+' : '+text});
-   save();renderAll();
  }
+ save();renderAll();
 }
 async function pollYoutubeComments(){
  if(!state.youtubePolling)return;
@@ -387,7 +404,7 @@ async function pollYoutubeComments(){
    (j.messages||[]).forEach(ingestYoutubeMessage);
    state.youtubeNextPageToken=j.nextPageToken||state.youtubeNextPageToken||'';
    save();
-   chatStatus.textContent='댓글 자동수집 중 · '+(j.messages||[]).length+'건 확인';
+   chatStatus.textContent='실시간 댓글 연결됨 · 새 댓글 '+(j.messages||[]).length+'건';
    chatStatus.className='badge b-ok';
    const wait=Math.max(2000,Math.min(10000,j.pollingIntervalMillis||3500));
    youtubePollTimer=setTimeout(pollYoutubeComments,wait);
@@ -527,7 +544,7 @@ function startNewBroadcast(){
  state.paymentStatus={};state.smsQueue=[];state.smsPreviewImages={};state.currentReceiptCustomer=null;
  state.broadcastStartedAt=new Date().toISOString();state.youtubeSeen={};state.youtubeNextPageToken='';stopYoutubeComments();
  localStorage.removeItem('firstoms_video');
- youtubeUrl.value='';videoFrame.src='';chatContainer.className='chatEmpty';chatContainer.innerHTML='유튜브 라이브 링크를 입력하고 영상 연결을 누르면<br>이곳에 실시간 채팅이 표시됩니다.';chatStatus.textContent='채팅 대기';chatStatus.className='badge b-warn';
+ youtubeUrl.value='';videoFrame.src='';chatStatus.textContent='채팅 대기';chatStatus.className='badge b-warn';
  pNo.value='';pName.value='';pPrice.value='';pLimit.value='';pMax.value='';extraQty.value='';
  cNick.value='';cText.value='';receiptArea.innerHTML='';packingArea.innerHTML='';smsPreviewArea.innerHTML='';
  save();renderAll();
@@ -553,7 +570,7 @@ function customer(n){
  return state.customers[n]
 }
 function updateCustomer(n,f,v){customer(n)[f]=v;save()}
-function renderAll(){let p=cur();currentProduct.innerHTML=p?`<b>#${esc(p.no)} ${esc(p.name)}</b> · ${money(p.price)} · 판매 ${p.sold}/${p.limit||'∞'} · 인당 ${p.max||'∞'}개`:'현재 등록 상품 없음';
+function renderAll(){renderYoutubeLiveComments();let p=cur();currentProduct.innerHTML=p?`<b>#${esc(p.no)} ${esc(p.name)}</b> · ${money(p.price)} · 판매 ${p.sold}/${p.limit||'∞'} · 인당 ${p.max||'∞'}개`:'현재 등록 상품 없음';
  let ok=state.orders.filter(o=>o.status==='ok').length,warn=state.raw.filter(x=>/확인필요/.test(x.type+x.text)).length,bad=state.orders.filter(o=>o.status!=='ok').length;kOk.textContent=ok;kWarn.textContent=warn;kBad.textContent=bad;
  orderBody.innerHTML=[...state.orders].reverse().map(o=>`<tr><td><span class="badge ${o.status==='ok'?'b-ok':o.status==='cancel'?'b-bad':'b-warn'}">${o.status==='ok'?'정상접수':o.status}</span></td><td>${o.time}</td><td>${esc(o.nick)}${o.gift?'<br><span class="badge b-info">선물</span>':''}</td><td>${esc(o.product)}</td><td>${o.qty}</td><td>${money(o.billable?o.qty*o.price:0)}</td><td>${esc(o.raw)}</td><td><button class="btn" onclick="editOrder('${o.id}')">수정</button></td></tr>`).join('');
  rawLog.innerHTML=[...state.raw].reverse().map(x=>`<div>[${x.time}] <b>${esc(x.type)}</b> ${esc(x.text)}</div>`).join('');
@@ -602,7 +619,12 @@ function printWindowWithReceipts(title,body){
  const w=window.open('','_blank','width=560,height=800');
  if(!w)return alert('팝업이 차단되었습니다. 브라우저에서 팝업을 허용해 주세요.');
  w.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>${title}</title>
- <style>body{margin:0;padding:18px;background:#fff;font-family:Arial,sans-serif}.receipt{width:360px;margin:0 auto 20px;background:#fff;color:#111;padding:22px;page-break-after:always}.receipt h2{text-align:center}.dash{border-top:1px dashed #444;margin:10px 0}.receipt table{width:100%;font-size:12px}.receipt td{padding:5px 0}.sum{font-size:18px;font-weight:900;text-align:right}.qr{text-align:center;margin-top:12px}@media print{body{padding:0}.receipt{margin:0 auto}}</style>
+ <style>body{margin:0;padding:18px;background:#fff;font-family:Arial,sans-serif}.receipt{width:360px;margin:0 auto 20px;background:#fff;color:#111;padding:22px;page-break-after:always}.receipt h2{text-align:center}.dash{border-top:1px dashed #444;margin:10px 0}.receipt table{width:100%;font-size:12px}.receipt td{padding:5px 0}.sum{font-size:18px;font-weight:900;text-align:right}.qr{text-align:center;margin-top:12px}@media print{body{padding:0}.receipt{margin:0 auto}}.liveCommentBox{height:270px;overflow:auto;border:1px solid #363b4a;border-radius:12px;background:#0d0f15;padding:8px;margin-bottom:10px}
+.liveCommentItem{display:grid;grid-template-columns:90px 150px 1fr 76px;gap:8px;align-items:center;padding:9px 8px;border-bottom:1px solid #242936;font-size:14px}
+.liveCommentItem:last-child{border-bottom:0}.liveCommentTime{color:#8d95a8}.liveCommentNick{font-weight:800;color:#ffd26f;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.liveCommentText{color:#f4f6fb;word-break:break-word}.liveCommentPick{padding:6px 9px;border:0;border-radius:8px;cursor:pointer;font-weight:800}
+.liveCommentEmpty{padding:90px 15px;text-align:center;color:#8d95a8}
+@media(max-width:800px){.liveCommentItem{grid-template-columns:70px 110px 1fr}.liveCommentPick{grid-column:3}}
+</style>
  </head><body>${body}<script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.4/build/qrcode.min.js"><\/script>
  <script>window.onload=function(){document.querySelectorAll('.qrCanvas').forEach(function(c){if(window.QRCode)QRCode.toCanvas(c,c.dataset.url,{width:110,margin:1},function(){});});setTimeout(function(){window.print()},600)};<\/script></body></html>`);
  w.document.close()
@@ -665,7 +687,12 @@ function printPacking(){
  .signRow{display:flex;justify-content:space-between;margin-top:22px;font-weight:700}
  .qr{text-align:center;margin-top:18px;font-size:11px}
  @media print{body{margin:0}.packingSheet{break-after:page}}
- </style></head><body>${body}
+ .liveCommentBox{height:270px;overflow:auto;border:1px solid #363b4a;border-radius:12px;background:#0d0f15;padding:8px;margin-bottom:10px}
+.liveCommentItem{display:grid;grid-template-columns:90px 150px 1fr 76px;gap:8px;align-items:center;padding:9px 8px;border-bottom:1px solid #242936;font-size:14px}
+.liveCommentItem:last-child{border-bottom:0}.liveCommentTime{color:#8d95a8}.liveCommentNick{font-weight:800;color:#ffd26f;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.liveCommentText{color:#f4f6fb;word-break:break-word}.liveCommentPick{padding:6px 9px;border:0;border-radius:8px;cursor:pointer;font-weight:800}
+.liveCommentEmpty{padding:90px 15px;text-align:center;color:#8d95a8}
+@media(max-width:800px){.liveCommentItem{grid-template-columns:70px 110px 1fr}.liveCommentPick{grid-column:3}}
+</style></head><body>${body}
  <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.4/build/qrcode.min.js"><\/script>
  <script>window.onload=function(){document.querySelectorAll('.qrCanvas').forEach(function(c){if(window.QRCode)QRCode.toCanvas(c,c.dataset.url,{width:105,margin:1},function(){});});setTimeout(function(){window.print()},600)};<\/script>
  </body></html>`);

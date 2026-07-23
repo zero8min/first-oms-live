@@ -178,7 +178,9 @@ const server=http.createServer((req,res)=>{
       id:x.id,author:x.authorDetails?.displayName||'유튜브고객',
       authorChannelId:x.authorDetails?.channelId||'',
       text:x.snippet?.displayMessage||x.snippet?.textMessageDetails?.messageText||'',
-      publishedAt:x.snippet?.publishedAt||''
+      publishedAt:x.snippet?.publishedAt||'',
+      isOwner:!!x.authorDetails?.isChatOwner,
+      isModerator:!!x.authorDetails?.isChatModerator
     }));
     return json(res,200,{ok:true,liveChatId,messages,nextPageToken:j.nextPageToken||'',pollingIntervalMillis:j.pollingIntervalMillis||3500})
    }catch(e){
