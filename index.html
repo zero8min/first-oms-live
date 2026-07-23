@@ -82,8 +82,17 @@ table{width:100%;border-collapse:collapse;font-size:13px}th,td{padding:9px 8px;b
         <input id="youtubeUrl" class="grow" placeholder="유튜브 영상/라이브 URL">
         <button class="btn info" onclick="loadVideo()">영상 연결</button>
       </div><br>
-      <div class="videoWrap"><iframe id="videoFrame" allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen></iframe></div>
-      <p class="muted">유튜브 주소를 넣으면 이 화면 안에서 영상이 재생됩니다. 댓글 자동수집 서버 주소는 설정에서 연결합니다.</p>
+      <div class="videoChatGrid">
+        <div class="videoWrap"><iframe id="videoFrame" allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen></iframe></div>
+        <div id="chatContainer" class="chatEmpty">
+          유튜브 라이브 링크를 입력하고 영상 연결을 누르면<br>이곳에 실시간 채팅이 표시됩니다.
+        </div>
+      </div>
+      <div class="row" style="margin-top:10px">
+        <span id="chatStatus" class="badge b-warn">채팅 대기</span>
+        <button class="btn info" onclick="openYoutubeChatWindow()">유튜브 채팅 새 창으로 열기</button>
+      </div>
+      <p class="muted">실시간 채팅 보기 기능입니다. 주문 자동수집과는 별개이며, 채팅을 보면서 오른쪽 비상 입력으로 주문을 접수할 수 있습니다.</p>
     </div>
     <div class="card">
       <h2>현재 상품 등록·추가수량</h2>
@@ -153,7 +162,7 @@ table{width:100%;border-collapse:collapse;font-size:13px}th,td{padding:9px 8px;b
       <button class="btn" onclick="selectAll('shipChecks',false)">전체해제</button>
       <button class="btn info" onclick="showPackingExample()">포장리스트 예시</button>
       <button class="btn ok" onclick="exportShippingExcel()">택배 파일접수 엑셀 저장</button>
-      <button class="btn info" onclick="printPacking()">선택 포장리스트+QR 출력</button>
+      <button class="btn info" onclick="printPacking()">선택 검수표만 출력</button>
     </div>
     <p class="muted">받는분 이름·주소·연락처가 자동저장됩니다. 선물 주문은 결제자와 수령자를 분리해 처리합니다.</p>
     <div class="tableWrap"><table><thead><tr><th><input type="checkbox" onchange="selectAll('shipChecks',this.checked)"></th><th>주문자/수령자</th><th>연락처</th><th>주소</th><th>상품</th><th>포장</th></tr></thead><tbody id="shipBody"></tbody></table></div>
@@ -284,13 +293,36 @@ function save(){localStorage.setItem(KEY,JSON.stringify(state));document.getElem
 async function load(){
  let x=localStorage.getItem(KEY);
  if(x)try{state=JSON.parse(x)}catch(e){}
- applySettings();renderAll();setTimeout(()=>{if(window.pNo){pNo.addEventListener('input',autofillProductByNo);pNo.addEventListener('change',autofillProductByNo)}},0);
+ applySettings();if(youtubeUrl.value){setTimeout(loadVideo,100)}renderAll();setTimeout(()=>{if(window.pNo){pNo.addEventListener('input',autofillProductByNo);pNo.addEventListener('change',autofillProductByNo)}},0);
  await syncCustomers(true);
  setInterval(()=>syncCustomers(true),5000);
 }
 document.querySelectorAll('nav button').forEach(b=>b.onclick=()=>{document.querySelectorAll('nav button').forEach(x=>x.classList.remove('active'));b.classList.add('active');document.querySelectorAll('.page').forEach(x=>x.classList.remove('active'));document.getElementById(b.dataset.page).classList.add('active');renderAll()})
 function videoId(url){let m=String(url).match(/(?:youtu\.be\/|v=|live\/|embed\/)([\w-]{6,})/);return m?m[1]:''}
-function loadVideo(){let id=videoId(youtubeUrl.value);if(!id)return alert('유튜브 주소를 확인해 주세요.');videoFrame.src='https://www.youtube.com/embed/'+id+'?autoplay=1';localStorage.setItem('firstoms_video',youtubeUrl.value)}
+function youtubeEmbedDomain(){
+ const h=location.hostname||'localhost';
+ return h==='127.0.0.1'?'localhost':h;
+}
+function loadYoutubeChat(id){
+ const domain=youtubeEmbedDomain();
+ chatContainer.className='chatWrap';
+ chatContainer.innerHTML=`<iframe id="youtubeChatFrame" src="https://www.youtube.com/live_chat?v=${encodeURIComponent(id)}&embed_domain=${encodeURIComponent(domain)}" allow="clipboard-write"></iframe>`;
+ chatStatus.textContent='실시간 채팅 연결 중';
+ chatStatus.className='badge b-info';
+ setTimeout(()=>{chatStatus.textContent='실시간 채팅 보기';chatStatus.className='badge b-ok'},1200);
+}
+function loadVideo(){
+ let id=videoId(youtubeUrl.value);
+ if(!id)return alert('유튜브 라이브 주소를 확인해 주세요.');
+ videoFrame.src='https://www.youtube.com/embed/'+id+'?autoplay=1';
+ loadYoutubeChat(id);
+ localStorage.setItem('firstoms_video',youtubeUrl.value)
+}
+function openYoutubeChatWindow(){
+ const id=videoId(youtubeUrl.value);
+ if(!id)return alert('먼저 유튜브 라이브 주소를 입력해 주세요.');
+ window.open('https://www.youtube.com/live_chat?v='+encodeURIComponent(id),'_blank','width=500,height=800')
+}
 function autofillProductByNo(){
  const no=pNo.value.trim();
  if(!no)return;
@@ -339,7 +371,7 @@ function startNewBroadcast(){
  state.paymentStatus={};state.smsQueue=[];state.smsPreviewImages={};state.currentReceiptCustomer=null;
  state.broadcastStartedAt=new Date().toISOString();
  localStorage.removeItem('firstoms_video');
- youtubeUrl.value='';videoFrame.src='';
+ youtubeUrl.value='';videoFrame.src='';chatContainer.className='chatEmpty';chatContainer.innerHTML='유튜브 라이브 링크를 입력하고 영상 연결을 누르면<br>이곳에 실시간 채팅이 표시됩니다.';chatStatus.textContent='채팅 대기';chatStatus.className='badge b-warn';
  pNo.value='';pName.value='';pPrice.value='';pLimit.value='';pMax.value='';extraQty.value='';
  cNick.value='';cText.value='';receiptArea.innerHTML='';packingArea.innerHTML='';smsPreviewArea.innerHTML='';
  save();renderAll();
@@ -431,7 +463,58 @@ function printSelectedReceipts(){let ns=selected('settleChecks');if(!ns.length)r
 function renderShipping(){let receivers={};activeOrders().forEach(o=>{let r=o.receiver||o.nick;if(!receivers[r])receivers[r]={receiver:r,payer:o.payer||o.nick,items:[]};receivers[r].items.push(o)});shipBody.innerHTML=Object.values(receivers).map(g=>{let c=customer(g.receiver);return `<tr><td><input class="shipChecks" type="checkbox" value="${esc(g.receiver)}"></td><td><b>${esc(g.receiver)}</b>${g.payer!==g.receiver?`<br><span class="badge b-info">선물: 결제 ${esc(g.payer)}</span>`:''}<br><input value="${esc(c.name)}" onchange="updateCustomer('${esc(g.receiver)}','name',this.value)" placeholder="받는 분"></td><td><input value="${esc(c.phone)}" onchange="updateCustomer('${esc(g.receiver)}','phone',this.value)" placeholder="연락처"></td><td><input value="${esc(c.address)}" onchange="updateCustomer('${esc(g.receiver)}','address',this.value)" placeholder="주소"></td><td>${g.items.map(o=>esc(o.product)+' × '+o.qty).join('<br>')}</td><td><span class="badge b-warn">대기</span></td></tr>`}).join('')}
 function shippingRows(ns){let rows=[['받는분','전화번호','주소','상품명/수량','배송메모','주문자']];let rec={};activeOrders().forEach(o=>{let r=o.receiver||o.nick;if(!rec[r])rec[r]={receiver:r,payer:o.payer||o.nick,items:[]};rec[r].items.push(o)});Object.values(rec).filter(g=>ns.includes(g.receiver)).forEach(g=>{let c=customer(g.receiver);rows.push([c.name||g.receiver,c.phone,[c.postalCode,c.address,c.detailAddress].filter(Boolean).join(' '),g.items.map(o=>o.product+' '+o.qty+'개').join(' / '),c.memo,g.payer])});return rows}
 function exportShippingExcel(){let ns=selected('shipChecks');if(!ns.length)return alert('고객을 선택해 주세요.');downloadExcelOrCsv('CJ_택배파일접수.xlsx','택배접수',shippingRows(ns))}
-function printPacking(){let ns=selected('shipChecks');if(!ns.length)return alert('고객을 선택해 주세요.');packingArea.innerHTML=ns.map(n=>{let c=customer(n),items=activeOrders().filter(o=>(o.receiver||o.nick)===n);return `<div class="receipt"><h2>포장 검수표</h2><div class="dash"></div><b>${esc(c.name||n)}</b><br>${esc(c.phone)}<br>${esc(c.address)}<div class="dash"></div>${items.map(o=>`□ ${esc(o.product)} × ${o.qty}`).join('<br>')}<div class="qr"><canvas class="qrCanvas" data-url="${esc(state.settings.kakaoUrl||location.href)}"></canvas><div style="font-size:11px">고객확인 QR</div></div></div>`}).join('');packingArea.style.display='block';drawQrs();document.querySelectorAll('.page').forEach(x=>x.classList.remove('printing'));ship.classList.add('printing');setTimeout(()=>window.print(),200)}
+function packingHtml(n){
+ const c=customer(n),items=activeOrders().filter(o=>(o.receiver||o.nick)===n);
+ const fullAddr=[c.postalCode,c.address,c.detailAddress].filter(Boolean).join(' ');
+ return `<div class="packingSheet">
+   <h2>포장 검수표</h2>
+   <div class="dash"></div>
+   <table class="infoTable">
+    <tr><th>받는 분</th><td>${esc(c.name||n)}</td></tr>
+    <tr><th>닉네임</th><td>${esc(n)}</td></tr>
+    <tr><th>연락처</th><td>${esc(c.phone||'미입력')}</td></tr>
+    <tr><th>주소</th><td>${esc(fullAddr||'미입력')}</td></tr>
+    <tr><th>배송메모</th><td>${esc(c.memo||'')}</td></tr>
+   </table>
+   <div class="dash"></div>
+   <table class="itemTable">
+    <thead><tr><th>검수</th><th>상품명</th><th>수량</th></tr></thead>
+    <tbody>${items.map(o=>`<tr><td class="check">□</td><td>${esc(o.product)}</td><td>${o.qty}</td></tr>`).join('')}</tbody>
+   </table>
+   <div class="checkSummary">총 상품종류 ${items.length}종 · 총 수량 ${items.reduce((s,o)=>s+(+o.qty||0),0)}개</div>
+   <div class="signRow"><span>포장자: __________</span><span>최종검수: __________</span></div>
+   <div class="qr"><canvas class="qrCanvas" data-url="${esc(state.settings.kakaoUrl||location.href)}"></canvas><div>고객확인 QR</div></div>
+ </div>`
+}
+function printPacking(){
+ const ns=selected('shipChecks');
+ if(!ns.length)return alert('출력할 고객을 선택해 주세요.');
+ const body=ns.map(packingHtml).join('');
+ const w=window.open('','_blank','width=760,height=900');
+ if(!w)return alert('팝업이 차단되었습니다. 브라우저에서 팝업 허용 후 다시 눌러주세요.');
+ w.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>포장 검수표 출력</title>
+ <style>
+ @page{size:A4;margin:12mm}
+ *{box-sizing:border-box}body{margin:0;background:#fff;color:#111;font-family:Arial,"Apple SD Gothic Neo",sans-serif}
+ .packingSheet{width:100%;max-width:760px;margin:0 auto;padding:8px 4px;page-break-after:always}
+ .packingSheet:last-child{page-break-after:auto}
+ h2{text-align:center;margin:0 0 12px;font-size:24px}
+ .dash{border-top:1px dashed #555;margin:12px 0}
+ table{width:100%;border-collapse:collapse}
+ .infoTable th,.infoTable td{border:1px solid #bbb;padding:8px;font-size:13px;text-align:left}
+ .infoTable th{width:90px;background:#f3f3f3}
+ .itemTable th,.itemTable td{border:1px solid #777;padding:10px;font-size:14px}
+ .itemTable th{background:#eee}.check{width:54px;text-align:center;font-size:22px}
+ .checkSummary{text-align:right;font-weight:700;margin-top:10px}
+ .signRow{display:flex;justify-content:space-between;margin-top:22px;font-weight:700}
+ .qr{text-align:center;margin-top:18px;font-size:11px}
+ @media print{body{margin:0}.packingSheet{break-after:page}}
+ </style></head><body>${body}
+ <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.4/build/qrcode.min.js"><\/script>
+ <script>window.onload=function(){document.querySelectorAll('.qrCanvas').forEach(function(c){if(window.QRCode)QRCode.toCanvas(c,c.dataset.url,{width:105,margin:1},function(){});});setTimeout(function(){window.print()},600)};<\/script>
+ </body></html>`);
+ w.document.close()
+}
 
 async function syncCustomers(silent){
  try{
