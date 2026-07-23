@@ -93,10 +93,10 @@ table{width:100%;border-collapse:collapse;font-size:13px}th,td{padding:9px 8px;b
         <button class="btn gold" onclick="connectYoutubeAccount()">유튜브 계정 연결</button>
         <button class="btn ok" onclick="startYoutubeComments()">댓글 자동수집 시작</button>
         <button class="btn bad" onclick="stopYoutubeComments()">댓글수집 중지</button>
-        <label class="badge b-info"><input id="youtubeAutoOrder" type="checkbox" checked> 새 댓글 자동주문</label>
+        <label class="badge b-info"><input id="youtubeAutoOrder" type="checkbox" checked> 주문형식 댓글만 자동접수</label>
         <button class="btn info" onclick="openYoutubeChatWindow()">유튜브 채팅 새 창으로 열기</button>
       </div>
-      <p class="muted">유튜브 계정 연결 후 댓글 자동수집을 시작하면 새 댓글이 원본댓글에 표시되고, 자동주문 체크 시 현재 상품 주문으로 즉시 접수됩니다.</p>
+      <p class="muted">상품등록 이후 댓글만 봅니다. 2, 2개, x2, 1번2개처럼 명확한 주문형식만 접수하며 가격·전화번호·관리자 글·일상 대화는 주문에서 제외합니다.</p>
     </div>
     <div class="card">
       <h2>현재 상품 등록·추가수량</h2>
@@ -378,10 +378,15 @@ function ingestYoutubeMessage(m){
  if(state.youtubeLiveComments.length>200)state.youtubeLiveComments=state.youtubeLiveComments.slice(-200);
  state.raw.push({id:uid(),time:now(),type:'유튜브댓글',text:nick+' : '+text});
  renderYoutubeLiveComments();
- // 채널 소유자/관리자가 쓴 상품 안내 댓글은 주문으로 잡지 않음
- if(youtubeAutoOrder.checked && !m.isOwner && !m.isModerator){
-   cNick.value=nick;cText.value=text;
-   processComment();
+
+ const p=cur();
+ const published=Date.parse(m.publishedAt||'')||Date.now();
+ const afterProduct=!!p && published >= (Number(p.createdAt)||0)-1500;
+ const isAdmin=!!m.isOwner||!!m.isModerator;
+ if(youtubeAutoOrder.checked && afterProduct && !isAdmin){
+   processComment(nick,text,m);
+ }else if(!afterProduct){
+   state.raw.push({id:uid(),time:now(),type:'주문제외',text:nick+' : '+text+' [상품 등록 전 댓글]'});
  }
  save();renderAll();
 }
@@ -522,7 +527,36 @@ async function closeProduct(){
  }
 }
 function log(type,text){state.raw.push({id:uid(),time:now(),type,text});save()}
-function parseQty(t){let m=t.match(/(\d+)\s*(?:개|ea|EA|x|X)?/);return m?+m[1]:1}
+function koreanQty(text){
+ const map={'한':1,'하나':1,'한개':1,'두':2,'둘':2,'두개':2,'세':3,'셋':3,'세개':3,'네':4,'넷':4,'네개':4,'다섯':5,'다섯개':5};
+ const s=String(text||'').replace(/\s+/g,'');
+ for(const [k,v] of Object.entries(map))if(s===k||s.endsWith(k))return v;
+ return 0;
+}
+function orderIntent(text,p){
+ const raw=String(text||'').trim();
+ const s=raw.replace(/\s+/g,'').toLowerCase();
+ if(!raw||!p)return {ok:false,reason:'현재 상품 없음'};
+ // 관리자 안내·가격·전화번호·일상 대화는 주문 제외
+ if(/마감되었습니다|확인하였습니다|상품등록|추가수량|한정\s*\d+|인당\s*최대|판매가|원\b/.test(raw))return {ok:false,reason:'관리자 안내'};
+ if(/\d{2,3}[-.\s]?\d{3,4}[-.\s]?\d{4}/.test(raw))return {ok:false,reason:'연락처 형식'};
+ if(/취소|변경|선물/.test(raw))return {ok:true,action:/전체취소|전부취소/.test(raw)?'전체취소':/취소/.test(raw)?'취소':/변경/.test(raw)?'변경':'선물',qty:0};
+ let qty=0, explicit=false;
+ // 허용 주문형식: 2 / 2개 / x2 / 1번 2개 / #1 2 / 수량2 / 주문2 / 두개
+ let m=s.match(/^(\d{1,2})(?:개|ea)?$/);
+ if(m){qty=+m[1];explicit=true}
+ if(!explicit&&(m=s.match(/^(?:x|×)(\d{1,2})$/))){qty=+m[1];explicit=true}
+ if(!explicit&&(m=s.match(/^(?:수량|주문|추가)(\d{1,2})(?:개)?$/))){qty=+m[1];explicit=true}
+ if(!explicit&&(m=s.match(/^(?:#?(\d{1,3})번?|상품(\d{1,3}))[:\-]?(?:수량|주문)?(\d{1,2})(?:개)?$/))){
+   const no=String(m[1]||m[2]||''); if(no===String(p.no)){qty=+(m[3]||1);explicit=true}
+ }
+ if(!explicit){
+   const k=koreanQty(s); if(k){qty=k;explicit=true}
+ }
+ if(!explicit)return {ok:false,reason:'주문형식 아님'};
+ if(!Number.isInteger(qty)||qty<1||qty>99)return {ok:false,reason:'수량 범위 오류'};
+ return {ok:true,action:'주문',qty};
+}
 function normalizeCustomerText(v){return String(v||'').replace(/\s+/g,'').toLowerCase()}
 function findCustomerKey(v){
  const q=normalizeCustomerText(v);if(!q)return '';
@@ -552,16 +586,42 @@ function startNewBroadcast(){
  broadcastStatus.className='badge b-ok';
  alert('새 방송을 시작했습니다. 기존 테스트 주문·정산·문자대기 내역을 초기화했습니다.');
 }
-function processComment(){let nick=cNick.value.trim(),text=cText.value.trim();if(!nick||!text)return alert('닉네임과 댓글을 입력해 주세요.');let matched=findCustomerKey(nick);if(matched){nick=matched;cNick.value=matched;}state.raw.push({id:uid(),time:now(),type:'원본댓글',text:nick+' : '+text});let p=cur();let lower=text.toLowerCase();let status='ok',kind='주문',qty=parseQty(text);
- if(!p){status='warn';kind='확인필요'}
- else if(/전체취소|전부취소/.test(text)){state.orders.filter(o=>o.nick===nick&&o.status==='ok').forEach(o=>o.status='cancel');status='cancel';kind='전체취소';qty=0}
- else if(/취소/.test(text)){let last=[...state.orders].reverse().find(o=>o.nick===nick&&o.productId===p.id&&o.status==='ok');if(last){last.status='cancel';p.sold=Math.max(0,p.sold-last.qty)}status='cancel';kind='취소';qty=0}
- else if(/변경/.test(text)){let last=[...state.orders].reverse().find(o=>o.nick===nick&&o.productId===p.id&&o.status==='ok');if(last){p.sold=Math.max(0,p.sold-last.qty);last.status='changed'}kind='변경'}
- else if(/추가/.test(text)){kind='추가'}
- else if(/선물/.test(text)){kind='선물';let receiver=prompt('선물 받는 분 닉네임을 입력하세요');if(!receiver){status='warn';kind='선물 확인필요'}else{state.orders.push({id:uid(),time:now(),nick:receiver,payer:nick,receiver,productId:p.id,product:p.name,qty,price:0,billable:false,gift:true,status:'ok',raw:text});}}
- else if(text.length<2){status='warn';kind='확인필요'}
- if(kind!=='선물' && kind!=='전체취소' && kind!=='취소'){if(p.max&&qty>p.max){qty=p.max;status='warn';kind+='(최대수량조정)'}if(p.limit&&p.sold+qty>p.limit){qty=Math.max(0,p.limit-p.sold);status=qty?'warn':'cancel';kind=qty?'잔여수량만 접수':'품절'}if(qty>0){state.orders.push({id:uid(),time:now(),nick,payer:nick,receiver:nick,productId:p.id,product:p.name,qty,price:p.price,billable:true,gift:false,status:status==='cancel'?'cancel':'ok',raw:text});p.sold+=qty}}
- save();cText.value='';renderAll()}
+function processComment(autoNick,autoText,sourceMeta){
+ let nick=String(autoNick??cNick.value).trim(),text=String(autoText??cText.value).trim();
+ if(!nick||!text){if(autoNick==null)alert('닉네임과 댓글을 입력해 주세요.');return false}
+ let matched=findCustomerKey(nick);if(matched){nick=matched;if(autoNick==null)cNick.value=matched}
+ state.raw.push({id:uid(),time:now(),type:'원본댓글',text:nick+' : '+text});
+ let p=cur(),intent=orderIntent(text,p);
+ if(!intent.ok){
+   state.raw.push({id:uid(),time:now(),type:'주문아님',text:nick+' : '+text+' ['+intent.reason+']'});
+   save();if(autoNick==null)cText.value='';renderAll();return false;
+ }
+ let qty=intent.qty||0,kind=intent.action,status='ok';
+ if(kind==='전체취소'){
+   state.orders.filter(o=>o.nick===nick&&o.status==='ok').forEach(o=>o.status='cancel');
+   save();if(autoNick==null)cText.value='';renderAll();return true;
+ }
+ if(kind==='취소'){
+   let last=[...state.orders].reverse().find(o=>o.nick===nick&&o.productId===p.id&&o.status==='ok');
+   if(last){last.status='cancel';p.sold=Math.max(0,p.sold-last.qty)}
+   save();if(autoNick==null)cText.value='';renderAll();return true;
+ }
+ if(kind==='변경'){
+   state.raw.push({id:uid(),time:now(),type:'확인필요',text:nick+' : '+text+' [변경수량 확인]'});
+   save();if(autoNick==null)cText.value='';renderAll();return false;
+ }
+ if(kind==='선물'){
+   state.raw.push({id:uid(),time:now(),type:'확인필요',text:nick+' : '+text+' [선물받는분 확인]'});
+   save();if(autoNick==null)cText.value='';renderAll();return false;
+ }
+ if(p.max&&qty>p.max){qty=p.max;status='warn';kind+='(최대수량조정)'}
+ if(p.limit&&p.sold+qty>p.limit){qty=Math.max(0,p.limit-p.sold);status=qty?'warn':'cancel';kind=qty?'잔여수량만 접수':'품절'}
+ if(qty>0){
+   state.orders.push({id:uid(),time:now(),nick,payer:nick,receiver:nick,productId:p.id,product:p.name,qty,price:p.price,billable:true,gift:false,status:status==='cancel'?'cancel':'ok',raw:text});
+   p.sold+=qty;
+ }
+ save();if(autoNick==null)cText.value='';renderAll();return qty>0;
+}
 function editOrder(id){let o=state.orders.find(x=>x.id===id);if(!o)return;let q=+prompt('최종 수량',o.qty);if(!Number.isFinite(q)||q<0)return;let p=state.products.find(x=>x.id===o.productId);if(p&&o.status==='ok')p.sold=Math.max(0,p.sold-o.qty+q);o.qty=q;o.status=q===0?'cancel':'ok';o.raw+=' [관리자수정]';save();renderAll()}
 function activeOrders(){return state.orders.filter(o=>o.status==='ok'&&o.qty>0)}
 function grouped(){let m={};activeOrders().forEach(o=>{let key=o.payer||o.nick;if(!m[key])m[key]={payer:key,items:[],amount:0,receivers:new Set};m[key].items.push(o);if(o.billable)m[key].amount+=o.qty*o.price;m[key].receivers.add(o.receiver||o.nick)});return Object.values(m)}
