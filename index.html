@@ -90,9 +90,13 @@ table{width:100%;border-collapse:collapse;font-size:13px}th,td{padding:9px 8px;b
       </div>
       <div class="row" style="margin-top:10px">
         <span id="chatStatus" class="badge b-warn">채팅 대기</span>
+        <button class="btn gold" onclick="connectYoutubeAccount()">유튜브 계정 연결</button>
+        <button class="btn ok" onclick="startYoutubeComments()">댓글 자동수집 시작</button>
+        <button class="btn bad" onclick="stopYoutubeComments()">댓글수집 중지</button>
+        <label class="badge b-info"><input id="youtubeAutoOrder" type="checkbox" checked> 새 댓글 자동주문</label>
         <button class="btn info" onclick="openYoutubeChatWindow()">유튜브 채팅 새 창으로 열기</button>
       </div>
-      <p class="muted">실시간 채팅 보기 기능입니다. 주문 자동수집과는 별개이며, 채팅을 보면서 오른쪽 비상 입력으로 주문을 접수할 수 있습니다.</p>
+      <p class="muted">유튜브 계정 연결 후 댓글 자동수집을 시작하면 새 댓글이 원본댓글에 표시되고, 자동주문 체크 시 현재 상품 주문으로 즉시 접수됩니다.</p>
     </div>
     <div class="card">
       <h2>현재 상품 등록·추가수량</h2>
@@ -284,7 +288,7 @@ table{width:100%;border-collapse:collapse;font-size:13px}th,td{padding:9px 8px;b
 
 <script>
 const KEY='firstoms_emergency_v2';
-let state={products:[],productCatalog:{},orders:[],raw:[],customers:{},paymentStatus:{},smsQueue:[],smsPreviewImages:{},settings:{bank:'',account:'',holder:'',shippingFee:4000,kakaoUrl:'http://pf.kakao.com/_DEPfX',smsUrl:'',commentApi:'',joinUrl:'',smsApi:'',smsSender:''},currentProductId:null,broadcastStartedAt:null,currentReceiptCustomer:null};
+let state={products:[],productCatalog:{},orders:[],raw:[],customers:{},paymentStatus:{},smsQueue:[],smsPreviewImages:{},settings:{bank:'',account:'',holder:'',shippingFee:4000,kakaoUrl:'http://pf.kakao.com/_DEPfX',smsUrl:'',commentApi:'',joinUrl:'',smsApi:'',smsSender:''},currentProductId:null,broadcastStartedAt:null,currentReceiptCustomer:null,youtubeSeen:{},youtubeNextPageToken:'',youtubePolling:false};
 function now(){return new Date().toLocaleTimeString('ko-KR',{hour12:false})}
 function uid(){return Date.now().toString(36)+Math.random().toString(36).slice(2,7)}
 function money(n){return Number(n||0).toLocaleString('ko-KR')+'원'}
@@ -323,6 +327,105 @@ function openYoutubeChatWindow(){
  if(!id)return alert('먼저 유튜브 라이브 주소를 입력해 주세요.');
  window.open('https://www.youtube.com/live_chat?v='+encodeURIComponent(id),'_blank','width=500,height=800')
 }
+let youtubePollTimer=null;
+async function connectYoutubeAccount(){
+ try{
+   const r=await fetch('/api/youtube/status',{cache:'no-store'});
+   const j=await r.json();
+   if(j.connected){
+     chatStatus.textContent='유튜브 계정 연결됨';
+     chatStatus.className='badge b-ok';
+     alert('유튜브 계정이 이미 연결되어 있습니다. 댓글 자동수집 시작을 누르세요.');
+     return;
+   }
+ }catch(e){}
+ window.open('/api/youtube/oauth/start','youtubeOAuth','width=560,height=760');
+ chatStatus.textContent='구글 승인 대기';
+ chatStatus.className='badge b-info';
+}
+async function checkYoutubeStatus(){
+ try{
+  const r=await fetch('/api/youtube/status',{cache:'no-store'}),j=await r.json();
+  if(j.connected){
+    chatStatus.textContent='유튜브 계정 연결됨';
+    chatStatus.className='badge b-ok';
+    return true;
+  }
+ }catch(e){}
+ return false;
+}
+function ingestYoutubeMessage(m){
+ state.youtubeSeen=state.youtubeSeen||{};
+ if(state.youtubeSeen[m.id])return;
+ state.youtubeSeen[m.id]=Date.now();
+ const nick=m.author||'유튜브고객',text=m.text||'';
+ if(!text)return;
+ if(youtubeAutoOrder.checked){
+   cNick.value=nick;cText.value=text;
+   processComment();
+ }else{
+   state.raw.push({id:uid(),time:now(),type:'유튜브댓글',text:nick+' : '+text});
+   save();renderAll();
+ }
+}
+async function pollYoutubeComments(){
+ if(!state.youtubePolling)return;
+ const id=videoId(youtubeUrl.value);
+ if(!id){stopYoutubeComments();return alert('유튜브 라이브 주소를 확인해 주세요.')}
+ try{
+   const q=new URLSearchParams({videoId:id});
+   if(state.youtubeNextPageToken)q.set('pageToken',state.youtubeNextPageToken);
+   const r=await fetch('/api/youtube/comments?'+q.toString(),{cache:'no-store'});
+   const j=await r.json();
+   if(r.status===401){
+     stopYoutubeComments();
+     chatStatus.textContent='유튜브 계정 연결 필요';
+     chatStatus.className='badge b-bad';
+     return alert('유튜브 계정 연결 버튼을 누르고 구글 권한을 승인해 주세요.');
+   }
+   if(!r.ok||!j.ok)throw new Error(j.error||('댓글 서버 오류 '+r.status));
+   (j.messages||[]).forEach(ingestYoutubeMessage);
+   state.youtubeNextPageToken=j.nextPageToken||state.youtubeNextPageToken||'';
+   save();
+   chatStatus.textContent='댓글 자동수집 중 · '+(j.messages||[]).length+'건 확인';
+   chatStatus.className='badge b-ok';
+   const wait=Math.max(2000,Math.min(10000,j.pollingIntervalMillis||3500));
+   youtubePollTimer=setTimeout(pollYoutubeComments,wait);
+ }catch(e){
+   chatStatus.textContent='댓글 오류: '+e.message;
+   chatStatus.className='badge b-bad';
+   youtubePollTimer=setTimeout(pollYoutubeComments,5000);
+ }
+}
+async function startYoutubeComments(){
+ const id=videoId(youtubeUrl.value);
+ if(!id)return alert('유튜브 라이브 주소를 입력하고 영상 연결을 먼저 눌러주세요.');
+ const connected=await checkYoutubeStatus();
+ if(!connected)return connectYoutubeAccount();
+ state.youtubePolling=true;
+ state.youtubeNextPageToken='';
+ save();
+ if(youtubePollTimer)clearTimeout(youtubePollTimer);
+ chatStatus.textContent='댓글 자동수집 시작 중';
+ chatStatus.className='badge b-info';
+ pollYoutubeComments();
+}
+function stopYoutubeComments(){
+ state.youtubePolling=false;
+ if(youtubePollTimer)clearTimeout(youtubePollTimer);
+ youtubePollTimer=null;
+ save();
+ chatStatus.textContent='댓글수집 중지';
+ chatStatus.className='badge b-warn';
+}
+window.addEventListener('message',function(e){
+ if(e.data==='youtube-connected'){
+   chatStatus.textContent='유튜브 계정 연결됨';
+   chatStatus.className='badge b-ok';
+   startYoutubeComments();
+ }
+});
+
 function autofillProductByNo(){
  const no=pNo.value.trim();
  if(!no)return;
@@ -369,7 +472,7 @@ function startNewBroadcast(){
  if(!confirm('테스트 주문·정산·문자대기 내역을 초기화하고 새 방송을 시작할까요?\\n고객DB와 상품번호 기억은 유지됩니다.'))return;
  state.products=[];state.orders=[];state.raw=[];state.currentProductId=null;
  state.paymentStatus={};state.smsQueue=[];state.smsPreviewImages={};state.currentReceiptCustomer=null;
- state.broadcastStartedAt=new Date().toISOString();
+ state.broadcastStartedAt=new Date().toISOString();state.youtubeSeen={};state.youtubeNextPageToken='';stopYoutubeComments();
  localStorage.removeItem('firstoms_video');
  youtubeUrl.value='';videoFrame.src='';chatContainer.className='chatEmpty';chatContainer.innerHTML='유튜브 라이브 링크를 입력하고 영상 연결을 누르면<br>이곳에 실시간 채팅이 표시됩니다.';chatStatus.textContent='채팅 대기';chatStatus.className='badge b-warn';
  pNo.value='';pName.value='';pPrice.value='';pLimit.value='';pMax.value='';extraQty.value='';
@@ -719,7 +822,7 @@ async function sendAllSms(){
 function exportRaw(){let rows=[['시간','유형','원문'],...state.raw.map(x=>[x.time,x.type,x.text])];downloadExcelOrCsv('원본댓글_이중저장.xlsx','원본댓글',rows)}
 function exportBackup(){let b=new Blob([JSON.stringify(state,null,2)],{type:'application/json'}),a=document.createElement('a');a.href=URL.createObjectURL(b);a.download='FIRST_OMS_전체백업_'+Date.now()+'.json';a.click()}
 function saveSettings(){state.settings={...state.settings,bank:bank.value,account:account.value,holder:holder.value,shippingFee:+shippingFee.value||0,kakaoUrl:kakaoUrl.value,smsUrl:smsUrl.value,commentApi:commentApi.value,joinUrl:joinUrl.value,smsApi:smsApi.value,smsSender:smsSender.value};save();alert('계좌·배송비·링크가 저장되었습니다.')}
-function applySettings(){state.settings.smsApi='/api/sms/send';bank.value=state.settings.bank||'';account.value=state.settings.account||'';holder.value=state.settings.holder||'';shippingFee.value=state.settings.shippingFee??4000;kakaoUrl.value=state.settings.kakaoUrl||'';smsUrl.value=state.settings.smsUrl||'';commentApi.value=state.settings.commentApi||'';joinUrl.value=state.settings.joinUrl||((location.protocol.startsWith('http'))?location.origin+'/join.html':'');smsApi.value='/api/sms/send';smsSender.value=state.settings.smsSender||'Render 환경변수 사용';youtubeUrl.value=localStorage.getItem('firstoms_video')||''}
+function applySettings(){state.settings.smsApi='/api/sms/send';bank.value=state.settings.bank||'';account.value=state.settings.account||'';holder.value=state.settings.holder||'';shippingFee.value=state.settings.shippingFee??4000;kakaoUrl.value=state.settings.kakaoUrl||'';smsUrl.value=state.settings.smsUrl||'';commentApi.value=state.settings.commentApi||'/api/youtube/comments';joinUrl.value=state.settings.joinUrl||((location.protocol.startsWith('http'))?location.origin+'/join.html':'');smsApi.value='/api/sms/send';smsSender.value=state.settings.smsSender||'Render 환경변수 사용';youtubeUrl.value=localStorage.getItem('firstoms_video')||''}
 function connectCommentApi(){state.settings.commentApi=commentApi.value;save();alert(commentApi.value?'댓글 API 주소 저장 완료. 실제 서버가 같은 형식으로 댓글을 보내야 자동수집됩니다.':'주소를 입력해 주세요.')}
 function copyJoinUrl(){
  let u=joinUrl.value||((location.protocol.startsWith('http'))?location.origin+'/join.html':'join.html');
