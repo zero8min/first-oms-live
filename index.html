@@ -3,985 +3,414 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>FIRST OMS · 땡라이브 비상 관제실 v2</title>
+<title>FIRST OMS 긴급 정산실</title>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
 <style>
-:root{--bg:#07080d;--panel:#12141c;--panel2:#191c26;--line:#303443;--gold:#d9b37b;--ok:#32d583;--warn:#ffbe55;--bad:#ff6474;--info:#67a7ff;--txt:#f8f8fb;--muted:#9aa1b3}
-*{box-sizing:border-box} body{margin:0;background:radial-gradient(circle at top,#231824,#07080d 42%);color:var(--txt);font-family:Arial,"Noto Sans KR",sans-serif}
-button,input,select,textarea{font:inherit} button{cursor:pointer}
-header{position:sticky;top:0;z-index:20;display:flex;justify-content:space-between;align-items:center;padding:16px 22px;background:#090a10f2;border-bottom:1px solid var(--line);backdrop-filter:blur(12px)}
-.brand{font-weight:900;letter-spacing:.07em}.brand b{color:var(--gold)} .status{display:flex;gap:8px;align-items:center;font-size:13px}
-.dot{width:10px;height:10px;border-radius:50%;background:var(--bad);box-shadow:0 0 12px currentColor}.dot.ok{background:var(--ok)}
-nav{display:flex;gap:8px;padding:14px 18px;position:sticky;top:65px;z-index:19;background:#090a10e8;border-bottom:1px solid var(--line)}
-nav button{border:1px solid var(--line);background:#141722;color:white;padding:10px 16px;border-radius:12px;font-weight:800}
-nav button.active{border-color:var(--gold);color:#111;background:linear-gradient(135deg,#f1d2a8,#bd8f55)}
-main{padding:18px;max-width:1600px;margin:auto}.page{display:none}.page.active{display:block}
-.grid{display:grid;grid-template-columns:1.1fr .9fr;gap:14px}.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
-.card{background:linear-gradient(180deg,#151823,#10121a);border:1px solid var(--line);border-radius:18px;padding:16px;box-shadow:0 16px 40px #0005}
-.card h2,.card h3{margin:0 0 12px}.muted{color:var(--muted);font-size:13px}.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
-input,select,textarea{background:#0d0f16;border:1px solid var(--line);color:white;padding:10px 11px;border-radius:10px;min-width:0}
-input[type=checkbox]{width:18px;height:18px}.grow{flex:1}.btn{border:1px solid var(--line);background:#202431;color:white;padding:10px 13px;border-radius:10px;font-weight:800}
-.btn.gold{background:linear-gradient(135deg,#f0d1a5,#bd8b4f);color:#15100a;border:0}.btn.ok{background:#163b2a;border-color:#267c54}.btn.warn{background:#4a3513;border-color:#8e6722}.btn.bad{background:#481d25;border-color:#923645}.btn.info{background:#172b49;border-color:#285e9a}
-.kpi{padding:15px;border-radius:15px;border:1px solid var(--line);background:#0d1018}.kpi b{font-size:25px;display:block;margin-top:6px}.kpi.ok{border-color:#238653}.kpi.warn{border-color:#9b6a18}.kpi.bad{border-color:#a03746}.kpi.info{border-color:#2b659f}
-.videoWrap{aspect-ratio:16/9;background:#000;border-radius:14px;overflow:hidden;border:1px solid var(--line)}iframe{width:100%;height:100%;border:0}
-table{width:100%;border-collapse:collapse;font-size:13px}th,td{padding:9px 8px;border-bottom:1px solid #282c38;text-align:left;vertical-align:middle}th{color:#d3d7e1;position:sticky;top:0;background:#151823}
-.tableWrap{overflow:auto;max-height:500px;border:1px solid var(--line);border-radius:12px}.badge{display:inline-flex;padding:5px 8px;border-radius:999px;font-size:12px;font-weight:900}.b-ok{background:#173d2a;color:#57e69a}.b-warn{background:#4a3616;color:#ffd080}.b-bad{background:#4c1e27;color:#ff8994}.b-info{background:#172d4c;color:#8bc0ff}
-.log{height:270px;overflow:auto;background:#08090e;border:1px solid var(--line);border-radius:12px;padding:10px;font-family:monospace;font-size:12px}.log div{padding:6px;border-bottom:1px dashed #282c38}
-.receipt{width:360px;background:#fff;color:#111;padding:22px;border-radius:4px;font-family:Arial,sans-serif}.receipt h2{text-align:center;margin:0 0 5px}.receipt .dash{border-top:1px dashed #444;margin:10px 0}.receipt table{font-size:12px}.receipt th,.receipt td{border:0;padding:5px 0}.receipt .sum{font-size:18px;font-weight:900;text-align:right}.receipt .qr{text-align:center;margin-top:12px}
-.help{padding:10px 12px;border-left:4px solid var(--gold);background:#2a2116;border-radius:8px;font-size:13px}
-
-.modalBack{display:none;position:fixed;inset:0;background:#000a;z-index:100;align-items:center;justify-content:center;padding:20px}
-.modalBack.show{display:flex}.modalBox{width:min(660px,100%);max-height:90vh;overflow:auto;background:#151823;border:1px solid var(--line);border-radius:20px;padding:20px}
-.formGrid{display:grid;grid-template-columns:1fr 1fr;gap:10px}.formGrid .full{grid-column:1/-1}.modalBox label{display:block;margin:8px 0 6px;font-size:13px;font-weight:800}
-@media(max-width:650px){.formGrid{grid-template-columns:1fr}.formGrid .full{grid-column:auto}}
-
-
-.paymentSelect{min-width:105px;padding:8px;border-radius:9px;font-weight:800}
-.popupBack{display:none;position:fixed;inset:0;background:#000b;z-index:300;align-items:center;justify-content:center;padding:16px}
-.popupBack.show{display:flex}
-.popupBox{width:min(520px,100%);max-height:94vh;overflow:auto;background:#20232d;border:1px solid var(--line);border-radius:18px;padding:16px}
-.smsConfirmMessage{white-space:pre-wrap;background:#11141c;border:1px solid var(--line);border-radius:12px;padding:12px;line-height:1.6;font-size:13px}
-.customerMatch{font-size:12px;margin-top:7px;min-height:18px}
-
-@media(max-width:950px){.grid,.grid3{grid-template-columns:1fr}nav{overflow:auto}.receipt{width:100%}}
-@media print{header,nav,.no-print{display:none!important}body{background:white}.page{display:none!important}.page.printing{display:block!important}.card{border:0;box-shadow:none}.receipt{page-break-after:always;width:360px;margin:0 auto}}
-.liveCommentBox{height:270px;overflow:auto;border:1px solid #363b4a;border-radius:12px;background:#0d0f15;padding:8px;margin-bottom:10px}
-.liveCommentItem{display:grid;grid-template-columns:90px 150px 1fr 76px;gap:8px;align-items:center;padding:9px 8px;border-bottom:1px solid #242936;font-size:14px}
-.liveCommentItem:last-child{border-bottom:0}.liveCommentTime{color:#8d95a8}.liveCommentNick{font-weight:800;color:#ffd26f;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.liveCommentText{color:#f4f6fb;word-break:break-word}.liveCommentPick{padding:6px 9px;border:0;border-radius:8px;cursor:pointer;font-weight:800}
-.liveCommentEmpty{padding:90px 15px;text-align:center;color:#8d95a8}
-@media(max-width:800px){.liveCommentItem{grid-template-columns:70px 110px 1fr}.liveCommentPick{grid-column:3}}
+:root{
+  --bg:#0d0f13;--panel:#171a20;--panel2:#20242c;--text:#f5f5f7;--muted:#aeb4c0;
+  --rose:#d7a17b;--rose2:#f1c7a8;--line:#343943;--good:#67c587;--warn:#e0b45f;--bad:#ef7b7b;
+}
+*{box-sizing:border-box} body{margin:0;background:linear-gradient(180deg,#0a0c10,#11141a);color:var(--text);
+font-family:-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Noto Sans KR",sans-serif}
+header{position:sticky;top:0;z-index:20;background:rgba(13,15,19,.93);backdrop-filter:blur(16px);
+border-bottom:1px solid var(--line);padding:16px 20px;display:flex;align-items:center;justify-content:space-between}
+.brand{font-weight:900;letter-spacing:.5px}.brand b{color:var(--rose2)} .sub{font-size:12px;color:var(--muted)}
+main{max-width:1400px;margin:0 auto;padding:22px}
+.tabs{display:flex;gap:8px;overflow:auto;padding-bottom:12px}
+.tab{border:1px solid var(--line);background:var(--panel);color:var(--text);padding:11px 15px;border-radius:12px;white-space:nowrap;cursor:pointer}
+.tab.active{background:linear-gradient(135deg,#51372c,#8a5b43);border-color:#b27a5a}
+.page{display:none}.page.active{display:block}
+.grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px}.card{background:linear-gradient(145deg,var(--panel),#12151a);
+border:1px solid var(--line);border-radius:18px;padding:18px;box-shadow:0 16px 35px rgba(0,0,0,.18)}
+.kpi strong{display:block;font-size:27px;margin-top:8px}.kpi small{color:var(--muted)}
+.section-title{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:22px 0 12px}
+h2,h3{margin:0}.btn{border:0;border-radius:12px;padding:11px 15px;font-weight:800;cursor:pointer;color:#161616;background:linear-gradient(135deg,var(--rose2),var(--rose))}
+.btn.secondary{background:var(--panel2);color:var(--text);border:1px solid var(--line)}
+.btn.good{background:var(--good)}.btn.warn{background:var(--warn)}.btn.bad{background:var(--bad)}
+.actions{display:flex;gap:8px;flex-wrap:wrap}.upload{display:inline-flex;align-items:center;gap:8px}
+input[type=file]{display:none} input,select,textarea{width:100%;background:#101319;color:var(--text);border:1px solid var(--line);
+border-radius:10px;padding:10px} label{font-size:13px;color:var(--muted)}
+.form-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
+table{width:100%;border-collapse:collapse;background:var(--panel);border-radius:15px;overflow:hidden}
+th,td{border-bottom:1px solid var(--line);padding:11px 9px;text-align:left;font-size:13px;vertical-align:top}
+th{background:#232832;color:#f5d5bd;position:sticky;top:70px} tr:hover td{background:#1b1f27}
+.badge{display:inline-block;border-radius:999px;padding:5px 9px;font-size:11px;font-weight:800}
+.badge.good{background:#193b29;color:#8be0a5}.badge.warn{background:#49391b;color:#f0c66e}.badge.bad{background:#4a2323;color:#ff9999}
+.muted{color:var(--muted)} .scroll{overflow:auto;max-height:58vh;border-radius:15px;border:1px solid var(--line)}
+.empty{padding:42px;text-align:center;color:var(--muted)}
+.receipt-wrap{display:grid;grid-template-columns:repeat(3,minmax(280px,1fr));gap:14px}
+.receipt{background:#fff;color:#151515;border-radius:14px;padding:20px;box-shadow:0 10px 30px rgba(0,0,0,.25)}
+.receipt h3{text-align:center;letter-spacing:1px}.receipt .meta{font-size:12px;color:#555;border-bottom:1px dashed #aaa;padding-bottom:10px;margin-bottom:10px}
+.receipt table{background:white}.receipt th,.receipt td{color:#111;border-color:#ddd;padding:7px;font-size:12px}.receipt th{background:#f4eee9;position:static}
+.receipt .total{font-size:18px;font-weight:900;text-align:right;margin-top:12px}.receipt .foot{font-size:11px;color:#666;text-align:center;margin-top:14px}
+.note{background:#2a221c;border:1px solid #6b4b38;color:#f1d2ba;border-radius:12px;padding:12px;margin:12px 0}
+.modal{display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:50;padding:18px;overflow:auto}
+.modal.show{display:block}.modal-box{max-width:700px;margin:40px auto;background:var(--panel);border:1px solid var(--line);border-radius:18px;padding:20px}
+@media(max-width:1000px){.grid,.form-grid{grid-template-columns:repeat(2,1fr)}.receipt-wrap{grid-template-columns:1fr}}
+@media(max-width:600px){main{padding:14px}.grid,.form-grid{grid-template-columns:1fr}header{padding:13px}.sub{display:none}}
+@media print{
+ body{background:white;color:black}.no-print,header,.tabs,.section-title,.note{display:none!important}
+ main{max-width:none;padding:0}.page{display:none!important}#receipts.page{display:block!important}.receipt-wrap{display:block}
+ .receipt{box-shadow:none;border:1px solid #aaa;break-inside:avoid;page-break-inside:avoid;margin:0 0 8mm;border-radius:0}
+}
 </style>
 </head>
 <body>
 <header>
-  <div class="brand">FIRST <b>OMS</b> · 땡라이브 비상 관제실 v2</div>
-  <div class="status"><span id="saveDot" class="dot ok"></span><span id="saveText">자동저장 정상</span></div>
+  <div><div class="brand"><b>FIRST OMS</b> 긴급 정산실</div><div class="sub">판매리스트 → 고객매칭 → 정산서 → 입금대조 → 택배리스트</div></div>
+  <button class="btn secondary no-print" onclick="saveAll()">저장</button>
 </header>
-<nav>
-  <button class="active" data-page="control">비상 방송실</button>
-  <button data-page="settle">정산실</button>
-  <button data-page="ship">택배실</button>
-  <button data-page="customers">고객정보</button>
-  <button data-page="smsroom">문자 대기실</button>
-  <button data-page="settings">연결·기본설정</button>
-  <button data-page="test">기능점검</button>
-</nav>
 <main>
-<section id="control" class="page active">
-  <div class="row no-print" style="margin-bottom:12px">
-    <button class="btn bad" onclick="startNewBroadcast()">● 방송 시작 · 오늘 테스트 초기화</button>
-    <span class="badge b-info" id="broadcastStatus">방송 대기</span>
-    <span class="muted">고객DB·상품번호 기억·기본설정은 유지됩니다.</span>
+  <div class="tabs no-print">
+    <button class="tab active" data-page="dashboard">대시보드</button>
+    <button class="tab" data-page="orders">판매리스트 업로드</button>
+    <button class="tab" data-page="customers">고객DB</button>
+    <button class="tab" data-page="receipts">정산서</button>
+    <button class="tab" data-page="payments">입금대조</button>
+    <button class="tab" data-page="shipping">택배실</button>
   </div>
-  <div class="grid3">
-    <div class="kpi ok">정상접수<b id="kOk">0</b></div>
-    <div class="kpi warn">확인필요<b id="kWarn">0</b></div>
-    <div class="kpi bad">취소·오류<b id="kBad">0</b></div>
-  </div><br>
-  <div class="grid">
-    <div class="card">
-      <h2>영상 스트리밍</h2>
-      <div class="row no-print">
-        <input id="youtubeUrl" class="grow" placeholder="유튜브 영상/라이브 URL">
-        <button class="btn info" onclick="loadVideo()">영상 연결</button>
-      </div><br>
-      <div class="videoWrap"><iframe id="videoFrame" allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen></iframe></div>
-      <div class="row" style="margin-top:10px">
-        <span id="chatStatus" class="badge b-warn">채팅 대기</span>
-        <button class="btn gold" onclick="connectYoutubeAccount()">유튜브 계정 연결</button>
-        <button class="btn ok" onclick="startYoutubeComments()">댓글 자동수집 시작</button>
-        <button class="btn bad" onclick="stopYoutubeComments()">댓글수집 중지</button>
-        <label class="badge b-info"><input id="youtubeAutoOrder" type="checkbox" checked> 주문형식 댓글만 자동접수</label>
-        <button class="btn info" onclick="openYoutubeChatWindow()">유튜브 채팅 새 창으로 열기</button>
-      </div>
-      <p class="muted">상품등록 이후 댓글만 봅니다. 2, 2개, x2, 1번2개처럼 명확한 주문형식만 접수하며 가격·전화번호·관리자 글·일상 대화는 주문에서 제외합니다.</p>
+
+  <section id="dashboard" class="page active">
+    <div class="grid">
+      <div class="card kpi"><small>업로드 주문행</small><strong id="kpiOrderRows">0</strong></div>
+      <div class="card kpi"><small>고객별 정산서</small><strong id="kpiReceipts">0</strong></div>
+      <div class="card kpi"><small>고객DB 매칭</small><strong id="kpiMatched">0</strong></div>
+      <div class="card kpi"><small>입금확인</small><strong id="kpiPaid">0</strong></div>
     </div>
-    <div class="card">
-      <h2>현재 상품 등록·추가수량</h2>
-      <div class="row">
-        <input id="pNo" style="width:85px" placeholder="#번호">
-        <input id="pName" class="grow" placeholder="상품명">
-        <input id="pPrice" type="number" style="width:130px" placeholder="가격">
-        <input id="pLimit" type="number" style="width:130px" placeholder="한정수량">
-        <input id="pMax" type="number" style="width:130px" placeholder="인당최대">
-      </div><br>
-      <div class="row">
-        <button class="btn gold" onclick="registerProduct()">상품등록·구간시작</button>
-        <input id="extraQty" type="number" style="width:130px" placeholder="추가수량">
-        <button class="btn warn" onclick="addStock()">추가수량 반영</button>
-        <button class="btn bad" onclick="closeProduct()">상품마감</button><span id="youtubeSendStatus" class="badge b-warn">유튜브 전송 대기</span>
-      </div>
-      <div id="currentProduct" class="help" style="margin-top:12px">현재 등록 상품 없음</div><p class="muted">상품번호만 입력하면 이전 등록 상품명·가격·인당 최대수량이 자동으로 불러와집니다. 한정수량은 매 방송마다 새로 입력합니다.</p>
-      <hr style="border-color:#2b2f3c;margin:16px 0">
-      <h3>유튜브 실시간 댓글 · 주문 비상 입력</h3>
-      <div id="liveCommentFeed" class="liveCommentBox">
-        <div class="liveCommentEmpty">댓글 자동수집 시작을 누르면<br>유튜브 댓글이 여기에 바로 표시됩니다.</div>
-      </div>
-      <div class="row">
-        <input id="cNick" placeholder="닉네임" oninput="previewCustomerMatch()" onblur="applyCustomerMatch()">
-        <input id="cText" class="grow" placeholder="예: 1번 2개 / 1개 추가 / 전체취소 / 2개로 변경 / 선물이요">
-        <button class="btn ok" onclick="processComment()">접수</button>
-      </div>
-      <div id="customerMatchInfo" class="customerMatch muted">닉네임을 입력하면 고객DB와 자동 대조합니다.</div><p class="muted">원문은 삭제되지 않고 주문 로그와 원본댓글에 이중 저장됩니다.</p>
+    <div class="note">오늘 댓글 자동수집이 멈춘 경우, 판매리스트 엑셀을 올려 고객별 정산서를 만들고 입금대조 후 택배실로 넘기는 비상용 화면입니다.</div>
+    <div class="section-title"><h2>빠른 실행</h2></div>
+    <div class="actions">
+      <label class="btn upload">판매리스트 업로드<input id="quickOrderFile" type="file" accept=".xlsx,.xls,.csv"></label>
+      <button class="btn secondary" onclick="go('customers')">고객DB 확인</button>
+      <button class="btn secondary" onclick="go('receipts')">정산서 보기</button>
+      <button class="btn secondary" onclick="go('payments')">입금 대조</button>
+      <button class="btn secondary" onclick="go('shipping')">택배리스트</button>
     </div>
-  </div><br>
-  <div class="grid">
-    <div class="card">
-      <h2>실시간 주문 관제</h2>
-      <div class="tableWrap"><table><thead><tr><th>상태</th><th>시간</th><th>고객</th><th>상품</th><th>수량</th><th>금액</th><th>원문</th><th>수정</th></tr></thead><tbody id="orderBody"></tbody></table></div>
-    </div>
-    <div class="card">
-      <h2>원본댓글·처리로그</h2>
-      <div id="rawLog" class="log"></div>
-      <br>
-      <div class="row">
-        <button class="btn" onclick="exportRaw()">원본댓글 엑셀용 저장</button>
-        <button class="btn" onclick="exportBackup()">전체 백업 JSON</button>
+  </section>
+
+  <section id="orders" class="page">
+    <div class="section-title">
+      <h2>판매리스트 업로드</h2>
+      <div class="actions">
+        <label class="btn upload">엑셀 선택<input id="orderFile" type="file" accept=".xlsx,.xls,.csv" multiple></label>
+        <button class="btn secondary" onclick="clearOrders()">주문 초기화</button>
       </div>
     </div>
-  </div>
-</section>
-
-<section id="settle" class="page">
-  <div class="card">
-    <div class="row">
-      <h2 class="grow">고객별 정산실</h2>
-      <button class="btn info" onclick="showReceiptExample()">정산서 예시</button>
-      <button class="btn gold" onclick="selectAll('settleChecks',true)">전체선택</button>
-      <button class="btn" onclick="selectAll('settleChecks',false)">전체해제</button>
-      <button class="btn ok" onclick="exportSelectedExcel()">선택 고객 엑셀 저장</button>
-      <button class="btn info" onclick="saveSelectedImages()">선택 정산서 이미지 저장</button>
-      <button class="btn gold" onclick="printSelectedReceipts()">선택 정산서 출력</button>
+    <div class="form-grid card">
+      <div><label>방송일자</label><input type="date" id="broadcastDate"></div>
+      <div><label>배송비</label><input type="number" id="shippingFee" value="4000"></div>
+      <div><label>중복 처리</label><select id="duplicateMode"><option value="append">기존 주문에 추가</option><option value="replaceDate">같은 날짜 주문 교체</option></select></div>
+      <div><label>자동 고객매칭</label><select id="autoMatch"><option value="yes">사용</option><option value="no">사용 안 함</option></select></div>
     </div>
-    <p class="muted">영수증형 정산서이며, 계좌·카카오채널 QR·상품·배송비·총액이 자동 반영됩니다.</p>
-    <div class="tableWrap"><table><thead><tr><th><input type="checkbox" onchange="selectAll('settleChecks',this.checked)"></th><th>주문닉네임</th><th>이름</th><th>연락처</th><th>주소</th><th>상품수</th><th>상품금액</th><th>배송비</th><th>총액</th><th>입금여부</th><th>정보</th><th>정산서</th><th>문자대기</th></tr></thead><tbody id="settleBody"></tbody></table></div>
-  </div>
-  <div id="receiptArea" style="display:flex;flex-wrap:wrap;gap:15px;margin-top:16px"></div>
-</section>
+    <p class="muted">샘플 형식: A 번호 / B 닉네임 / C 품목 / D 수량 / E 단가 / F 금액. 첫 행 위치가 달라도 헤더를 자동 탐색합니다.</p>
+    <div id="ordersTable"></div>
+  </section>
 
-<section id="ship" class="page">
-  <div class="card">
-    <div class="row">
-      <h2 class="grow">택배 접수·포장실</h2>
-      <button class="btn gold" onclick="selectAll('shipChecks',true)">전체선택</button>
-      <button class="btn" onclick="selectAll('shipChecks',false)">전체해제</button>
-      <button class="btn info" onclick="showPackingExample()">포장리스트 예시</button>
-      <button class="btn ok" onclick="exportShippingExcel()">택배 파일접수 엑셀 저장</button>
-      <button class="btn info" onclick="printPacking()">선택 검수표만 출력</button>
+  <section id="customers" class="page">
+    <div class="section-title">
+      <h2>고객DB</h2>
+      <div class="actions">
+        <label class="btn upload">고객DB 엑셀 업로드<input id="customerFile" type="file" accept=".xlsx,.xls,.csv"></label>
+        <button class="btn secondary" onclick="openCustomerModal()">고객 직접 등록</button>
+        <button class="btn secondary" onclick="downloadCustomerTemplate()">고객DB 양식</button>
+      </div>
     </div>
-    <p class="muted">받는분 이름·주소·연락처가 자동저장됩니다. 선물 주문은 결제자와 수령자를 분리해 처리합니다.</p>
-    <div class="tableWrap"><table><thead><tr><th><input type="checkbox" onchange="selectAll('shipChecks',this.checked)"></th><th>주문자/수령자</th><th>연락처</th><th>주소</th><th>상품</th><th>포장</th></tr></thead><tbody id="shipBody"></tbody></table></div>
-  </div>
-  <div id="packingArea" style="display:none"></div>
-</section>
+    <p class="muted">필수 권장 열: 실명, 닉네임, 전화번호, 주소. 실명 또는 닉네임으로 주문·입금내역을 매칭합니다.</p>
+    <div id="customersTable"></div>
+  </section>
 
-
-<section id="customers" class="page">
-  <div class="card">
-    <div class="row">
-      <h2 class="grow">땡라이브 고객정보 DB</h2>
-      <span class="badge b-warn" id="customerSyncStatus">동기화 대기</span>
-      <button class="btn gold" onclick="openCustomerModal()">+ 고객추가</button>
-      <button class="btn bad" onclick="deleteSelectedCustomers()">선택 고객 삭제</button>
-      <button class="btn info" onclick="syncCustomers(false)">지금 동기화</button>
-      <button class="btn ok" onclick="exportCustomerExcel()">고객정보 엑셀 저장</button>
-      <button class="btn" onclick="window.open('/join.html','_blank')">가입폼 열기</button>
+  <section id="receipts" class="page">
+    <div class="section-title no-print">
+      <h2>고객별 정산서</h2>
+      <div class="actions">
+        <button class="btn" onclick="window.print()">전체 정산서 인쇄/PDF</button>
+        <button class="btn secondary" onclick="downloadReceiptList()">정산서 목록 엑셀</button>
+      </div>
     </div>
-    <p class="muted">가입폼 제출 또는 수기 고객추가 시 이름·닉네임·연락처·주소가 정산실과 택배실에 즉시 반영됩니다.</p>
-    <div class="tableWrap"><table>
-      <thead><tr>
-        <th><input type="checkbox" onchange="selectAll('customerChecks',this.checked)"></th>
-        <th>가입시간</th><th>이름</th><th>주문닉네임</th><th>연락처</th><th>주소</th><th>배송메모</th><th>등록방식</th><th>수정</th>
-      </tr></thead>
-      <tbody id="customerBody"></tbody>
-    </table></div>
-  </div>
-</section>
+    <div id="receiptSummary" class="note no-print"></div>
+    <div id="receiptCards" class="receipt-wrap"></div>
+  </section>
 
-
-<section id="smsroom" class="page">
-  <div class="card">
-    <div class="row">
-      <h2 class="grow">문자 대기실</h2>
-      <span class="badge b-info" id="smsQueueCount">대기 0명</span>
-      <button class="btn gold" onclick="buildSmsQueue()">정산서 발행 고객 불러오기</button>
-      <button class="btn" onclick="selectAll('smsChecks',true)">전체선택</button>
-      <button class="btn" onclick="selectAll('smsChecks',false)">전체해제</button>
-      <button class="btn ok" onclick="sendSelectedSms()">선택전송</button>
-      <button class="btn info" onclick="sendAllSms()">일괄전송</button>
-      <button class="btn warn" onclick="toggleUnsentOnly()">미전송 고객만 보기</button>
+  <section id="payments" class="page">
+    <div class="section-title">
+      <h2>입금내역 대조</h2>
+      <div class="actions">
+        <label class="btn upload">거래내역 업로드<input id="paymentFile" type="file" accept=".xlsx,.xls,.csv"></label>
+        <button class="btn secondary" onclick="clearPayments()">입금내역 초기화</button>
+      </div>
     </div>
-    <p class="muted">가입폼 고객은 저장된 연락처를 자동 사용합니다. 미가입 고객은 전화번호를 수기로 입력할 수 있습니다. 이미지 확인 체크 후 전송할 수 있습니다.</p>
-    <div class="tableWrap"><table>
-      <thead><tr>
-        <th><input type="checkbox" onchange="selectAll('smsChecks',this.checked)"></th>
-        <th>고객</th><th>연락처</th><th>정산금액</th><th>정산서 이미지</th><th>확인</th><th>전송</th><th>상태</th>
-      </tr></thead>
-      <tbody id="smsBody"></tbody>
-    </table></div>
-  </div>
-  <div id="smsPreviewArea" style="display:flex;flex-wrap:wrap;gap:15px;margin-top:16px"></div>
-</section>
+    <p class="muted">입금자명·입금액·거래일시를 자동 탐색합니다. 고객DB의 실명 또는 닉네임과 금액을 함께 대조하며, 동명이인·금액불일치는 확인필요로 분리합니다.</p>
+    <div id="paymentsTable"></div>
+  </section>
 
-<section id="settings" class="page">
-  <div class="grid">
-    <div class="card">
-      <h2>정산서 기본정보</h2>
-      <div class="row"><input id="bank" placeholder="은행"><input id="account" class="grow" placeholder="계좌번호"><input id="holder" placeholder="예금주"></div><br>
-      <div class="row"><input id="shippingFee" type="number" value="4000" placeholder="배송비"><input id="kakaoUrl" class="grow" placeholder="카카오채널 링크"></div><br>
-      <button class="btn gold" onclick="saveSettings()">기본정보 저장</button>
+  <section id="shipping" class="page">
+    <div class="section-title">
+      <h2>택배실</h2>
+      <div class="actions">
+        <button class="btn" onclick="downloadShippingList()">택배리스트 엑셀 출력</button>
+        <button class="btn secondary" onclick="printShipping()">택배리스트 인쇄</button>
+      </div>
     </div>
-    <div class="card">
-      <h2>외부 연결</h2>
-      <div class="row"><input id="commentApi" class="grow" placeholder="댓글 수집 API 주소"><button class="btn info" onclick="connectCommentApi()">댓글서버 연결</button></div><br>
-      <div class="row"><input id="smsUrl" class="grow" placeholder="문자 발송 사이트/솔라피 링크"><button class="btn" onclick="openSms()">문자 사이트 열기</button></div><br>
-<div class="row"><input id="smsApi" class="grow" placeholder="문자 API 주소(선택)"><input id="smsSender" placeholder="발신번호(선택)"></div><br><div class="row"><input id="joinUrl" class="grow" placeholder="가입폼 공개주소 (예: https://도메인/join.html)"><button class="btn" onclick="copyJoinUrl()">가입링크 복사</button></div>
-      <p class="muted">링크만 넣어도 버튼으로 바로 열 수 있습니다. 실제 자동발송은 문자 API 키 연결이 필요합니다.</p>
+    <div class="form-grid card">
+      <div><label>출력 대상</label><select id="shippingFilter" onchange="renderShipping()"><option value="paid">입금완료만</option><option value="all">전체 정산서</option></select></div>
+      <div><label>합배송 기준</label><select id="bundleMode" onchange="renderShipping()"><option value="date">방송일자별 분리</option><option value="customer">고객별 합배송</option></select></div>
     </div>
-  </div>
-</section>
-
-<section id="test" class="page">
-  <div class="card">
-    <div class="row"><h2 class="grow">전체 기능 자동점검</h2><button class="btn gold" onclick="runSelfTest()">점검 실행</button></div>
-    <div id="testResult" class="log" style="height:420px"></div>
-  </div>
-</section>
+    <div id="shippingTable"></div>
+  </section>
 </main>
 
-<div id="receiptPopup" class="popupBack" onclick="if(event.target===this)closeReceiptPopup()">
- <div class="popupBox">
-  <div class="row"><h2 class="grow">정산서 상세보기</h2>
-   <button class="btn gold" onclick="printCurrentReceiptOnly()">정산서만 인쇄</button>
-   <button class="btn" onclick="closeReceiptPopup()">닫기</button>
+<div id="customerModal" class="modal">
+ <div class="modal-box">
+  <div class="section-title"><h3>고객 등록/수정</h3><button class="btn secondary" onclick="closeCustomerModal()">닫기</button></div>
+  <div class="form-grid">
+   <div><label>실명</label><input id="cName"></div>
+   <div><label>닉네임</label><input id="cNick"></div>
+   <div><label>전화번호</label><input id="cPhone"></div>
+   <div><label>주소</label><input id="cAddress"></div>
   </div>
-  <div id="receiptPopupContent"></div>
+  <input type="hidden" id="cEditIndex">
+  <div class="actions" style="margin-top:16px"><button class="btn" onclick="saveCustomer()">저장</button></div>
  </div>
 </div>
-
-<div id="smsConfirmPopup" class="popupBack" onclick="if(event.target===this)closeSmsConfirm()">
- <div class="popupBox">
-  <div class="row"><h2 class="grow">문자 전송 최종확인</h2><button class="btn" onclick="closeSmsConfirm()">닫기</button></div>
-  <div id="smsConfirmReceipt"></div>
-  <h3>실제 발송 내용</h3>
-  <div id="smsConfirmMessage" class="smsConfirmMessage"></div>
-  <label style="display:block;margin:14px 0"><input type="checkbox" id="smsFinalCheck"> 수신번호와 정산 내용을 확인했습니다.</label>
-  <div class="row" style="justify-content:flex-end">
-   <button class="btn" onclick="closeSmsConfirm()">취소</button>
-   <button class="btn ok" id="smsFinalSendButton" onclick="confirmAndSendSms()">확인 후 바로 전송</button>
-  </div>
- </div>
-</div>
-
-<div id="customerModal" class="modalBack" onclick="if(event.target===this)closeCustomerModal()">
-<div class="modalBox"><div class="row"><h2 class="grow" id="customerModalTitle">고객정보 추가</h2><button class="btn" onclick="closeCustomerModal()">닫기</button></div>
-<input type="hidden" id="mOriginalNickname">
-<div class="formGrid">
-<div><label>고객 성함 *</label><input id="mName" placeholder="받는 분 이름"></div>
-<div><label>방송 주문 닉네임 *</label><input id="mNickname" placeholder="유튜브 닉네임"></div>
-<div><label>연락처 *</label><input id="mPhone" placeholder="010-0000-0000"></div>
-<div><label>우편번호</label><input id="mPostalCode" placeholder="우편번호"></div>
-<div class="full"><label>기본주소 *</label><input id="mAddress" placeholder="기본주소"></div>
-<div class="full"><label>상세주소</label><input id="mDetailAddress" placeholder="상세주소"></div>
-<div class="full"><label>배송메모</label><input id="mMemo" placeholder="문 앞, 연락 후 배송 등"></div>
-</div><div class="row" style="justify-content:flex-end;margin-top:18px"><button class="btn" onclick="closeCustomerModal()">취소</button><button class="btn gold" onclick="saveCustomerFromModal()">고객정보 저장</button></div>
-</div></div>
 
 <script>
-const KEY='firstoms_emergency_v2';
-let state={products:[],productCatalog:{},orders:[],raw:[],customers:{},paymentStatus:{},smsQueue:[],smsPreviewImages:{},settings:{bank:'',account:'',holder:'',shippingFee:4000,kakaoUrl:'http://pf.kakao.com/_DEPfX',smsUrl:'',commentApi:'',joinUrl:'',smsApi:'',smsSender:''},currentProductId:null,broadcastStartedAt:null,currentReceiptCustomer:null,youtubeSeen:{},youtubeNextPageToken:'',youtubePolling:false,youtubeLiveComments:[]};
-function now(){return new Date().toLocaleTimeString('ko-KR',{hour12:false})}
-function uid(){return Date.now().toString(36)+Math.random().toString(36).slice(2,7)}
-function money(n){return Number(n||0).toLocaleString('ko-KR')+'원'}
-function esc(s){return String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]))}
-function save(){localStorage.setItem(KEY,JSON.stringify(state));document.getElementById('saveDot').className='dot ok';document.getElementById('saveText').textContent='자동저장 정상'}
-async function load(){
- let x=localStorage.getItem(KEY);
- if(x)try{state=JSON.parse(x)}catch(e){}
- applySettings();if(youtubeUrl.value){setTimeout(loadVideo,100)}renderAll();setTimeout(()=>{if(window.pNo){pNo.addEventListener('input',autofillProductByNo);pNo.addEventListener('change',autofillProductByNo)}},0);
- await syncCustomers(true);
- setInterval(()=>syncCustomers(true),5000);
-}
-document.querySelectorAll('nav button').forEach(b=>b.onclick=()=>{document.querySelectorAll('nav button').forEach(x=>x.classList.remove('active'));b.classList.add('active');document.querySelectorAll('.page').forEach(x=>x.classList.remove('active'));document.getElementById(b.dataset.page).classList.add('active');renderAll()})
-function videoId(url){let m=String(url).match(/(?:youtu\.be\/|v=|live\/|embed\/)([\w-]{6,})/);return m?m[1]:''}
-function youtubeEmbedDomain(){
- const h=location.hostname||'localhost';
- return h==='127.0.0.1'?'localhost':h;
-}
-function loadYoutubeChat(id){}
-function loadVideo(){
- let id=videoId(youtubeUrl.value);
- if(!id)return alert('유튜브 라이브 주소를 확인해 주세요.');
- videoFrame.src='https://www.youtube.com/embed/'+id+'?autoplay=1';
- 
- localStorage.setItem('firstoms_video',youtubeUrl.value)
-}
-function openYoutubeChatWindow(){
- const id=videoId(youtubeUrl.value);
- if(!id)return alert('먼저 유튜브 라이브 주소를 입력해 주세요.');
- window.open('https://www.youtube.com/live_chat?v='+encodeURIComponent(id),'_blank','width=500,height=800')
-}
-let youtubePollTimer=null;
-async function connectYoutubeAccount(){
- try{
-   const r=await fetch('/api/youtube/status',{cache:'no-store'});
-   const j=await r.json();
-   if(j.connected){
-     chatStatus.textContent='유튜브 계정 연결됨';
-     chatStatus.className='badge b-ok';
-     alert('유튜브 계정이 이미 연결되어 있습니다. 댓글 자동수집 시작을 누르세요.');
-     return;
-   }
- }catch(e){}
- window.open('/api/youtube/oauth/start','youtubeOAuth','width=560,height=760');
- chatStatus.textContent='구글 승인 대기';
- chatStatus.className='badge b-info';
-}
-async function checkYoutubeStatus(){
- try{
-  const r=await fetch('/api/youtube/status',{cache:'no-store'}),j=await r.json();
-  if(j.connected){
-    chatStatus.textContent='유튜브 계정 연결됨';
-    chatStatus.className='badge b-ok';
-    return true;
-  }
- }catch(e){}
- return false;
-}
-function escapeHtml(v){return String(v??'').replace(/[&<>"']/g,s=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[s]))}
-function pickYoutubeComment(id){
- const m=(state.youtubeLiveComments||[]).find(x=>x.id===id);if(!m)return;
- cNick.value=m.author||'';cText.value=m.text||'';
- previewCustomerMatch();cText.focus();
-}
-function renderYoutubeLiveComments(){
- const box=document.getElementById('liveCommentFeed');if(!box)return;
- const rows=(state.youtubeLiveComments||[]).slice(-100).reverse();
- if(!rows.length){box.innerHTML='<div class="liveCommentEmpty">댓글 자동수집 시작을 누르면<br>유튜브 댓글이 여기에 바로 표시됩니다.</div>';return}
- box.innerHTML=rows.map(m=>`<div class="liveCommentItem">
-  <span class="liveCommentTime">${escapeHtml((m.publishedAt||'').slice(11,19)||m.time||'')}</span>
-  <span class="liveCommentNick">${escapeHtml(m.author||'유튜브고객')}</span>
-  <span class="liveCommentText">${escapeHtml(m.text||'')}</span>
-  <button class="liveCommentPick" onclick="pickYoutubeComment('${m.id}')">선택</button>
- </div>`).join('');
-}
-function ingestYoutubeMessage(m){
- state.youtubeSeen=state.youtubeSeen||{};
- if(state.youtubeSeen[m.id])return;
- state.youtubeSeen[m.id]=Date.now();
- const nick=m.author||'유튜브고객',text=m.text||'';
- if(!text)return;
- state.youtubeLiveComments=state.youtubeLiveComments||[];
- state.youtubeLiveComments.push({...m,time:now()});
- if(state.youtubeLiveComments.length>200)state.youtubeLiveComments=state.youtubeLiveComments.slice(-200);
- state.raw.push({id:uid(),time:now(),type:'유튜브댓글',text:nick+' : '+text});
- renderYoutubeLiveComments();
+const KEY='firstOmsEmergencySettlementV1';
+let state={orders:[],customers:[],payments:[]};
+const $=id=>document.getElementById(id);
+const money=n=>(Number(n)||0).toLocaleString('ko-KR')+'원';
+const norm=v=>String(v??'').trim().replace(/\s+/g,'').toLowerCase();
+const phoneNorm=v=>String(v??'').replace(/\D/g,'');
+const today=()=>new Date().toISOString().slice(0,10);
+$('broadcastDate').value=today();
 
- const p=cur();
- const published=Date.parse(m.publishedAt||'')||Date.now();
- const afterProduct=!!p && published >= (Number(p.createdAt)||0)-1500;
- const isAdmin=!!m.isOwner||!!m.isModerator;
- if(youtubeAutoOrder.checked && afterProduct && !isAdmin){
-   processComment(nick,text,m);
- }else if(!afterProduct){
-   state.raw.push({id:uid(),time:now(),type:'주문제외',text:nick+' : '+text+' [상품 등록 전 댓글]'});
+document.querySelectorAll('.tab').forEach(b=>b.onclick=()=>go(b.dataset.page));
+function go(id){
+ document.querySelectorAll('.tab').forEach(b=>b.classList.toggle('active',b.dataset.page===id));
+ document.querySelectorAll('.page').forEach(p=>p.classList.toggle('active',p.id===id));
+ if(id==='receipts') renderReceipts(); if(id==='shipping') renderShipping();
+}
+function saveAll(){localStorage.setItem(KEY,JSON.stringify(state));alert('현재 자료를 이 기기에 저장했습니다.');}
+function loadAll(){try{state=JSON.parse(localStorage.getItem(KEY))||state}catch(e){} renderAll();}
+function readWorkbook(file, cb){
+ const r=new FileReader(); r.onload=e=>{try{
+  const wb=XLSX.read(e.target.result,{type:'array',cellDates:true});
+  const all=[]; wb.SheetNames.forEach(sn=>all.push(...XLSX.utils.sheet_to_json(wb.Sheets[sn],{header:1,defval:''})));
+  cb(all,file.name);
+ }catch(err){alert('파일을 읽지 못했습니다: '+err.message)}}; r.readAsArrayBuffer(file);
+}
+function findHeader(rows, aliases){
+ for(let i=0;i<Math.min(rows.length,30);i++){
+  const row=rows[i].map(norm); let score=0;
+  Object.values(aliases).forEach(list=>{if(row.some(v=>list.some(a=>v.includes(norm(a)))))score++});
+  if(score>=2)return i;
+ } return 0;
+}
+function colMap(header, aliases){
+ const h=header.map(norm), m={};
+ for(const [key,list] of Object.entries(aliases)){
+  m[key]=h.findIndex(v=>list.some(a=>v.includes(norm(a))));
  }
- save();renderAll();
+ return m;
 }
-async function pollYoutubeComments(){
- if(!state.youtubePolling)return;
- const id=videoId(youtubeUrl.value);
- if(!id){stopYoutubeComments();return alert('유튜브 라이브 주소를 확인해 주세요.')}
- try{
-   const q=new URLSearchParams({videoId:id});
-   if(state.youtubeNextPageToken)q.set('pageToken',state.youtubeNextPageToken);
-   const r=await fetch('/api/youtube/comments?'+q.toString(),{cache:'no-store'});
-   const j=await r.json();
-   if(r.status===401){
-     stopYoutubeComments();
-     chatStatus.textContent='유튜브 계정 연결 필요';
-     chatStatus.className='badge b-bad';
-     return alert('유튜브 계정 연결 버튼을 누르고 구글 권한을 승인해 주세요.');
-   }
-   if(!r.ok||!j.ok)throw new Error(j.error||('댓글 서버 오류 '+r.status));
-   (j.messages||[]).forEach(ingestYoutubeMessage);
-   state.youtubeNextPageToken=j.nextPageToken||state.youtubeNextPageToken||'';
-   save();
-   chatStatus.textContent='실시간 댓글 연결됨 · 새 댓글 '+(j.messages||[]).length+'건';
-   chatStatus.className='badge b-ok';
-   const wait=Math.max(2000,Math.min(10000,j.pollingIntervalMillis||3500));
-   youtubePollTimer=setTimeout(pollYoutubeComments,wait);
- }catch(e){
-   chatStatus.textContent='댓글 오류: '+e.message;
-   chatStatus.className='badge b-bad';
-   youtubePollTimer=setTimeout(pollYoutubeComments,5000);
- }
-}
-async function startYoutubeComments(){
- const id=videoId(youtubeUrl.value);
- if(!id)return alert('유튜브 라이브 주소를 입력하고 영상 연결을 먼저 눌러주세요.');
- const connected=await checkYoutubeStatus();
- if(!connected)return connectYoutubeAccount();
- state.youtubePolling=true;
- state.youtubeNextPageToken='';
- save();
- if(youtubePollTimer)clearTimeout(youtubePollTimer);
- chatStatus.textContent='댓글 자동수집 시작 중';
- chatStatus.className='badge b-info';
- pollYoutubeComments();
-}
-function stopYoutubeComments(){
- state.youtubePolling=false;
- if(youtubePollTimer)clearTimeout(youtubePollTimer);
- youtubePollTimer=null;
- save();
- chatStatus.textContent='댓글수집 중지';
- chatStatus.className='badge b-warn';
-}
-window.addEventListener('message',function(e){
- if(e.data==='youtube-connected'){
-   chatStatus.textContent='유튜브 계정 연결됨';
-   chatStatus.className='badge b-ok';
-   startYoutubeComments();
- }
-});
-
-function autofillProductByNo(){
- const no=pNo.value.trim();
- if(!no)return;
- const saved=state.productCatalog?.[no] || [...state.products].reverse().find(x=>String(x.no)===String(no));
- if(!saved){
-   pName.value='';pPrice.value='';pMax.value='';
-   return;
- }
- pName.value=saved.name||'';
- pPrice.value=saved.price||'';
- pMax.value=saved.max||'';
- // 한정수량은 방송마다 달라질 수 있어 자동확정하지 않음
- if(!pLimit.value && saved.lastLimit) pLimit.placeholder='이전 '+saved.lastLimit+'개';
-}
-function rememberProduct(p){
- state.productCatalog=state.productCatalog||{};
- state.productCatalog[String(p.no)]={
-   no:String(p.no),name:p.name,price:p.price,max:p.max||0,lastLimit:p.limit||0,
-   updatedAt:new Date().toISOString()
- };
-}
-async function postYoutubeMessage(text){
- const id=videoId(youtubeUrl.value);
- if(!id)throw new Error('유튜브 라이브 주소를 먼저 입력하고 영상 연결을 눌러주세요.');
- const r=await fetch('/api/youtube/message',{
-   method:'POST',headers:{'Content-Type':'application/json'},
-   body:JSON.stringify({videoId:id,text})
+const orderAliases={
+ nick:['닉네임','고객닉네임','구매자','고객명','성명'],
+ item:['품목','상품명','상품','제품명'],
+ qty:['수량','개수','주문수량'],
+ unit:['단가','가격','판매가'],
+ amount:['금액','합계','총액','판매금액'],
+ date:['방송일','방송일자','주문일','날짜']
+};
+function importOrders(rows,filename){
+ const hi=findHeader(rows,orderAliases), map=colMap(rows[hi]||[],orderAliases);
+ const bdate=$('broadcastDate').value||today(), fee=Number($('shippingFee').value)||0;
+ let parsed=[];
+ rows.slice(hi+1).forEach((r,idx)=>{
+  const nick=map.nick>=0?r[map.nick]:'', item=map.item>=0?r[map.item]:'';
+  if(!String(nick).trim()||!String(item).trim())return;
+  const qty=Number(String(map.qty>=0?r[map.qty]:1).replace(/[^0-9.-]/g,''))||1;
+  const unit=Number(String(map.unit>=0?r[map.unit]:0).replace(/[^0-9.-]/g,''))||0;
+  const amount=Number(String(map.amount>=0?r[map.amount]:0).replace(/[^0-9.-]/g,''))||qty*unit;
+  const dateVal=map.date>=0&&r[map.date]?formatDate(r[map.date]):bdate;
+  parsed.push({id:crypto.randomUUID(),date:dateVal,nick:String(nick).trim(),item:String(item).trim(),qty,unit,amount,fee,source:filename});
  });
- const j=await r.json();
- if(!r.ok||!j.ok)throw new Error(j.error||('유튜브 전송 오류 '+r.status));
- return j
-}
-function productYoutubeText(p){
- const parts=[`#${p.no} ${p.name} - ${money(p.price)}`];
- if(p.limit>0)parts.push(`한정 ${p.limit}개`);
- if(p.max>0)parts.push(`인당 최대 ${p.max}개`);
- return parts.join(' · ');
-}
-async function registerProduct(){
- let p={id:uid(),no:pNo.value.trim()||String(state.products.length+1),name:pName.value.trim(),price:+pPrice.value,limit:+pLimit.value,max:+pMax.value,sold:0,active:true,createdAt:Date.now()};
- if(!p.name||!p.price)return alert('상품명과 가격을 입력해 주세요.');
- state.products.push(p);rememberProduct(p);state.currentProductId=p.id;
- log('상품등록','#'+p.no+' '+p.name+' / '+money(p.price));save();renderAll();
- youtubeSendStatus.textContent='유튜브 전송 중';youtubeSendStatus.className='badge b-info';
- try{
-   await postYoutubeMessage(productYoutubeText(p));
-   youtubeSendStatus.textContent='유튜브 댓글 등록 완료';youtubeSendStatus.className='badge b-ok';
- }catch(e){
-   youtubeSendStatus.textContent='유튜브 전송 실패';youtubeSendStatus.className='badge b-bad';
-   alert('상품은 방송실에 등록됐지만 유튜브 댓글 전송은 실패했습니다.\\n'+e.message+'\\n\\n먼저 유튜브 계정 연결을 눌러 승인해 주세요.');
+ if($('duplicateMode').value==='replaceDate'){
+  const dates=[...new Set(parsed.map(x=>x.date))]; state.orders=state.orders.filter(o=>!dates.includes(o.date));
  }
+ state.orders.push(...parsed); autoMatchAll(); saveSilently(); renderAll(); go('orders');
+ alert(parsed.length+'개 주문행을 불러왔습니다.');
 }
-function cur(){return state.products.find(p=>p.id===state.currentProductId)}
-async function addStock(){
- let p=cur(),q=+extraQty.value;
- if(!p||q<=0)return alert('현재 상품과 추가수량을 확인해 주세요.');
- p.limit+=q;log('추가수량',p.name+' +'+q+'개');save();renderAll();
- try{
-   youtubeSendStatus.textContent='추가수량 전송 중';youtubeSendStatus.className='badge b-info';
-   await postYoutubeMessage(`#${p.no} ${p.name} 추가수량 ${q}개 · 총 한정 ${p.limit}개`);
-   youtubeSendStatus.textContent='추가수량 댓글 완료';youtubeSendStatus.className='badge b-ok';
- }catch(e){
-   youtubeSendStatus.textContent='추가수량 전송 실패';youtubeSendStatus.className='badge b-bad';
-   alert(e.message);
- }
+function formatDate(v){
+ if(v instanceof Date&&!isNaN(v))return v.toISOString().slice(0,10);
+ const s=String(v).trim(); const d=new Date(s); return isNaN(d)?($('broadcastDate').value||today()):d.toISOString().slice(0,10);
 }
-async function closeProduct(){
- let p=cur();if(!p)return;
- p.active=false;log('상품마감',p.name);save();renderAll();
- try{
-   youtubeSendStatus.textContent='마감댓글 전송 중';youtubeSendStatus.className='badge b-info';
-   await postYoutubeMessage(`--마감되었습니다-- #${p.no} ${p.name}`);
-   youtubeSendStatus.textContent='마감댓글 완료';youtubeSendStatus.className='badge b-ok';
- }catch(e){
-   youtubeSendStatus.textContent='마감댓글 실패';youtubeSendStatus.className='badge b-bad';
-   alert(e.message);
- }
-}
-function log(type,text){state.raw.push({id:uid(),time:now(),type,text});save()}
-function koreanQty(text){
- const map={'한':1,'하나':1,'한개':1,'두':2,'둘':2,'두개':2,'세':3,'셋':3,'세개':3,'네':4,'넷':4,'네개':4,'다섯':5,'다섯개':5};
- const s=String(text||'').replace(/\s+/g,'');
- for(const [k,v] of Object.entries(map))if(s===k||s.endsWith(k))return v;
- return 0;
-}
-function orderIntent(text,p){
- const raw=String(text||'').trim();
- const s=raw.replace(/\s+/g,'').toLowerCase();
- if(!raw||!p)return {ok:false,reason:'현재 상품 없음'};
- // 관리자 안내·가격·전화번호·일상 대화는 주문 제외
- if(/마감되었습니다|확인하였습니다|상품등록|추가수량|한정\s*\d+|인당\s*최대|판매가|원\b/.test(raw))return {ok:false,reason:'관리자 안내'};
- if(/\d{2,3}[-.\s]?\d{3,4}[-.\s]?\d{4}/.test(raw))return {ok:false,reason:'연락처 형식'};
- if(/취소|변경|선물/.test(raw))return {ok:true,action:/전체취소|전부취소/.test(raw)?'전체취소':/취소/.test(raw)?'취소':/변경/.test(raw)?'변경':'선물',qty:0};
- let qty=0, explicit=false;
- // 허용 주문형식: 2 / 2개 / x2 / 1번 2개 / #1 2 / 수량2 / 주문2 / 두개
- let m=s.match(/^(\d{1,2})(?:개|ea)?$/);
- if(m){qty=+m[1];explicit=true}
- if(!explicit&&(m=s.match(/^(?:x|×)(\d{1,2})$/))){qty=+m[1];explicit=true}
- if(!explicit&&(m=s.match(/^(?:수량|주문|추가)(\d{1,2})(?:개)?$/))){qty=+m[1];explicit=true}
- if(!explicit&&(m=s.match(/^(?:#?(\d{1,3})번?|상품(\d{1,3}))[:\-]?(?:수량|주문)?(\d{1,2})(?:개)?$/))){
-   const no=String(m[1]||m[2]||''); if(no===String(p.no)){qty=+(m[3]||1);explicit=true}
- }
- if(!explicit){
-   const k=koreanQty(s); if(k){qty=k;explicit=true}
- }
- if(!explicit)return {ok:false,reason:'주문형식 아님'};
- if(!Number.isInteger(qty)||qty<1||qty>99)return {ok:false,reason:'수량 범위 오류'};
- return {ok:true,action:'주문',qty};
-}
-function normalizeCustomerText(v){return String(v||'').replace(/\s+/g,'').toLowerCase()}
-function findCustomerKey(v){
- const q=normalizeCustomerText(v);if(!q)return '';
- const keys=Object.keys(state.customers||{});
- return keys.find(k=>normalizeCustomerText(k)===q)
-  ||keys.find(k=>normalizeCustomerText(state.customers[k]?.nickname)===q)
-  ||keys.find(k=>normalizeCustomerText(state.customers[k]?.name)===q)||'';
-}
-function previewCustomerMatch(){
- const key=findCustomerKey(cNick.value),box=document.getElementById('customerMatchInfo');
- if(!box)return;
- if(key){const c=state.customers[key];box.style.color='#7ee2a8';box.textContent=`고객정보 자동연결: ${c.name||key} · ${c.phone||'연락처 없음'} · ${[c.address,c.detailAddress].filter(Boolean).join(' ')||'주소 없음'}`}
- else{box.style.color='';box.textContent='일치 고객 없음 · 정산 전 고객정보 확인이 필요합니다.'}
-}
-function applyCustomerMatch(){const key=findCustomerKey(cNick.value);if(key)cNick.value=key;previewCustomerMatch()}
-function startNewBroadcast(){
- if(!confirm('테스트 주문·정산·문자대기 내역을 초기화하고 새 방송을 시작할까요?\\n고객DB와 상품번호 기억은 유지됩니다.'))return;
- state.products=[];state.orders=[];state.raw=[];state.currentProductId=null;
- state.paymentStatus={};state.smsQueue=[];state.smsPreviewImages={};state.currentReceiptCustomer=null;
- state.broadcastStartedAt=new Date().toISOString();state.youtubeSeen={};state.youtubeNextPageToken='';stopYoutubeComments();
- localStorage.removeItem('firstoms_video');
- youtubeUrl.value='';videoFrame.src='';chatStatus.textContent='채팅 대기';chatStatus.className='badge b-warn';
- pNo.value='';pName.value='';pPrice.value='';pLimit.value='';pMax.value='';extraQty.value='';
- cNick.value='';cText.value='';receiptArea.innerHTML='';packingArea.innerHTML='';smsPreviewArea.innerHTML='';
- save();renderAll();
- broadcastStatus.textContent='방송 진행 중 · '+new Date().toLocaleTimeString('ko-KR',{hour:'2-digit',minute:'2-digit'});
- broadcastStatus.className='badge b-ok';
- alert('새 방송을 시작했습니다. 기존 테스트 주문·정산·문자대기 내역을 초기화했습니다.');
-}
-function processComment(autoNick,autoText,sourceMeta){
- let nick=String(autoNick??cNick.value).trim(),text=String(autoText??cText.value).trim();
- if(!nick||!text){if(autoNick==null)alert('닉네임과 댓글을 입력해 주세요.');return false}
- let matched=findCustomerKey(nick);if(matched){nick=matched;if(autoNick==null)cNick.value=matched}
- state.raw.push({id:uid(),time:now(),type:'원본댓글',text:nick+' : '+text});
- let p=cur(),intent=orderIntent(text,p);
- if(!intent.ok){
-   state.raw.push({id:uid(),time:now(),type:'주문아님',text:nick+' : '+text+' ['+intent.reason+']'});
-   save();if(autoNick==null)cText.value='';renderAll();return false;
- }
- let qty=intent.qty||0,kind=intent.action,status='ok';
- if(kind==='전체취소'){
-   state.orders.filter(o=>o.nick===nick&&o.status==='ok').forEach(o=>o.status='cancel');
-   save();if(autoNick==null)cText.value='';renderAll();return true;
- }
- if(kind==='취소'){
-   let last=[...state.orders].reverse().find(o=>o.nick===nick&&o.productId===p.id&&o.status==='ok');
-   if(last){last.status='cancel';p.sold=Math.max(0,p.sold-last.qty)}
-   save();if(autoNick==null)cText.value='';renderAll();return true;
- }
- if(kind==='변경'){
-   state.raw.push({id:uid(),time:now(),type:'확인필요',text:nick+' : '+text+' [변경수량 확인]'});
-   save();if(autoNick==null)cText.value='';renderAll();return false;
- }
- if(kind==='선물'){
-   state.raw.push({id:uid(),time:now(),type:'확인필요',text:nick+' : '+text+' [선물받는분 확인]'});
-   save();if(autoNick==null)cText.value='';renderAll();return false;
- }
- if(p.max&&qty>p.max){qty=p.max;status='warn';kind+='(최대수량조정)'}
- if(p.limit&&p.sold+qty>p.limit){qty=Math.max(0,p.limit-p.sold);status=qty?'warn':'cancel';kind=qty?'잔여수량만 접수':'품절'}
- if(qty>0){
-   state.orders.push({id:uid(),time:now(),nick,payer:nick,receiver:nick,productId:p.id,product:p.name,qty,price:p.price,billable:true,gift:false,status:status==='cancel'?'cancel':'ok',raw:text});
-   p.sold+=qty;
- }
- save();if(autoNick==null)cText.value='';renderAll();return qty>0;
-}
-function editOrder(id){let o=state.orders.find(x=>x.id===id);if(!o)return;let q=+prompt('최종 수량',o.qty);if(!Number.isFinite(q)||q<0)return;let p=state.products.find(x=>x.id===o.productId);if(p&&o.status==='ok')p.sold=Math.max(0,p.sold-o.qty+q);o.qty=q;o.status=q===0?'cancel':'ok';o.raw+=' [관리자수정]';save();renderAll()}
-function activeOrders(){return state.orders.filter(o=>o.status==='ok'&&o.qty>0)}
-function grouped(){let m={};activeOrders().forEach(o=>{let key=o.payer||o.nick;if(!m[key])m[key]={payer:key,items:[],amount:0,receivers:new Set};m[key].items.push(o);if(o.billable)m[key].amount+=o.qty*o.price;m[key].receivers.add(o.receiver||o.nick)});return Object.values(m)}
-function customer(n){
- if(!state.customers[n])state.customers[n]={name:n,nickname:n,phone:'',postalCode:'',address:'',detailAddress:'',memo:'',joinedAt:'',source:'수기'};
- return state.customers[n]
-}
-function updateCustomer(n,f,v){customer(n)[f]=v;save()}
-function renderAll(){renderYoutubeLiveComments();let p=cur();currentProduct.innerHTML=p?`<b>#${esc(p.no)} ${esc(p.name)}</b> · ${money(p.price)} · 판매 ${p.sold}/${p.limit||'∞'} · 인당 ${p.max||'∞'}개`:'현재 등록 상품 없음';
- let ok=state.orders.filter(o=>o.status==='ok').length,warn=state.raw.filter(x=>/확인필요/.test(x.type+x.text)).length,bad=state.orders.filter(o=>o.status!=='ok').length;kOk.textContent=ok;kWarn.textContent=warn;kBad.textContent=bad;
- orderBody.innerHTML=[...state.orders].reverse().map(o=>`<tr><td><span class="badge ${o.status==='ok'?'b-ok':o.status==='cancel'?'b-bad':'b-warn'}">${o.status==='ok'?'정상접수':o.status}</span></td><td>${o.time}</td><td>${esc(o.nick)}${o.gift?'<br><span class="badge b-info">선물</span>':''}</td><td>${esc(o.product)}</td><td>${o.qty}</td><td>${money(o.billable?o.qty*o.price:0)}</td><td>${esc(o.raw)}</td><td><button class="btn" onclick="editOrder('${o.id}')">수정</button></td></tr>`).join('');
- rawLog.innerHTML=[...state.raw].reverse().map(x=>`<div>[${x.time}] <b>${esc(x.type)}</b> ${esc(x.text)}</div>`).join('');
- renderSettlement();renderShipping();renderCustomerDb();renderSmsRoom()}
-function paymentOf(n){return (state.paymentStatus&&state.paymentStatus[n])||'미입금'}
-function setPaymentStatus(n,v){state.paymentStatus=state.paymentStatus||{};state.paymentStatus[n]=v;save();renderSettlement()}
-function moveCustomerToSms(n){
- if(paymentOf(n)!=='입금')return alert('입금 완료 고객만 문자 대기실로 이동할 수 있습니다.');
- const g=grouped().find(x=>x.payer===n);if(!g)return alert('정산 내역이 없습니다.');
- const fee=+state.settings.shippingFee||0,c=customer(n);
- state.smsQueue=state.smsQueue||[];
- const old=state.smsQueue.find(x=>x.nickname===n);
- const item={nickname:n,phone:c.phone||'',amount:g.amount+fee,status:old?.status||'대기',sentAt:old?.sentAt||''};
- if(old)Object.assign(old,item);else state.smsQueue.push(item);
- save();renderSmsRoom();alert(n+' 고객을 문자 대기실로 이동했습니다.');
-}
-function renderSettlement(){
- let gs=grouped();
- settleBody.innerHTML=gs.map(g=>{
-   let c=customer(g.payer),fee=+state.settings.shippingFee||0,total=g.amount+fee;
-   let fullAddr=[c.postalCode,c.address,c.detailAddress].filter(Boolean).join(' '),ps=paymentOf(g.payer);
-   return `<tr>
-    <td><input class="settleChecks" type="checkbox" value="${esc(g.payer)}"></td>
-    <td><b>${esc(g.payer)}</b>${c.phone&&c.address?'<br><span class="badge b-ok">고객DB 자동연결</span>':'<br><span class="badge b-warn">정보확인</span>'}</td>
-    <td>${esc(c.name||'미입력')}</td><td>${esc(c.phone||'미입력')}</td><td>${esc(fullAddr||'미입력')}</td>
-    <td>${g.items.length}</td><td>${money(g.amount)}</td><td>${money(fee)}</td><td><b>${money(total)}</b></td>
-    <td><select class="paymentSelect" onchange="setPaymentStatus('${esc(g.payer)}',this.value)">
-      <option value="미입금" ${ps==='미입금'?'selected':''}>미입금</option>
-      <option value="입금" ${ps==='입금'?'selected':''}>입금</option>
-      <option value="보류" ${ps==='보류'?'selected':''}>보류</option>
-    </select></td>
-    <td><button class="btn" onclick="editInfo('${esc(g.payer)}')">수정</button></td>
-    <td><button class="btn info" onclick="showReceipt('${esc(g.payer)}')">팝업 보기</button></td>
-    <td><button class="btn ${ps==='입금'?'ok':'warn'}" onclick="moveCustomerToSms('${esc(g.payer)}')">문자 대기실 이동</button></td>
-   </tr>`
- }).join('')
-}
-async function editInfo(n){openCustomerModal(n)}
-function receiptHtml(n){let g=grouped().find(x=>x.payer===n);if(!g)return '';let fee=+state.settings.shippingFee||0;let total=g.amount+fee;let rows=g.items.filter(x=>x.billable).map(o=>`<tr><td>${esc(o.product)} × ${o.qty}</td><td style="text-align:right">${money(o.qty*o.price)}</td></tr>`).join('');return `<div class="receipt" data-customer="${esc(n)}"><h2>땡라이브 정산서</h2><div style="text-align:center;font-size:12px">FIRST OMS</div><div class="dash"></div><div>주문닉네임: <b>${esc(n)}</b></div><div>입금상태: <b>${esc(paymentOf(n))}</b></div><div>성함: ${esc((customer(n).name)||'')}</div><div>연락처: ${esc((customer(n).phone)||'')}</div><div>주소: ${esc([customer(n).postalCode,customer(n).address,customer(n).detailAddress].filter(Boolean).join(' '))}</div><div class="dash"></div><table>${rows}</table><div class="dash"></div><div>상품금액 <span style="float:right">${money(g.amount)}</span></div><div>배송비 <span style="float:right">${money(fee)}</span></div><div class="dash"></div><div class="sum">총 ${money(total)}</div><div class="dash"></div><div style="font-size:12px">입금계좌: ${esc(state.settings.bank)} ${esc(state.settings.account)}<br>예금주: ${esc(state.settings.holder)}</div><div class="qr"><canvas class="qrCanvas" data-url="${esc(state.settings.kakaoUrl||location.href)}"></canvas><div style="font-size:11px">카카오채널 문의</div></div></div>`}
-function showReceipt(n){
- state.currentReceiptCustomer=n;receiptPopupContent.innerHTML=receiptHtml(n);
- receiptPopup.classList.add('show');setTimeout(drawQrs,50)
-}
-function closeReceiptPopup(){receiptPopup.classList.remove('show')}
-function printWindowWithReceipts(title,body){
- const w=window.open('','_blank','width=560,height=800');
- if(!w)return alert('팝업이 차단되었습니다. 브라우저에서 팝업을 허용해 주세요.');
- w.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>${title}</title>
- <style>body{margin:0;padding:18px;background:#fff;font-family:Arial,sans-serif}.receipt{width:360px;margin:0 auto 20px;background:#fff;color:#111;padding:22px;page-break-after:always}.receipt h2{text-align:center}.dash{border-top:1px dashed #444;margin:10px 0}.receipt table{width:100%;font-size:12px}.receipt td{padding:5px 0}.sum{font-size:18px;font-weight:900;text-align:right}.qr{text-align:center;margin-top:12px}@media print{body{padding:0}.receipt{margin:0 auto}}.liveCommentBox{height:270px;overflow:auto;border:1px solid #363b4a;border-radius:12px;background:#0d0f15;padding:8px;margin-bottom:10px}
-.liveCommentItem{display:grid;grid-template-columns:90px 150px 1fr 76px;gap:8px;align-items:center;padding:9px 8px;border-bottom:1px solid #242936;font-size:14px}
-.liveCommentItem:last-child{border-bottom:0}.liveCommentTime{color:#8d95a8}.liveCommentNick{font-weight:800;color:#ffd26f;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.liveCommentText{color:#f4f6fb;word-break:break-word}.liveCommentPick{padding:6px 9px;border:0;border-radius:8px;cursor:pointer;font-weight:800}
-.liveCommentEmpty{padding:90px 15px;text-align:center;color:#8d95a8}
-@media(max-width:800px){.liveCommentItem{grid-template-columns:70px 110px 1fr}.liveCommentPick{grid-column:3}}
-</style>
- </head><body>${body}<script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.4/build/qrcode.min.js"><\/script>
- <script>window.onload=function(){document.querySelectorAll('.qrCanvas').forEach(function(c){if(window.QRCode)QRCode.toCanvas(c,c.dataset.url,{width:110,margin:1},function(){});});setTimeout(function(){window.print()},600)};<\/script></body></html>`);
- w.document.close()
-}
-function printCurrentReceiptOnly(){const n=state.currentReceiptCustomer;if(!n)return alert('정산서를 먼저 열어주세요.');printWindowWithReceipts('정산서_'+n,receiptHtml(n))}
-function drawQrs(){document.querySelectorAll('.qrCanvas').forEach(c=>{if(window.QRCode)QRCode.toCanvas(c,c.dataset.url,{width:110,margin:1},()=>{});else{let x=c.getContext('2d');x.fillStyle='#fff';x.fillRect(0,0,110,110);x.fillStyle='#000';x.fillText('QR 연결 필요',10,55)}})}
-function selected(cls){return [...document.querySelectorAll('.'+cls+':checked')].map(x=>x.value)}
-function selectAll(cls,v){document.querySelectorAll('.'+cls).forEach(x=>x.checked=v)}
-function csvDownload(name,rows){if(!rows.length)return alert('저장할 데이터가 없습니다.');let csv='\uFEFF'+rows.map(r=>r.map(v=>'"'+String(v??'').replace(/"/g,'""')+'"').join(',')).join('\r\n');let b=new Blob([csv],{type:'text/csv;charset=utf-8'}),a=document.createElement('a');a.href=URL.createObjectURL(b);a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000)}
-function exportSelectedExcel(){let ns=selected('settleChecks');if(!ns.length)return alert('고객을 선택해 주세요.');let rows=[['고객','상품','수량','단가','금액','배송비','총액','은행','계좌번호','예금주']];grouped().filter(g=>ns.includes(g.payer)).forEach(g=>g.items.filter(o=>o.billable).forEach((o,i)=>rows.push([g.payer,o.product,o.qty,o.price,o.qty*o.price,i?0:+state.settings.shippingFee,(i?0:g.amount+(+state.settings.shippingFee||0)),state.settings.bank,state.settings.account,state.settings.holder])));downloadExcelOrCsv('땡라이브_선택정산.xlsx','정산',rows)}
-function downloadExcelOrCsv(name,sheet,rows){if(window.XLSX){let wb=XLSX.utils.book_new(),ws=XLSX.utils.aoa_to_sheet(rows);XLSX.utils.book_append_sheet(wb,ws,sheet);XLSX.writeFile(wb,name)}else csvDownload(name.replace('.xlsx','.csv'),rows)}
-async function saveSelectedImages(){let ns=selected('settleChecks');if(!ns.length)return alert('고객을 선택해 주세요.');for(let n of ns){receiptArea.innerHTML=receiptHtml(n);drawQrs();await new Promise(r=>setTimeout(r,100));let el=receiptArea.querySelector('.receipt');if(window.html2canvas){let canvas=await html2canvas(el,{scale:2,backgroundColor:'#fff'});let a=document.createElement('a');a.download='정산서_'+n+'.png';a.href=canvas.toDataURL('image/png');a.click()}else alert('이미지 저장 라이브러리를 불러오지 못했습니다. 인터넷 연결 후 다시 시도해 주세요.')}renderAll()}
-function printSelectedReceipts(){let ns=selected('settleChecks');if(!ns.length)return alert('고객을 선택해 주세요.');printWindowWithReceipts('선택 정산서 출력',ns.map(receiptHtml).join(''))}
-function renderShipping(){let receivers={};activeOrders().forEach(o=>{let r=o.receiver||o.nick;if(!receivers[r])receivers[r]={receiver:r,payer:o.payer||o.nick,items:[]};receivers[r].items.push(o)});shipBody.innerHTML=Object.values(receivers).map(g=>{let c=customer(g.receiver);return `<tr><td><input class="shipChecks" type="checkbox" value="${esc(g.receiver)}"></td><td><b>${esc(g.receiver)}</b>${g.payer!==g.receiver?`<br><span class="badge b-info">선물: 결제 ${esc(g.payer)}</span>`:''}<br><input value="${esc(c.name)}" onchange="updateCustomer('${esc(g.receiver)}','name',this.value)" placeholder="받는 분"></td><td><input value="${esc(c.phone)}" onchange="updateCustomer('${esc(g.receiver)}','phone',this.value)" placeholder="연락처"></td><td><input value="${esc(c.address)}" onchange="updateCustomer('${esc(g.receiver)}','address',this.value)" placeholder="주소"></td><td>${g.items.map(o=>esc(o.product)+' × '+o.qty).join('<br>')}</td><td><span class="badge b-warn">대기</span></td></tr>`}).join('')}
-function shippingRows(ns){let rows=[['받는분','전화번호','주소','상품명/수량','배송메모','주문자']];let rec={};activeOrders().forEach(o=>{let r=o.receiver||o.nick;if(!rec[r])rec[r]={receiver:r,payer:o.payer||o.nick,items:[]};rec[r].items.push(o)});Object.values(rec).filter(g=>ns.includes(g.receiver)).forEach(g=>{let c=customer(g.receiver);rows.push([c.name||g.receiver,c.phone,[c.postalCode,c.address,c.detailAddress].filter(Boolean).join(' '),g.items.map(o=>o.product+' '+o.qty+'개').join(' / '),c.memo,g.payer])});return rows}
-function exportShippingExcel(){let ns=selected('shipChecks');if(!ns.length)return alert('고객을 선택해 주세요.');downloadExcelOrCsv('CJ_택배파일접수.xlsx','택배접수',shippingRows(ns))}
-function packingHtml(n){
- const c=customer(n),items=activeOrders().filter(o=>(o.receiver||o.nick)===n);
- const fullAddr=[c.postalCode,c.address,c.detailAddress].filter(Boolean).join(' ');
- return `<div class="packingSheet">
-   <h2>포장 검수표</h2>
-   <div class="dash"></div>
-   <table class="infoTable">
-    <tr><th>받는 분</th><td>${esc(c.name||n)}</td></tr>
-    <tr><th>닉네임</th><td>${esc(n)}</td></tr>
-    <tr><th>연락처</th><td>${esc(c.phone||'미입력')}</td></tr>
-    <tr><th>주소</th><td>${esc(fullAddr||'미입력')}</td></tr>
-    <tr><th>배송메모</th><td>${esc(c.memo||'')}</td></tr>
-   </table>
-   <div class="dash"></div>
-   <table class="itemTable">
-    <thead><tr><th>검수</th><th>상품명</th><th>수량</th></tr></thead>
-    <tbody>${items.map(o=>`<tr><td class="check">□</td><td>${esc(o.product)}</td><td>${o.qty}</td></tr>`).join('')}</tbody>
-   </table>
-   <div class="checkSummary">총 상품종류 ${items.length}종 · 총 수량 ${items.reduce((s,o)=>s+(+o.qty||0),0)}개</div>
-   <div class="signRow"><span>포장자: __________</span><span>최종검수: __________</span></div>
-   <div class="qr"><canvas class="qrCanvas" data-url="${esc(state.settings.kakaoUrl||location.href)}"></canvas><div>고객확인 QR</div></div>
- </div>`
-}
-function printPacking(){
- const ns=selected('shipChecks');
- if(!ns.length)return alert('출력할 고객을 선택해 주세요.');
- const body=ns.map(packingHtml).join('');
- const w=window.open('','_blank','width=760,height=900');
- if(!w)return alert('팝업이 차단되었습니다. 브라우저에서 팝업 허용 후 다시 눌러주세요.');
- w.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>포장 검수표 출력</title>
- <style>
- @page{size:A4;margin:12mm}
- *{box-sizing:border-box}body{margin:0;background:#fff;color:#111;font-family:Arial,"Apple SD Gothic Neo",sans-serif}
- .packingSheet{width:100%;max-width:760px;margin:0 auto;padding:8px 4px;page-break-after:always}
- .packingSheet:last-child{page-break-after:auto}
- h2{text-align:center;margin:0 0 12px;font-size:24px}
- .dash{border-top:1px dashed #555;margin:12px 0}
- table{width:100%;border-collapse:collapse}
- .infoTable th,.infoTable td{border:1px solid #bbb;padding:8px;font-size:13px;text-align:left}
- .infoTable th{width:90px;background:#f3f3f3}
- .itemTable th,.itemTable td{border:1px solid #777;padding:10px;font-size:14px}
- .itemTable th{background:#eee}.check{width:54px;text-align:center;font-size:22px}
- .checkSummary{text-align:right;font-weight:700;margin-top:10px}
- .signRow{display:flex;justify-content:space-between;margin-top:22px;font-weight:700}
- .qr{text-align:center;margin-top:18px;font-size:11px}
- @media print{body{margin:0}.packingSheet{break-after:page}}
- .liveCommentBox{height:270px;overflow:auto;border:1px solid #363b4a;border-radius:12px;background:#0d0f15;padding:8px;margin-bottom:10px}
-.liveCommentItem{display:grid;grid-template-columns:90px 150px 1fr 76px;gap:8px;align-items:center;padding:9px 8px;border-bottom:1px solid #242936;font-size:14px}
-.liveCommentItem:last-child{border-bottom:0}.liveCommentTime{color:#8d95a8}.liveCommentNick{font-weight:800;color:#ffd26f;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.liveCommentText{color:#f4f6fb;word-break:break-word}.liveCommentPick{padding:6px 9px;border:0;border-radius:8px;cursor:pointer;font-weight:800}
-.liveCommentEmpty{padding:90px 15px;text-align:center;color:#8d95a8}
-@media(max-width:800px){.liveCommentItem{grid-template-columns:70px 110px 1fr}.liveCommentPick{grid-column:3}}
-</style></head><body>${body}
- <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.4/build/qrcode.min.js"><\/script>
- <script>window.onload=function(){document.querySelectorAll('.qrCanvas').forEach(function(c){if(window.QRCode)QRCode.toCanvas(c,c.dataset.url,{width:105,margin:1},function(){});});setTimeout(function(){window.print()},600)};<\/script>
- </body></html>`);
- w.document.close()
-}
+$('orderFile').onchange=e=>[...e.target.files].forEach(f=>readWorkbook(f,importOrders));
+$('quickOrderFile').onchange=e=>[...e.target.files].forEach(f=>readWorkbook(f,importOrders));
 
-async function syncCustomers(silent){
- try{
-   let res=await fetch('/api/customers',{cache:'no-store'});
-   if(!res.ok)throw new Error('HTTP '+res.status);
-   let list=await res.json();
-   list.forEach(c=>{
-     if(!c.nickname)return;
-     state.customers[c.nickname]={...customer(c.nickname),...c};
-   });
-   save();renderCustomerDb();renderSettlement();renderShipping();
-   let s=document.getElementById('customerSyncStatus');
-   if(s){s.className='badge b-ok';s.textContent='서버 동기화 정상 · '+list.length+'명'}
- }catch(e){
-   let s=document.getElementById('customerSyncStatus');
-   if(s){s.className='badge b-warn';s.textContent='로컬 모드'}
-   if(!silent)alert('서버 동기화가 되지 않아 현재 기기 안에 저장합니다. server.js로 실행하면 가입폼과 실시간 연동됩니다.');
- }
-}
-async function upsertCustomerServer(c){
- try{
-   await fetch('/api/customers',{
-     method:'POST',headers:{'Content-Type':'application/json'},
-     body:JSON.stringify(c)
-   });
-   await syncCustomers(true);
- }catch(e){}
-}
-function openCustomerModal(nickname){
- const c=nickname?state.customers[nickname]:null;
- customerModalTitle.textContent=c?'고객정보 수정':'고객정보 추가';
- mOriginalNickname.value=nickname||'';mName.value=c?.name||'';mNickname.value=c?.nickname||nickname||'';
- mPhone.value=c?.phone||'';mPostalCode.value=c?.postalCode||'';mAddress.value=c?.address||'';
- mDetailAddress.value=c?.detailAddress||'';mMemo.value=c?.memo||'';customerModal.classList.add('show');
-}
-function closeCustomerModal(){customerModal.classList.remove('show')}
-async function saveCustomerFromModal(){
- const original=mOriginalNickname.value.trim();
- const c={id:(original&&state.customers[original]?.id)||uid(),name:mName.value.trim(),nickname:mNickname.value.trim(),
- phone:mPhone.value.trim(),postalCode:mPostalCode.value.trim(),address:mAddress.value.trim(),detailAddress:mDetailAddress.value.trim(),
- memo:mMemo.value.trim(),joinedAt:(original&&state.customers[original]?.joinedAt)||new Date().toLocaleString('ko-KR'),source:original?'관리자 수정':'관리자 수기등록'};
- if(!c.name||!c.nickname||!c.phone||!c.address)return alert('이름, 닉네임, 연락처, 기본주소를 모두 입력해 주세요.');
- if(original&&original!==c.nickname)delete state.customers[original];
- state.customers[c.nickname]=c;save();closeCustomerModal();renderAll();await upsertCustomerServer(c);alert('고객정보가 저장되었습니다.');
-}
-async function manualAddCustomer(){openCustomerModal()}
-function renderCustomerDb(){
- let rows=Object.values(state.customers).sort((a,b)=>String(b.joinedAt||'').localeCompare(String(a.joinedAt||'')));
- if(!document.getElementById('customerBody'))return;
- customerBody.innerHTML=rows.map(c=>{
-   let full=[c.postalCode,c.address,c.detailAddress].filter(Boolean).join(' ');
-   return `<tr>
-    <td><input class="customerChecks" type="checkbox" value="${esc(c.nickname||'')}"></td>
-    <td>${esc(c.joinedAt||'')}</td><td>${esc(c.name||'')}</td><td><b>${esc(c.nickname||'')}</b></td>
-    <td>${esc(c.phone||'')}</td><td>${esc(full)}</td><td>${esc(c.memo||'')}</td>
-    <td><span class="badge ${String(c.source).includes('가입폼')?'b-ok':'b-info'}">${esc(c.source||'수기')}</span></td>
-    <td><button class="btn" onclick="openCustomerModal('${esc(c.nickname||'')}')">수정</button> <button class="btn bad" onclick="deleteCustomer('${esc(c.nickname||'')}')">삭제</button></td>
-   </tr>`
- }).join('');
-}
-function exportCustomerExcel(){
- let ns=selected('customerChecks');
- let list=Object.values(state.customers).filter(c=>!ns.length||ns.includes(c.nickname));
- let rows=[['가입시간','성함','주문닉네임','연락처','우편번호','기본주소','상세주소','배송메모','등록방식']];
- list.forEach(c=>rows.push([c.joinedAt,c.name,c.nickname,c.phone,c.postalCode,c.address,c.detailAddress,c.memo,c.source]));
- downloadExcelOrCsv('땡라이브_고객정보DB.xlsx','고객정보',rows);
-}
-
-
-function showReceiptExample(){
- const n='땡라이브고객';
- const old=state.customers[n];
- const p={id:'exampleProduct',no:'1',name:'오리지널 몬스터킹 960g',price:24000,limit:100,max:5,sold:2,active:false};
- const o={id:'exampleOrder',time:now(),nick:n,payer:n,receiver:n,productId:p.id,product:p.name,qty:2,price:p.price,billable:true,gift:false,status:'ok',raw:'1번 2개'};
- state.customers[n]={name:'홍길동',nickname:n,phone:'010-1234-5678',postalCode:'11426',address:'경기도 양주시 예시로 123',detailAddress:'101동 1001호',memo:'문 앞 배송',joinedAt:'예시',source:'예시'};
- state.products.push(p);state.orders.push(o);
- receiptArea.innerHTML=receiptHtml(n);drawQrs();
- state.products=state.products.filter(x=>x.id!==p.id);
- state.orders=state.orders.filter(x=>x.id!==o.id);
- if(old)state.customers[n]=old;else delete state.customers[n];
- alert('아래에 실제 발송될 영수증형 정산서 예시가 표시되었습니다.');
-}
-function showPackingExample(){
- const n='포장예시고객';
- const old=state.customers[n];
- const p={id:'packingExampleProduct',no:'2',name:'대구막창',price:10000,limit:50,max:5,sold:2,active:false};
- const o={id:'packingExampleOrder',time:now(),nick:n,payer:n,receiver:n,productId:p.id,product:p.name,qty:2,price:p.price,billable:true,gift:false,status:'ok',raw:'2번 2개'};
- state.customers[n]={name:'홍길동',nickname:n,phone:'010-1234-5678',postalCode:'11426',address:'경기도 양주시 예시로 123',detailAddress:'101동 1001호',memo:'문 앞 배송',joinedAt:'예시',source:'예시'};
- state.products.push(p);state.orders.push(o);
- const c=customer(n);
- packingArea.innerHTML=`<div class="receipt">
-   <h2>포장 검수표</h2><div class="dash"></div>
-   <b>${esc(c.name||n)}</b><br>${esc(c.phone)}<br>${esc([c.postalCode,c.address,c.detailAddress].filter(Boolean).join(' '))}
-   <div class="dash"></div>□ ${esc(p.name)} × 2
-   <div class="dash"></div><div style="font-size:12px">배송메모: ${esc(c.memo||'')}</div>
-   <div class="qr"><canvas class="qrCanvas" data-url="${esc(state.settings.kakaoUrl||'http://pf.kakao.com/_DEPfX')}"></canvas><div style="font-size:11px">고객확인 QR</div></div>
- </div>`;
- packingArea.style.display='block';drawQrs();
- state.products=state.products.filter(x=>x.id!==p.id);
- state.orders=state.orders.filter(x=>x.id!==o.id);
- if(old)state.customers[n]=old;else delete state.customers[n];
- alert('실제 출력될 포장 검수표와 QR 예시가 아래에 표시되었습니다.');
-}
-async function deleteCustomer(n){
- if(!confirm(n+' 고객정보를 삭제할까요?'))return;
- delete state.customers[n];save();renderAll();
- try{await fetch('/api/customers/'+encodeURIComponent(n),{method:'DELETE'})}catch(e){}
-}
-async function deleteSelectedCustomers(){
- const ns=selected('customerChecks');
- if(!ns.length)return alert('삭제할 고객을 선택해 주세요.');
- if(!confirm(ns.length+'명의 고객정보를 삭제할까요?'))return;
- ns.forEach(n=>delete state.customers[n]);save();renderAll();
- for(const n of ns){try{await fetch('/api/customers/'+encodeURIComponent(n),{method:'DELETE'})}catch(e){}}
-}
-function buildSmsQueue(){
- const paid=grouped().filter(g=>paymentOf(g.payer)==='입금');
- state.smsQueue=state.smsQueue||[];
- paid.forEach(g=>{
-   const c=customer(g.payer),fee=+state.settings.shippingFee||0,old=state.smsQueue.find(x=>x.nickname===g.payer);
-   const item={nickname:g.payer,phone:c.phone||old?.phone||'',amount:g.amount+fee,status:old?.status||'대기',sentAt:old?.sentAt||''};
-   if(old)Object.assign(old,item);else state.smsQueue.push(item)
+const customerAliases={name:['실명','이름','고객명','성명'],nick:['닉네임','방송닉네임','별명'],phone:['전화번호','연락처','휴대폰','핸드폰'],address:['주소','배송지','배송주소']};
+function importCustomers(rows){
+ const hi=findHeader(rows,customerAliases), map=colMap(rows[hi]||[],customerAliases); let n=0;
+ rows.slice(hi+1).forEach(r=>{
+  const name=map.name>=0?r[map.name]:'', nick=map.nick>=0?r[map.nick]:'';
+  if(!String(name).trim()&&!String(nick).trim())return;
+  state.customers.push({id:crypto.randomUUID(),name:String(name).trim(),nick:String(nick).trim(),phone:String(map.phone>=0?r[map.phone]:'').trim(),address:String(map.address>=0?r[map.address]:'').trim()}); n++;
  });
- save();renderSmsRoom();
- if(!paid.length)alert('입금 완료로 선택된 고객이 없습니다.')
+ dedupeCustomers(); autoMatchAll(); saveSilently(); renderAll(); alert(n+'명 고객을 불러왔습니다.');
 }
-let smsUnsentOnly=false,smsPendingIndex=-1;
-function toggleUnsentOnly(){smsUnsentOnly=!smsUnsentOnly;renderSmsRoom()}
-function renderSmsRoom(){
- if(!document.getElementById('smsBody'))return;
- const q=state.smsQueue||[],view=smsUnsentOnly?q.filter(x=>x.status!=='전송완료'):q;
- smsQueueCount.textContent='대기 '+q.filter(x=>x.status!=='전송완료').length+'명';
- smsBody.innerHTML=view.map(x=>{const i=q.indexOf(x);return `<tr>
- <td><input class="smsChecks" type="checkbox" value="${esc(x.nickname)}"></td>
- <td><b>${esc(x.nickname)}</b><br><span class="muted">${esc(customer(x.nickname).name||'미가입/수기')}</span></td>
- <td><input value="${esc(x.phone||'')}" placeholder="010-0000-0000" onchange="updateSmsPhone(${i},this.value)"></td>
- <td><b>${money(x.amount)}</b></td>
- <td><button class="btn info" onclick="showSmsReceiptDetail(${i})">정산서 상세보기</button></td>
- <td><button class="btn ok" onclick="openSmsConfirm(${i})">문자전송</button></td>
- <td><span class="badge ${x.status==='전송완료'?'b-ok':x.status==='미전송'||x.status==='전송실패'?'b-bad':'b-warn'}">${esc(x.status||'대기')}</span>${x.sentAt?'<br><span class="muted">'+esc(x.sentAt)+'</span>':''}</td>
- </tr>`}).join('')
+$('customerFile').onchange=e=>readWorkbook(e.target.files[0],importCustomers);
+function dedupeCustomers(){
+ const seen=new Map(); state.customers=state.customers.filter(c=>{const k=norm(c.nick)+'|'+norm(c.name)+'|'+phoneNorm(c.phone);if(seen.has(k))return false;seen.set(k,1);return true});
 }
-function updateSmsPhone(i,v){
- state.smsQueue[i].phone=v.replace(/[^0-9]/g,'');
- const n=state.smsQueue[i].nickname;if(state.customers[n])state.customers[n].phone=v;
- save();renderCustomerDb();renderSettlement();renderShipping()
+function findCustomerByNick(nick){
+ const n=norm(nick); const exact=state.customers.filter(c=>norm(c.nick)===n);
+ if(exact.length===1)return {customer:exact[0],status:'matched'};
+ if(exact.length>1)return {customer:null,status:'duplicate'};
+ const byName=state.customers.filter(c=>norm(c.name)===n);
+ if(byName.length===1)return {customer:byName[0],status:'matched-name'};
+ return {customer:null,status:'unmatched'};
 }
-function showSmsReceiptDetail(i){const x=state.smsQueue[i];if(x)showReceipt(x.nickname)}
-function smsMessageFor(n){
- const g=grouped().find(x=>x.payer===n),c=customer(n),fee=+state.settings.shippingFee||0;
- if(!g)return '';
- const items=g.items.filter(x=>x.billable).map(o=>`${o.product} ${o.qty}개 ${money(o.qty*o.price)}`).join('\n');
- return `[땡라이브 정산서]\n${c.name||n}(${n})님\n${items}\n상품금액 ${money(g.amount)}\n배송비 ${money(fee)}\n총 결제금액 ${money(g.amount+fee)}\n입금계좌 ${state.settings.bank||''} ${state.settings.account||''} ${state.settings.holder||''}\n문의 ${state.settings.kakaoUrl||''}`;
+function autoMatchAll(){state.orders.forEach(o=>{const m=findCustomerByNick(o.nick);o.customerId=m.customer?.id||null;o.matchStatus=m.status})}
+function getReceipts(){
+ const groups=new Map();
+ state.orders.forEach(o=>{
+  const k=o.date+'|'+norm(o.nick);
+  if(!groups.has(k))groups.set(k,{key:k,date:o.date,nick:o.nick,items:[],customerId:o.customerId,matchStatus:o.matchStatus,fee:o.fee||0});
+  groups.get(k).items.push(o);
+ });
+ return [...groups.values()].map(g=>{
+  const c=state.customers.find(x=>x.id===g.customerId)||null;
+  const subtotal=g.items.reduce((a,x)=>a+(Number(x.amount)||0),0), total=subtotal+(Number(g.fee)||0);
+  const pay=matchPayment(g,c,total);
+  return {...g,customer:c,subtotal,total,payment:pay};
+ }).sort((a,b)=>b.date.localeCompare(a.date)||a.nick.localeCompare(b.nick,'ko'));
 }
-function openSmsConfirm(i){
- const x=state.smsQueue[i];if(!x)return;
- if(!x.phone)return alert('고객 연락처가 없습니다. 고객정보 또는 연락처를 먼저 입력해 주세요.');
- smsPendingIndex=i;smsConfirmReceipt.innerHTML=receiptHtml(x.nickname);
- smsConfirmMessage.textContent=`수신번호: ${x.phone}\n\n${smsMessageFor(x.nickname)}`;
- smsFinalCheck.checked=false;smsFinalSendButton.disabled=false;smsFinalSendButton.textContent='확인 후 바로 전송';
- smsConfirmPopup.classList.add('show');setTimeout(drawQrs,50)
+function matchPayment(g,c,total){
+ const names=[g.nick,c?.nick,c?.name].filter(Boolean).map(norm);
+ const candidates=state.payments.filter(p=>names.includes(norm(p.payer)));
+ const exact=candidates.filter(p=>Number(p.amount)===Number(total));
+ if(exact.length===1)return {status:'paid',payment:exact[0]};
+ if(exact.length>1)return {status:'review',reason:'동일 금액 입금 여러 건'};
+ if(candidates.length)return {status:'amount-mismatch',payment:candidates[0],reason:'이름 일치·금액 불일치'};
+ return {status:'unpaid'};
 }
-function closeSmsConfirm(){smsConfirmPopup.classList.remove('show');smsPendingIndex=-1}
-async function confirmAndSendSms(){
- if(smsPendingIndex<0)return;
- if(!smsFinalCheck.checked)return alert('수신번호와 정산 내용을 확인한 뒤 체크해 주세요.');
- smsFinalSendButton.disabled=true;smsFinalSendButton.textContent='전송 중...';
- const ok=await sendSmsReceipt(smsPendingIndex,true);
- if(ok){closeSmsConfirm();alert('문자를 실제 발송 요청했습니다.')}else{
-   smsFinalSendButton.disabled=false;smsFinalSendButton.textContent='다시 전송';
- }
+function renderOrders(){
+ if(!state.orders.length){$('ordersTable').innerHTML='<div class="empty">판매리스트 엑셀을 올려주세요.</div>';return}
+ $('ordersTable').innerHTML='<div class="scroll"><table><thead><tr><th>방송일</th><th>닉네임</th><th>상품</th><th>수량</th><th>단가</th><th>금액</th><th>고객매칭</th><th></th></tr></thead><tbody>'+
+ state.orders.map((o,i)=>`<tr><td>${o.date}</td><td>${esc(o.nick)}</td><td>${esc(o.item)}</td><td>${o.qty}</td><td>${money(o.unit)}</td><td>${money(o.amount)}</td><td>${matchBadge(o)}</td><td><button class="btn bad" onclick="deleteOrder(${i})">삭제</button></td></tr>`).join('')+
+ '</tbody></table></div>';
 }
-async function sendSmsReceipt(i,quiet=false){
- const x=state.smsQueue[i];if(!x)return false;
- const phone=String(x.phone||'').replace(/[^0-9]/g,'');
- if(phone.length<10){x.status='미전송';save();renderSmsRoom();if(!quiet)alert('올바른 연락처가 없어 미전송 처리했습니다.');return false}
- try{
-   const r=await fetch('/api/sms/send',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({to:phone,text:smsMessageFor(x.nickname),nickname:x.nickname})});
-   let result={};try{result=await r.json()}catch(e){}
-   if(!r.ok||!result.ok)throw new Error(result.error||('전송 오류 '+r.status));
-   x.status='전송완료';x.sentAt=new Date().toLocaleString('ko-KR');x.solapi=result.result||{};
-   save();renderSmsRoom();return true
- }catch(e){
-   x.status='전송실패';x.lastError=e.message;save();renderSmsRoom();
-   if(!quiet)alert('문자 전송 실패: '+e.message);else alert('문자 전송 실패: '+e.message);
-   return false
- }
+function matchBadge(o){return o.customerId?'<span class="badge good">DB 매칭</span>':o.matchStatus==='duplicate'?'<span class="badge warn">중복 후보</span>':'<span class="badge bad">정보 확인 필요</span>'}
+function renderCustomers(){
+ if(!state.customers.length){$('customersTable').innerHTML='<div class="empty">고객DB를 업로드하거나 직접 등록해주세요.</div>';return}
+ $('customersTable').innerHTML='<div class="scroll"><table><thead><tr><th>실명</th><th>닉네임</th><th>전화번호</th><th>주소</th><th></th></tr></thead><tbody>'+
+ state.customers.map((c,i)=>`<tr><td>${esc(c.name)}</td><td>${esc(c.nick)}</td><td>${esc(c.phone)}</td><td>${esc(c.address)}</td><td><button class="btn secondary" onclick="editCustomer(${i})">수정</button> <button class="btn bad" onclick="deleteCustomer(${i})">삭제</button></td></tr>`).join('')+
+ '</tbody></table></div>';
 }
-async function sendSelectedSms(){
- const ns=selected('smsChecks');if(!ns.length)return alert('전송할 고객을 선택해 주세요.');
- if(!confirm(ns.length+'명의 저장된 연락처로 정산서 문자를 바로 전송할까요?'))return;
- let ok=0,fail=0;for(const n of ns){const i=(state.smsQueue||[]).findIndex(x=>x.nickname===n);(await sendSmsReceipt(i,true))?ok++:fail++}
- alert(`선택전송 결과: 성공 ${ok}명 / 실패 ${fail}명`)
+function renderReceipts(){
+ const rs=getReceipts(), matched=rs.filter(r=>r.customer).length;
+ $('receiptSummary').textContent=`총 ${rs.length}장 · 고객DB 매칭 ${matched}장 · 정보확인 필요 ${rs.length-matched}장`;
+ $('receiptCards').innerHTML=rs.length?rs.map((r,i)=>receiptHTML(r,i)).join(''):'<div class="empty">정산서가 없습니다.</div>';
+ updateKpi();
 }
-async function sendAllSms(){
- const q=(state.smsQueue||[]).filter(x=>x.status!=='전송완료');if(!q.length)return alert('전송 대기 고객이 없습니다.');
- if(!confirm(q.length+'명의 저장된 연락처로 정산서 문자를 일괄 전송할까요?'))return;
- let ok=0,fail=0;for(const x of q){const i=state.smsQueue.indexOf(x);(await sendSmsReceipt(i,true))?ok++:fail++}
- alert(`일괄전송 결과: 성공 ${ok}명 / 실패 ${fail}명`)
+function receiptHTML(r,i){
+ const c=r.customer, pay=r.payment;
+ const payBadge=pay.status==='paid'?'<span class="badge good">입금확인</span>':pay.status==='amount-mismatch'?'<span class="badge warn">금액 확인</span>':'<span class="badge bad">미입금</span>';
+ return `<article class="receipt">
+ <h3>땡라이브 정산서</h3>
+ <div class="meta">정산번호 ${r.date.replaceAll('-','')}-${String(i+1).padStart(3,'0')}<br>방송일 ${r.date}</div>
+ <div><b>${esc(c?.name||'고객정보 확인 필요')}</b> · ${esc(r.nick)} ${payBadge}</div>
+ <div class="meta">${esc(c?.phone||'연락처 미등록')}<br>${esc(c?.address||'주소 미등록')}</div>
+ <table><thead><tr><th>상품</th><th>수량</th><th>단가</th><th>금액</th></tr></thead><tbody>
+ ${r.items.map(x=>`<tr><td>${esc(x.item)}</td><td>${x.qty}</td><td>${money(x.unit)}</td><td>${money(x.amount)}</td></tr>`).join('')}
+ </tbody></table>
+ <div style="margin-top:10px;font-size:13px">상품합계 <b>${money(r.subtotal)}</b><br>배송비 <b>${money(r.fee)}</b></div>
+ <div class="total">결제금액 ${money(r.total)}</div>
+ <div class="actions no-print" style="margin-top:12px">
+  ${c?.phone?`<button class="btn" onclick="sendSms(${i})">문자 보내기</button>`:'<button class="btn bad" disabled>전화번호 없음</button>'}
+  <button class="btn secondary" onclick="printOne(${i})">이 정산서 인쇄</button>
+ </div>
+ <div class="foot">FIRST OMS · 주문내역을 확인해 주세요.</div>
+ </article>`;
 }
-
-function exportRaw(){let rows=[['시간','유형','원문'],...state.raw.map(x=>[x.time,x.type,x.text])];downloadExcelOrCsv('원본댓글_이중저장.xlsx','원본댓글',rows)}
-function exportBackup(){let b=new Blob([JSON.stringify(state,null,2)],{type:'application/json'}),a=document.createElement('a');a.href=URL.createObjectURL(b);a.download='FIRST_OMS_전체백업_'+Date.now()+'.json';a.click()}
-function saveSettings(){state.settings={...state.settings,bank:bank.value,account:account.value,holder:holder.value,shippingFee:+shippingFee.value||0,kakaoUrl:kakaoUrl.value,smsUrl:smsUrl.value,commentApi:commentApi.value,joinUrl:joinUrl.value,smsApi:smsApi.value,smsSender:smsSender.value};save();alert('계좌·배송비·링크가 저장되었습니다.')}
-function applySettings(){state.settings.smsApi='/api/sms/send';bank.value=state.settings.bank||'';account.value=state.settings.account||'';holder.value=state.settings.holder||'';shippingFee.value=state.settings.shippingFee??4000;kakaoUrl.value=state.settings.kakaoUrl||'';smsUrl.value=state.settings.smsUrl||'';commentApi.value=state.settings.commentApi||'/api/youtube/comments';joinUrl.value=state.settings.joinUrl||((location.protocol.startsWith('http'))?location.origin+'/join.html':'');smsApi.value='/api/sms/send';smsSender.value=state.settings.smsSender||'Render 환경변수 사용';youtubeUrl.value=localStorage.getItem('firstoms_video')||''}
-function connectCommentApi(){state.settings.commentApi=commentApi.value;save();alert(commentApi.value?'댓글 API 주소 저장 완료. 실제 서버가 같은 형식으로 댓글을 보내야 자동수집됩니다.':'주소를 입력해 주세요.')}
-function copyJoinUrl(){
- let u=joinUrl.value||((location.protocol.startsWith('http'))?location.origin+'/join.html':'join.html');
- navigator.clipboard?.writeText(u).then(()=>alert('가입폼 링크가 복사되었습니다.')).catch(()=>prompt('아래 링크를 복사하세요',u));
+function sendSms(i){
+ const r=getReceipts()[i], c=r.customer;if(!c?.phone)return;
+ const items=r.items.map(x=>`${x.item} ${x.qty}개`).join(', ');
+ const msg=`[땡라이브 정산서]\n${c.name||r.nick}님\n${items}\n상품합계 ${money(r.subtotal)}\n배송비 ${money(r.fee)}\n결제금액 ${money(r.total)}\n감사합니다.`;
+ location.href=`sms:${phoneNorm(c.phone)}?&body=${encodeURIComponent(msg)}`;
 }
-function openSms(){let u=smsUrl.value||state.settings.smsUrl;if(!u)return alert('문자 링크를 입력해 주세요.');window.open(u,'_blank')}
-function runSelfTest(){let r=[];let test=(name,fn)=>{try{let ok=fn();r.push(`<div>${ok?'✅':'❌'} ${name}</div>`)}catch(e){r.push(`<div>❌ ${name}: ${esc(e.message)}</div>`)}};
-test('브라우저 자동저장',()=>{save();return !!localStorage.getItem(KEY)});
-test('상품등록 데이터 구조',()=>Array.isArray(state.products));
-test('주문 원본댓글 이중저장',()=>Array.isArray(state.orders)&&Array.isArray(state.raw));
-test('고객별 정산 합산',()=>Array.isArray(grouped()));
-test('엑셀 저장 라이브러리',()=>!!window.XLSX);
-test('이미지 저장 라이브러리',()=>!!window.html2canvas);
-test('QR 생성 라이브러리',()=>!!window.QRCode);
-test('출력 기능',()=>typeof window.print==='function');
-test('택배 파일 데이터 생성',()=>Array.isArray(shippingRows([])));
-test('계좌정보 저장',()=>typeof state.settings.account==='string');
-testResult.innerHTML=r.join('')+`<div style="margin-top:10px"><b>주의:</b> 외부 CDN 3개(XLSX·이미지·QR)가 차단되면 해당 기능은 인터넷 연결 후 재시도해야 합니다. CSV와 인쇄, 로컬 자동저장은 계속 작동합니다.</div>`}
-load();
+function printOne(i){
+ const html=getReceipts(); const card=document.querySelectorAll('.receipt')[i]; if(!card)return;
+ const w=window.open('','_blank');w.document.write(`<html><head><title>정산서</title><style>body{font-family:sans-serif;padding:20px}.receipt{max-width:500px;margin:auto}.receipt table{width:100%;border-collapse:collapse}.receipt th,.receipt td{border:1px solid #ccc;padding:7px}.no-print{display:none}.total{text-align:right;font-size:20px;font-weight:bold}</style></head><body>${card.outerHTML}</body></html>`);w.document.close();w.print();
+}
+const paymentAliases={payer:['입금자','입금자명','보낸분','거래내용','적요','성명'],amount:['입금액','금액','거래금액','입금'],date:['거래일시','거래일','날짜','시간']};
+function importPayments(rows){
+ const hi=findHeader(rows,paymentAliases), map=colMap(rows[hi]||[],paymentAliases);let n=0;
+ rows.slice(hi+1).forEach(r=>{
+  const payer=map.payer>=0?r[map.payer]:'', amount=Number(String(map.amount>=0?r[map.amount]:0).replace(/[^0-9.-]/g,''));
+  if(!String(payer).trim()||!amount||amount<0)return;
+  state.payments.push({id:crypto.randomUUID(),payer:String(payer).trim(),amount,date:String(map.date>=0?r[map.date]:'').trim()});n++;
+ });
+ saveSilently();renderAll();go('payments');alert(n+'건 입금내역을 불러왔습니다.');
+}
+$('paymentFile').onchange=e=>readWorkbook(e.target.files[0],importPayments);
+function renderPayments(){
+ const rs=getReceipts();
+ if(!state.payments.length){$('paymentsTable').innerHTML='<div class="empty">은행 거래내역 엑셀을 올려주세요.</div>';return}
+ $('paymentsTable').innerHTML='<div class="scroll"><table><thead><tr><th>입금자</th><th>입금액</th><th>거래일시</th><th>대조결과</th></tr></thead><tbody>'+
+ state.payments.map(p=>{
+  const matches=rs.filter(r=>[r.nick,r.customer?.nick,r.customer?.name].filter(Boolean).map(norm).includes(norm(p.payer)));
+  let result='<span class="badge bad">미확인 입금</span>';
+  if(matches.length===1&&matches[0].total===Number(p.amount))result=`<span class="badge good">입금확인</span> ${esc(matches[0].nick)}`;
+  else if(matches.length===1)result=`<span class="badge warn">금액 불일치</span> 청구 ${money(matches[0].total)}`;
+  else if(matches.length>1)result='<span class="badge warn">동명이인/복수 후보</span>';
+  return `<tr><td>${esc(p.payer)}</td><td>${money(p.amount)}</td><td>${esc(p.date)}</td><td>${result}</td></tr>`;
+ }).join('')+'</tbody></table></div>';
+}
+function renderShipping(){
+ const filter=$('shippingFilter').value, bundle=$('bundleMode').value; let rs=getReceipts();
+ if(filter==='paid')rs=rs.filter(r=>r.payment.status==='paid');
+ const groups=new Map();
+ rs.forEach(r=>{
+  const k=bundle==='customer'?(r.customer?.id||r.nick):(r.key);
+  if(!groups.has(k))groups.set(k,{name:r.customer?.name||'',nick:r.nick,phone:r.customer?.phone||'',address:r.customer?.address||'',dates:new Set(),items:[],total:0,status:r.payment.status});
+  const g=groups.get(k);g.dates.add(r.date);g.items.push(...r.items);g.total+=r.total;
+ });
+ const arr=[...groups.values()];
+ $('shippingTable').innerHTML=arr.length?'<div class="scroll"><table><thead><tr><th>고객명</th><th>닉네임</th><th>연락처</th><th>주소</th><th>방송일</th><th>상품/수량</th><th>결제금액</th></tr></thead><tbody>'+
+ arr.map(g=>`<tr><td>${esc(g.name)}</td><td>${esc(g.nick)}</td><td>${esc(g.phone)}</td><td>${esc(g.address)}</td><td>${[...g.dates].join(', ')}</td><td>${g.items.map(x=>esc(x.item)+' '+x.qty+'개').join('<br>')}</td><td>${money(g.total)}</td></tr>`).join('')+'</tbody></table></div>':'<div class="empty">출력할 택배 대상이 없습니다.</div>';
+ window.currentShipping=arr;
+}
+function downloadShippingList(){
+ renderShipping(); const rows=(window.currentShipping||[]).map((g,i)=>({'번호':i+1,'받는분':g.name,'닉네임':g.nick,'연락처':g.phone,'주소':g.address,'방송일':[...g.dates].join(', '),'상품내역':g.items.map(x=>x.item+' '+x.qty+'개').join(' / '),'총수량':g.items.reduce((a,x)=>a+Number(x.qty),0),'결제금액':g.total}));
+ exportXlsx(rows,'FIRST_OMS_택배리스트.xlsx','택배리스트');
+}
+function printShipping(){go('shipping');window.print()}
+function downloadReceiptList(){
+ const rows=getReceipts().map((r,i)=>({'정산번호':r.date.replaceAll('-','')+'-'+String(i+1).padStart(3,'0'),'방송일':r.date,'실명':r.customer?.name||'','닉네임':r.nick,'전화번호':r.customer?.phone||'','주소':r.customer?.address||'','상품내역':r.items.map(x=>x.item+' '+x.qty+'개').join(' / '),'상품합계':r.subtotal,'배송비':r.fee,'결제금액':r.total,'고객매칭':r.customer?'완료':'확인필요','입금상태':r.payment.status==='paid'?'입금완료':'미입금/확인필요'}));
+ exportXlsx(rows,'FIRST_OMS_정산서목록.xlsx','정산서');
+}
+function downloadCustomerTemplate(){exportXlsx([{'실명':'홍길동','닉네임':'길동맘','전화번호':'010-0000-0000','주소':'서울시 ...'}],'FIRST_OMS_고객DB_양식.xlsx','고객DB')}
+function exportXlsx(rows,name,sheet){
+ if(!rows.length){alert('출력할 자료가 없습니다.');return}
+ const ws=XLSX.utils.json_to_sheet(rows),wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,sheet);XLSX.writeFile(wb,name);
+}
+function openCustomerModal(){ $('cEditIndex').value='';$('cName').value='';$('cNick').value='';$('cPhone').value='';$('cAddress').value='';$('customerModal').classList.add('show')}
+function closeCustomerModal(){$('customerModal').classList.remove('show')}
+function editCustomer(i){const c=state.customers[i];$('cEditIndex').value=i;$('cName').value=c.name;$('cNick').value=c.nick;$('cPhone').value=c.phone;$('cAddress').value=c.address;$('customerModal').classList.add('show')}
+function saveCustomer(){
+ const c={id:crypto.randomUUID(),name:$('cName').value.trim(),nick:$('cNick').value.trim(),phone:$('cPhone').value.trim(),address:$('cAddress').value.trim()};
+ if(!c.name&&!c.nick){alert('실명 또는 닉네임을 입력해 주세요.');return}
+ const i=$('cEditIndex').value;if(i==='')state.customers.push(c);else{c.id=state.customers[Number(i)].id;state.customers[Number(i)]=c}
+ autoMatchAll();saveSilently();renderAll();closeCustomerModal();
+}
+function deleteCustomer(i){if(confirm('이 고객을 삭제할까요?')){state.customers.splice(i,1);autoMatchAll();saveSilently();renderAll()}}
+function deleteOrder(i){state.orders.splice(i,1);saveSilently();renderAll()}
+function clearOrders(){if(confirm('모든 주문을 초기화할까요?')){state.orders=[];saveSilently();renderAll()}}
+function clearPayments(){if(confirm('입금내역을 초기화할까요?')){state.payments=[];saveSilently();renderAll()}}
+function saveSilently(){localStorage.setItem(KEY,JSON.stringify(state))}
+function updateKpi(){const rs=getReceipts();$('kpiOrderRows').textContent=state.orders.length;$('kpiReceipts').textContent=rs.length;$('kpiMatched').textContent=rs.filter(r=>r.customer).length;$('kpiPaid').textContent=rs.filter(r=>r.payment.status==='paid').length}
+function renderAll(){renderOrders();renderCustomers();renderReceipts();renderPayments();renderShipping();updateKpi()}
+function esc(v){return String(v??'').replace(/[&<>"']/g,s=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[s]))}
+loadAll();
 </script>
 </body>
 </html>
