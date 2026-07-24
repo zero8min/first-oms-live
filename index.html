@@ -48,6 +48,24 @@ th{background:#232832;color:#f5d5bd;position:sticky;top:70px} tr:hover td{backgr
 .modal.show{display:block}.modal-box{max-width:700px;margin:40px auto;background:var(--panel);border:1px solid var(--line);border-radius:18px;padding:20px}
 .search-bar{display:grid;grid-template-columns:1fr auto auto;gap:8px;margin:12px 0}.settings-box{margin:12px 0}.settings-box textarea{min-height:180px;resize:vertical}.account-box{margin-top:12px;padding:12px;border:1px solid #d9c5b8;background:#fff8f2;border-radius:10px;font-size:13px;line-height:1.6}
 .search-highlight{background:#6b4b38}
+/* 판매리스트 표 열 정렬 고정 */
+#orders .scroll{overflow:auto;max-height:62vh}
+#orders table{min-width:1180px;table-layout:fixed}
+#orders th,#orders td{position:static;vertical-align:middle;padding:9px 8px}
+#orders th:nth-child(1),#orders td:nth-child(1){width:130px}
+#orders th:nth-child(2),#orders td:nth-child(2){width:145px}
+#orders th:nth-child(3),#orders td:nth-child(3){width:260px}
+#orders th:nth-child(4),#orders td:nth-child(4){width:90px}
+#orders th:nth-child(5),#orders td:nth-child(5){width:120px}
+#orders th:nth-child(6),#orders td:nth-child(6){width:120px}
+#orders th:nth-child(7),#orders td:nth-child(7){width:110px}
+#orders th:nth-child(8),#orders td:nth-child(8){width:130px;text-align:center}
+#orders th:nth-child(9),#orders td:nth-child(9){width:90px;text-align:center}
+#orders td input{display:block;width:100%;min-width:0;margin:0}
+#orders td:nth-child(8) .badge{white-space:nowrap}
+#orders td:nth-child(9) .btn{width:100%;padding:9px 6px}
+.tabs{position:relative;z-index:30}
+.tab{position:relative;z-index:31;pointer-events:auto}
 /* 고객DB 표: 고정 헤더 때문에 고객 행과 버튼이 위로 겹치던 문제 수정 */
 #customers .scroll{overflow-x:auto;overflow-y:visible;max-height:none}
 #customers table{min-width:1050px;table-layout:fixed}
@@ -72,6 +90,12 @@ th{background:#232832;color:#f5d5bd;position:sticky;top:70px} tr:hover td{backgr
 #adminPostcodeEmbed{width:100%;height:calc(100% - 48px)}
 @media(max-width:600px){.admin-customer-form{grid-template-columns:1fr}.admin-customer-form .full{grid-column:auto}.admin-address-row{grid-template-columns:1fr}.admin-address-row .btn{width:100%}}
 
+
+.receipt-edit-list{display:flex;flex-direction:column;gap:10px;margin-top:12px}
+.receipt-edit-row{display:grid;grid-template-columns:minmax(180px,2fr) 90px 120px 120px auto;gap:8px;align-items:end;padding:10px;border:1px solid var(--line);border-radius:12px;background:#11151b}
+.receipt-edit-row label{display:block;margin-bottom:5px}
+.receipt-edit-summary{display:grid;grid-template-columns:1fr 180px;gap:12px;align-items:end;margin-top:14px}
+@media(max-width:760px){.receipt-edit-row{grid-template-columns:1fr 1fr}.receipt-edit-row .item-field{grid-column:1/-1}.receipt-edit-row .delete-field{grid-column:1/-1}.receipt-edit-row .delete-field .btn{width:100%}.receipt-edit-summary{grid-template-columns:1fr}}
 @media(max-width:1150px){.receipt-wrap{grid-template-columns:minmax(0,620px)}}
 @media(max-width:1000px){.grid,.form-grid{grid-template-columns:repeat(2,1fr)}}
 @media(max-width:600px){main{padding:14px}.grid,.form-grid{grid-template-columns:1fr}header{padding:13px}.sub{display:none}.receipt{padding:14px}.receipt th,.receipt td{font-size:11px;padding:6px}}
@@ -95,12 +119,12 @@ th{background:#232832;color:#f5d5bd;position:sticky;top:70px} tr:hover td{backgr
 </header>
 <main>
   <div class="tabs no-print">
-    <button class="tab active" data-page="dashboard">대시보드</button>
-    <button class="tab" data-page="orders">판매리스트 업로드</button>
-    <button class="tab" data-page="customers">고객DB</button>
-    <button class="tab" data-page="receipts">정산서</button>
-    <button class="tab" data-page="payments">입금대조</button>
-    <button class="tab" data-page="shipping">택배실</button>
+    <button type="button" class="tab active" data-page="dashboard" onclick="go('dashboard')">대시보드</button>
+    <button type="button" class="tab" data-page="orders" onclick="go('orders')">판매리스트 업로드</button>
+    <button type="button" class="tab" data-page="customers" onclick="go('customers')">고객DB</button>
+    <button type="button" class="tab" data-page="receipts" onclick="go('receipts')">정산서</button>
+    <button type="button" class="tab" data-page="payments" onclick="go('payments')">입금대조</button>
+    <button type="button" class="tab" data-page="shipping" onclick="go('shipping')">택배실</button>
   </div>
 
   <section id="dashboard" class="page active">
@@ -234,6 +258,23 @@ th{background:#232832;color:#f5d5bd;position:sticky;top:70px} tr:hover td{backgr
   <div class="actions" style="margin-top:16px"><button class="btn" onclick="saveCustomer()">고객정보 저장</button></div>
  </div>
 </div>
+<div id="receiptEditModal" class="modal">
+  <div class="modal-box" style="max-width:980px">
+    <div class="section-title" style="margin-top:0">
+      <div><h2>정산서 수정</h2><div id="receiptEditTitle" class="muted" style="margin-top:6px"></div></div>
+      <button class="btn secondary" onclick="closeReceiptEdit()">닫기</button>
+    </div>
+    <div id="receiptEditRows" class="receipt-edit-list"></div>
+    <div class="receipt-edit-summary">
+      <button class="btn secondary" onclick="addReceiptItem()">+ 상품 추가</button>
+      <div><label>배송비</label><input id="receiptEditFee" type="number" min="0" step="100"></div>
+    </div>
+    <div class="actions" style="justify-content:flex-end;margin-top:18px">
+      <button class="btn secondary" onclick="closeReceiptEdit()">취소</button>
+      <button class="btn" onclick="saveReceiptEdit()">수정내용 저장</button>
+    </div>
+  </div>
+</div>
 <div id="adminPostcodeLayer" class="postcodeLayer">
  <div class="postcodeBox">
   <div class="postcodeHead">주소검색<button type="button" onclick="closeAdminPostcode()">닫기</button></div>
@@ -251,11 +292,19 @@ const phoneNorm=v=>String(v??'').replace(/\D/g,'');
 const today=()=>new Date().toISOString().slice(0,10);
 $('broadcastDate').value=today();
 
-document.querySelectorAll('.tab').forEach(b=>b.onclick=()=>go(b.dataset.page));
+document.querySelectorAll('.tab').forEach(b=>b.addEventListener('click',e=>{e.preventDefault();go(b.dataset.page)}));
 function go(id){
+ const target=document.getElementById(id);
+ if(!target){console.warn('페이지를 찾을 수 없습니다:',id);return;}
  document.querySelectorAll('.tab').forEach(b=>b.classList.toggle('active',b.dataset.page===id));
  document.querySelectorAll('.page').forEach(p=>p.classList.toggle('active',p.id===id));
- if(id==='receipts') renderReceipts(); if(id==='shipping') renderShipping();
+ if(id==='dashboard') updateKpi();
+ if(id==='orders') renderOrders();
+ if(id==='customers') renderCustomers();
+ if(id==='receipts') renderReceipts();
+ if(id==='payments') renderPayments();
+ if(id==='shipping') renderShipping();
+ window.scrollTo({top:0,behavior:'auto'});
 }
 function saveAll(){localStorage.setItem(KEY,JSON.stringify(state));alert('현재 자료를 이 기기에 저장했습니다.');}
 function loadAll(){try{const saved=JSON.parse(localStorage.getItem(KEY));if(saved)state={...state,...saved,settings:{...state.settings,...(saved.settings||{})}}}catch(e){} renderMessageSettings();renderAll();}
@@ -394,7 +443,7 @@ function matchPayment(g,c,total){
 }
 function renderOrders(){
  if(!state.orders.length){$('ordersTable').innerHTML='<div class="empty">판매리스트 엑셀을 올려주세요.</div>';return}
- $('ordersTable').innerHTML='<div class="scroll"><table><thead><tr><th>방송일</th><th>닉네임</th><th>상품</th><th>수량</th><th>단가</th><th>금액</th><th>배송비</th><th>고객매칭</th><th></th></tr></thead><tbody>'+
+ $('ordersTable').innerHTML='<div class="scroll"><table class="orders-fixed-table"><colgroup><col><col><col><col><col><col><col><col><col></colgroup><thead><tr><th>방송일</th><th>닉네임</th><th>상품</th><th>수량</th><th>단가</th><th>금액</th><th>배송비</th><th>고객매칭</th><th>관리</th></tr></thead><tbody>'+
  state.orders.map((o,i)=>`<tr><td><input type="date" value="${esc(o.date)}" onchange="updateOrder(${i},'date',this.value)"></td><td><input value="${esc(o.nick)}" onchange="updateOrder(${i},'nick',this.value)"></td><td><input value="${esc(o.item)}" onchange="updateOrder(${i},'item',this.value)"></td><td><input type="number" min="0" value="${o.qty}" onchange="updateOrder(${i},'qty',this.value)"></td><td><input type="number" min="0" value="${o.unit}" onchange="updateOrder(${i},'unit',this.value)"></td><td><input type="number" min="0" value="${o.amount}" onchange="updateOrder(${i},'amount',this.value,true)"></td><td><input type="number" min="0" value="${o.fee||0}" onchange="updateOrder(${i},'fee',this.value)"></td><td>${matchBadge(o)}</td><td><button class="btn bad" onclick="deleteOrder(${i})">삭제</button></td></tr>`).join('')+
  '</tbody></table></div>';
 }
@@ -483,11 +532,62 @@ function receiptHTML(r,i){
  <div class="account-box"><b>입금계좌</b><br>${esc(state.settings?.bank||'카카오뱅크')} ${esc(state.settings?.account||'계좌번호를 설정해 주세요')}<br>예금주 ${esc(state.settings?.holder||'김미숙')}</div>
  <div class="actions no-print" style="margin-top:12px">
   ${c?.phone?`<button class="btn" onclick="sendKakao(${i},this)">카카오 알림톡 전송</button><button class="btn secondary" onclick="sendSms(${i},this)">문자 전송</button>`:'<button class="btn bad" disabled>전화번호 없음</button>'}
+  <button class="btn warn" onclick="openReceiptEdit(${i})">정산서 수정</button>
   <button class="btn secondary" onclick="printOne(${i})">이 정산서 인쇄</button>
  </div>
  <div class="foot">FIRST OMS · 주문내역을 확인해 주세요.</div>
  </article>`;
 }
+
+function receiptByKey(key){return getReceipts().find(r=>r.key===key)||null}
+function openReceiptEdit(i){
+ const r=getReceipts()[i]; if(!r)return;
+ $('receiptEditModal').dataset.key=r.key;
+ $('receiptEditTitle').textContent=`${r.date} · ${r.customer?.name||r.nick} (${r.nick})`;
+ renderReceiptEditRows();
+ $('receiptEditModal').classList.add('show');
+}
+function closeReceiptEdit(){$('receiptEditModal').classList.remove('show')}
+function renderReceiptEditRows(){
+ const key=$('receiptEditModal').dataset.key, r=receiptByKey(key); if(!r){closeReceiptEdit();return}
+ $('receiptEditFee').value=Number(r.fee)||0;
+ $('receiptEditRows').innerHTML=r.items.map(o=>`<div class="receipt-edit-row" data-id="${esc(o.id)}">
+   <div class="item-field"><label>상품명</label><input data-field="item" value="${esc(o.item)}"></div>
+   <div><label>수량</label><input data-field="qty" type="number" min="0" value="${Number(o.qty)||0}"></div>
+   <div><label>단가</label><input data-field="unit" type="number" min="0" value="${Number(o.unit)||0}"></div>
+   <div><label>금액</label><input data-field="amount" type="number" min="0" value="${Number(o.amount)||0}"></div>
+   <div class="delete-field"><label>&nbsp;</label><button class="btn bad" onclick="deleteReceiptItem('${esc(o.id)}')">삭제</button></div>
+  </div>`).join('');
+}
+function addReceiptItem(){
+ const key=$('receiptEditModal').dataset.key, r=receiptByKey(key); if(!r)return;
+ const fee=Number($('receiptEditFee').value)||0;
+ state.orders.push({id:crypto.randomUUID(),date:r.date,nick:r.nick,item:'새 상품',qty:1,unit:0,amount:0,fee,customerId:r.customerId||null,matchStatus:r.matchStatus||'unmatched',source:'정산서 수정'});
+ renderReceiptEditRows();
+}
+function deleteReceiptItem(id){
+ const r=receiptByKey($('receiptEditModal').dataset.key); if(!r)return;
+ if(r.items.length<=1){alert('정산서에는 상품이 최소 1개 있어야 합니다. 정산서 전체를 지우려면 판매리스트에서 주문을 삭제해 주세요.');return}
+ if(!confirm('이 상품을 정산서에서 삭제할까요?'))return;
+ state.orders=state.orders.filter(o=>o.id!==id);
+ renderReceiptEditRows();
+}
+function saveReceiptEdit(){
+ const key=$('receiptEditModal').dataset.key, r=receiptByKey(key); if(!r)return;
+ const fee=Number($('receiptEditFee').value)||0;
+ document.querySelectorAll('#receiptEditRows .receipt-edit-row').forEach(row=>{
+  const o=state.orders.find(x=>x.id===row.dataset.id); if(!o)return;
+  const item=row.querySelector('[data-field="item"]').value.trim();
+  const qty=Math.max(0,Number(row.querySelector('[data-field="qty"]').value)||0);
+  const unit=Math.max(0,Number(row.querySelector('[data-field="unit"]').value)||0);
+  const amountRaw=row.querySelector('[data-field="amount"]').value;
+  const parsedAmount=Number(amountRaw);
+  o.item=item||'상품명 미입력';o.qty=qty;o.unit=unit;o.amount=Number.isFinite(parsedAmount)?Math.max(0,parsedAmount):qty*unit;o.fee=fee;
+ });
+ state.orders.filter(o=>o.date===r.date&&norm(o.nick)===norm(r.nick)).forEach(o=>o.fee=fee);
+ autoMatchAll();saveSilently();renderAll();closeReceiptEdit();alert('정산서 수정내용을 저장했습니다.');
+}
+
 function kakaoVariables(r){
  const c=r.customer||{}, x=state.settings||{};
  return {
