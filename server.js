@@ -54,6 +54,41 @@ async function sendSolapiSms(to,text){
 }
 
 
+function solapiConfig(){
+ return {
+  apiKey:process.env.SOLAPI_API_KEY||'',
+  apiSecret:process.env.SOLAPI_API_SECRET||'',
+  sender:onlyDigits(process.env.SOLAPI_SENDER),
+  pfId:process.env.SOLAPI_KAKAO_PF_ID||process.env.SOLAPI_PF_ID||'',
+  templateId:process.env.SOLAPI_KAKAO_TEMPLATE_ID||process.env.SOLAPI_TEMPLATE_ID||''
+ }
+}
+async function sendSolapiKakao(to,variables,text){
+ const cfg=solapiConfig();
+ if(!cfg.apiKey||!cfg.apiSecret||!cfg.sender)throw new Error('SOLAPI API Key·Secret·발신번호 환경변수를 확인해 주세요.');
+ if(!cfg.pfId||!cfg.templateId)throw new Error('SOLAPI_KAKAO_PF_ID와 SOLAPI_KAKAO_TEMPLATE_ID를 Render 환경변수에 등록해 주세요.');
+ const receiver=onlyDigits(to);
+ if(receiver.length<10)throw new Error('수신번호가 올바르지 않습니다.');
+ const vars={};
+ Object.entries(variables||{}).forEach(([k,v])=>{vars[String(k)]=String(v??'')});
+ const payload={messages:[{
+  to:receiver,
+  from:cfg.sender,
+  text:String(text||'').slice(0,1900),
+  kakaoOptions:{pfId:cfg.pfId,templateId:cfg.templateId,variables:vars,disableSms:false}
+ }],showMessageList:true};
+ const r=await fetch('https://api.solapi.com/messages/v4/send-many/detail',{
+  method:'POST',headers:{Authorization:solapiAuth(cfg.apiKey,cfg.apiSecret),'Content-Type':'application/json'},body:JSON.stringify(payload)
+ });
+ const raw=await r.text();let data={};try{data=JSON.parse(raw)}catch(e){data={raw}}
+ if(!r.ok)throw new Error(data.errorMessage||data.message||data.errorCode||('SOLAPI HTTP '+r.status));
+ if(Array.isArray(data.failedMessageList)&&data.failedMessageList.length){
+  const f=data.failedMessageList[0];throw new Error(f.statusMessage||f.errorMessage||'알림톡 접수 실패')
+ }
+ return data
+}
+
+
 function readYoutubeAuth(){try{return JSON.parse(fs.readFileSync(YT_AUTH,'utf8'))}catch(e){return{}}}
 function saveYoutubeAuth(v){fs.writeFileSync(YT_AUTH,JSON.stringify(v,null,2),'utf8')}
 function youtubeConfig(){
@@ -205,6 +240,21 @@ const server=http.createServer((req,res)=>{
     return json(res,status,{ok:false,error:e.message})
    }
   })()
+ }
+
+ if(u.pathname==='/api/kakao/status'&&req.method==='GET'){
+  const cfg=solapiConfig();
+  return json(res,200,{ok:true,ready:!!(cfg.apiKey&&cfg.apiSecret&&cfg.sender&&cfg.pfId&&cfg.templateId),sender:cfg.sender?cfg.sender.slice(0,3)+'****'+cfg.sender.slice(-4):'',pfId:cfg.pfId?cfg.pfId.slice(0,6)+'…':'',templateId:cfg.templateId?cfg.templateId.slice(0,6)+'…':'',missing:[!cfg.apiKey&&'SOLAPI_API_KEY',!cfg.apiSecret&&'SOLAPI_API_SECRET',!cfg.sender&&'SOLAPI_SENDER',!cfg.pfId&&'SOLAPI_KAKAO_PF_ID',!cfg.templateId&&'SOLAPI_KAKAO_TEMPLATE_ID'].filter(Boolean)})
+ }
+ if(u.pathname==='/api/kakao/send'&&req.method==='POST'){
+  return readBody(req).then(async body=>{
+   try{
+    const data=JSON.parse(body||'{}');
+    if(!data.to)return json(res,400,{ok:false,error:'수신번호가 없습니다.'});
+    const result=await sendSolapiKakao(data.to,data.variables||{},data.text||'');
+    json(res,200,{ok:true,result})
+   }catch(e){json(res,500,{ok:false,error:e.message})}
+  }).catch(e=>json(res,400,{ok:false,error:e.message}))
  }
 
  if(u.pathname==='/api/sms/send'&&req.method==='POST'){

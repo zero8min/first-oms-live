@@ -4,7 +4,8 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>FIRST OMS 긴급 정산실</title>
-<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js">checkKakaoStatus(false);
+</script>
 <style>
 :root{
   --bg:#0d0f13;--panel:#171a20;--panel2:#20242c;--text:#f5f5f7;--muted:#aeb4c0;
@@ -179,6 +180,12 @@ th{background:#232832;color:#f5d5bd;position:sticky;top:70px} tr:hover td{backgr
       </div>
       <div style="margin-top:12px"><label>문자 내용 직접 설정</label><textarea id="setSmsTemplate"></textarea></div>
       <p class="muted">사용 가능: {고객명} {닉네임} {상품내역} {상품합계} {배송비} {결제금액} {은행} {예금주} {계좌번호} {문의안내}</p>
+      <div class="note" style="margin-top:10px">
+        <b>카카오 알림톡 계정 연동</b> · 솔라피에 연결된 비즈니스 채널과 승인 템플릿을 사용합니다.<br>
+        <span id="kakaoStatus">연동상태 확인 중...</span>
+        <button class="btn secondary" style="margin-left:8px" onclick="checkKakaoStatus(true)">연동상태 확인</button>
+      </div>
+      <p class="muted">알림톡은 승인된 템플릿 문구로 전송되며, 실패하면 같은 내용이 문자로 자동 대체됩니다.</p>
     </div>
     <div id="receiptSummary" class="note no-print"></div>
     <div id="receiptCards" class="receipt-wrap"></div>
@@ -480,11 +487,53 @@ function receiptHTML(r,i){
  <div class="total">결제금액 ${money(r.total)}</div>
  <div class="account-box"><b>입금계좌</b><br>${esc(state.settings?.bank||'카카오뱅크')} ${esc(state.settings?.account||'계좌번호를 설정해 주세요')}<br>예금주 ${esc(state.settings?.holder||'김미숙')}</div>
  <div class="actions no-print" style="margin-top:12px">
-  ${c?.phone?`<button class="btn" onclick="sendSms(${i},this)">솔라피 문자전송</button>`:'<button class="btn bad" disabled>전화번호 없음</button>'}
+  ${c?.phone?`<button class="btn" onclick="sendKakao(${i},this)">카카오 알림톡 전송</button> <button class="btn secondary" onclick="sendSms(${i},this)">문자로 전송</button>`:'<button class="btn bad" disabled>전화번호 없음</button>'}
   <button class="btn secondary" onclick="printOne(${i})">이 정산서 인쇄</button>
  </div>
  <div class="foot">FIRST OMS · 주문내역을 확인해 주세요.</div>
  </article>`;
+}
+function formatKakaoVariables(r){
+ const c=r.customer||{}, x=state.settings||{};
+ const items=r.items.map(v=>`${v.item} ${v.qty}개`).join(', ');
+ return {
+  '#{고객명}':String(c.name||r.nick||''),
+  '#{닉네임}':String(r.nick||''),
+  '#{상품내역}':String(items),
+  '#{상품합계}':String(money(r.subtotal)),
+  '#{배송비}':String(money(r.fee)),
+  '#{결제금액}':String(money(r.total)),
+  '#{은행}':String(x.bank||'카카오뱅크'),
+  '#{예금주}':String(x.holder||'김미숙'),
+  '#{계좌번호}':String(x.account||'계좌번호 미설정'),
+  '#{문의안내}':String(x.contact||'')
+ };
+}
+async function checkKakaoStatus(showAlert=false){
+ try{
+  const r=await fetch('/api/kakao/status',{cache:'no-store'}),d=await r.json();
+  const el=$('kakaoStatus');
+  if(d.ready){if(el)el.innerHTML='<span class="badge good">연동완료</span> 카카오채널·알림톡 템플릿 사용 가능';if(showAlert)alert('카카오 알림톡 연동이 완료되어 있습니다.');}
+  else{if(el)el.innerHTML='<span class="badge bad">설정필요</span> 누락: '+(d.missing||[]).join(', ');if(showAlert)alert('Render 환경변수 누락: '+(d.missing||[]).join(', '));}
+ }catch(e){if($('kakaoStatus'))$('kakaoStatus').textContent='연동상태 확인 실패: '+e.message;}
+}
+async function sendKakao(i,button){
+ const r=getReceipts()[i], c=r.customer;
+ if(!c?.phone){alert('고객 전화번호가 없습니다.');return}
+ const msg=formatSms(r), variables=formatKakaoVariables(r);
+ if(!confirm(`${c.name||r.nick}님 (${c.phone})에게 카카오 알림톡을 바로 전송할까요?\n\n알림톡 실패 시 문자로 자동 대체됩니다.`))return;
+ const old=button?.textContent||'카카오 알림톡 전송';
+ try{
+  if(button){button.disabled=true;button.textContent='알림톡 전송 중...'}
+  const response=await fetch('/api/kakao/send',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({to:c.phone,text:msg,variables})});
+  const data=await response.json().catch(()=>({}));
+  if(!response.ok||!data.ok)throw new Error(data.error||`카카오 API 오류 ${response.status}`);
+  if(button)button.textContent='알림톡 접수완료';
+  alert(`${c.name||r.nick}님에게 카카오 알림톡 전송을 접수했습니다.\n실패 시 문자로 자동 대체됩니다.`);
+ }catch(e){
+  if(button){button.disabled=false;button.textContent=old}
+  alert('카카오 알림톡 전송 실패: '+e.message+'\n\n솔라피 카카오채널 연결, 승인 템플릿, Render 환경변수를 확인해 주세요.');
+ }
 }
 async function sendSms(i,button){
  const r=getReceipts()[i], c=r.customer;
