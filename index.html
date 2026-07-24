@@ -60,6 +60,7 @@ th{background:#232832;color:#f5d5bd;position:sticky;top:70px} tr:hover td{backgr
   <div><div class="brand"><b>FIRST OMS</b> 긴급 정산실</div><div class="sub">판매리스트 → 고객매칭 → 정산서 → 입금대조 → 택배리스트</div></div>
   <div class="actions no-print">
     <button class="btn secondary" onclick="recoverOldData()">이전 고객DB 복구</button>
+    <button class="btn secondary" onclick="downloadCustomerBackup()">고객정보 백업</button>
     <button class="btn secondary" onclick="downloadBackup()">전체 백업</button>
     <label class="btn secondary upload">백업 복원<input id="backupFile" type="file" accept=".json"></label>
     <button class="btn secondary" onclick="saveAll()">저장</button>
@@ -200,15 +201,40 @@ function loadAll(){try{state=JSON.parse(localStorage.getItem(KEY))||state}catch(
 function readWorkbook(file, cb){
  const r=new FileReader(); r.onload=e=>{try{
   const wb=XLSX.read(e.target.result,{type:'array',cellDates:true});
-  const all=[];
-  wb.SheetNames.forEach(sn=>{
-    const sheetRows=XLSX.utils.sheet_to_json(wb.Sheets[sn],{header:1,defval:'',blankrows:false,raw:false});
-    for(let i=0;i<sheetRows.length;i++){
-      const row=sheetRows[i];
-      if(Array.isArray(row) && row.some(v=>String(v??'').trim()!=='')) all.push(row);
-    }
+  // 땡라이브 양식은 F열 수식이 100만 행까지 미리 들어가 있어 !ref가 크게 잡힙니다.
+  // 전체 시트를 무작정 읽지 않고, 실제 데이터가 있는 시트/행만 찾아서 읽습니다.
+  const aliases = cb===importOrders ? orderAliases : (cb===importCustomers ? customerAliases : paymentAliases);
+  const preferred = cb===importOrders ? ['판매리스트','판매 리스트','주문리스트','주문'] : [];
+  const names=[...wb.SheetNames].sort((a,b)=>{
+    const ap=preferred.some(x=>norm(a).includes(norm(x)))?0:1;
+    const bp=preferred.some(x=>norm(b).includes(norm(x)))?0:1;
+    return ap-bp;
   });
-  cb(all,file.name);
+  let bestRows=null,bestScore=-1;
+  for(const sn of names){
+    const ws=wb.Sheets[sn]; if(!ws)continue;
+    // 헤더 탐색은 위쪽 60행, A~Z만 읽기
+    const probe=XLSX.utils.sheet_to_json(ws,{header:1,defval:'',blankrows:true,raw:false,range:'A1:Z60'});
+    let hi=-1,score=-1;
+    for(let i=0;i<probe.length;i++){
+      const row=(probe[i]||[]).map(norm); let sc=0;
+      Object.values(aliases).forEach(list=>{if(row.some(v=>list.some(a=>v.includes(norm(a)))))sc++});
+      if(sc>score){score=sc;hi=i}
+    }
+    if(score<2)continue;
+    // 실제 주문행은 최대 50,000행까지만 읽고, 연속 빈 행 200개면 종료
+    const endRow=Math.min(50000, Math.max(hi+5000, 5000));
+    const rawRows=XLSX.utils.sheet_to_json(ws,{header:1,defval:'',blankrows:true,raw:false,range:`A${hi+1}:Z${endRow}`});
+    const rows=[]; let emptyRun=0;
+    for(const row of rawRows){
+      const meaningful=(row||[]).slice(0,12).some(v=>String(v??'').trim()!=='' && !String(v).trim().startsWith('='));
+      if(meaningful){rows.push(row);emptyRun=0}else{emptyRun++; if(emptyRun>=200 && rows.length>1)break}
+    }
+    if(score>bestScore){bestScore=score;bestRows=rows}
+    if(preferred.some(x=>norm(sn).includes(norm(x))))break;
+  }
+  if(!bestRows)throw new Error('번호·고객명·품목·수량·단가·금액 제목행을 찾지 못했습니다.');
+  cb(bestRows,file.name);
  }catch(err){alert('파일을 읽지 못했습니다: '+err.message)}}; r.readAsArrayBuffer(file);
 }
 function findHeader(rows, aliases){
@@ -440,6 +466,23 @@ function saveSilently(){localStorage.setItem(KEY,JSON.stringify(state))}
 function updateKpi(){const rs=getReceipts();$('kpiOrderRows').textContent=state.orders.length;$('kpiReceipts').textContent=rs.length;$('kpiMatched').textContent=rs.filter(r=>r.customer).length;$('kpiPaid').textContent=rs.filter(r=>r.payment.status==='paid').length}
 function renderAll(){renderOrders();renderCustomers();renderReceipts();renderPayments();renderShipping();updateKpi()}
 function esc(v){return String(v??'').replace(/[&<>"']/g,s=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[s]))}
+
+async function downloadCustomerBackup(){
+ try{
+  const r=await fetch('/api/customers/backup',{cache:'no-store'});
+  if(!r.ok)throw new Error('HTTP '+r.status);
+  const blob=await r.blob();
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  a.download='FIRST_OMS_고객정보백업_'+today()+'.json';
+  document.body.appendChild(a);a.click();a.remove();URL.revokeObjectURL(a.href);
+  alert('고객정보 백업 파일을 저장했습니다. 서버에도 customers-backup.json으로 자동 보관됩니다.');
+ }catch(e){
+  const blob=new Blob([JSON.stringify({version:1,exportedAt:new Date().toISOString(),customers:state.customers},null,2)],{type:'application/json'});
+  const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='FIRST_OMS_고객정보백업_'+today()+'.json';a.click();URL.revokeObjectURL(a.href);
+  alert('서버 연결 없이 현재 화면의 고객정보를 백업했습니다.');
+ }
+}
 
 function downloadBackup(){
  const blob=new Blob([JSON.stringify({version:2,exportedAt:new Date().toISOString(),state},null,2)],{type:'application/json'});

@@ -1,11 +1,28 @@
 const http=require('http'),fs=require('fs'),path=require('path'),url=require('url'),crypto=require('crypto');
-const ROOT=__dirname, DATA=path.join(ROOT,'data','customers.json'), YT_AUTH=path.join(ROOT,'data','youtube-auth.json');
+const ROOT=__dirname, DATA=path.join(ROOT,'data','customers.json'), CUSTOMER_BACKUP=path.join(ROOT,'data','customers-backup.json'), BACKUP_DIR=path.join(ROOT,'data','backups'), YT_AUTH=path.join(ROOT,'data','youtube-auth.json');
 if(!fs.existsSync(path.dirname(DATA)))fs.mkdirSync(path.dirname(DATA),{recursive:true});
 if(!fs.existsSync(DATA))fs.writeFileSync(DATA,'[]','utf8');
 if(!fs.existsSync(YT_AUTH))fs.writeFileSync(YT_AUTH,'{}','utf8');
 const mime={'.html':'text/html; charset=utf-8','.js':'application/javascript; charset=utf-8','.css':'text/css; charset=utf-8','.json':'application/json; charset=utf-8','.png':'image/png','.jpg':'image/jpeg','.jpeg':'image/jpeg','.ico':'image/x-icon'};
 function readCustomers(){try{return JSON.parse(fs.readFileSync(DATA,'utf8'))}catch(e){return[]}}
-function saveCustomers(v){fs.writeFileSync(DATA,JSON.stringify(v,null,2),'utf8')}
+function backupCustomers(){
+ try{
+  if(!fs.existsSync(BACKUP_DIR))fs.mkdirSync(BACKUP_DIR,{recursive:true});
+  const current=readCustomers();
+  const text=JSON.stringify(current,null,2);
+  fs.writeFileSync(CUSTOMER_BACKUP,text,'utf8');
+  const stamp=new Date().toISOString().replace(/[:.]/g,'-');
+  fs.writeFileSync(path.join(BACKUP_DIR,`customers-${stamp}.json`),text,'utf8');
+  const files=fs.readdirSync(BACKUP_DIR).filter(x=>/^customers-.*\.json$/.test(x)).sort();
+  while(files.length>30){const old=files.shift();try{fs.unlinkSync(path.join(BACKUP_DIR,old))}catch(e){}}
+  return {count:current.length,file:'customers-backup.json'};
+ }catch(e){return {count:0,error:e.message}}
+}
+function saveCustomers(v){
+ backupCustomers();
+ fs.writeFileSync(DATA,JSON.stringify(v,null,2),'utf8');
+ fs.writeFileSync(CUSTOMER_BACKUP,JSON.stringify(v,null,2),'utf8');
+}
 
 function readBody(req,max=1024*1024){
  return new Promise((resolve,reject)=>{
@@ -199,6 +216,21 @@ const server=http.createServer((req,res)=>{
     json(res,200,{ok:true,result})
    }catch(e){json(res,500,{ok:false,error:e.message})}
   }).catch(e=>json(res,400,{ok:false,error:e.message}))
+ }
+
+ if(u.pathname==='/api/customers/backup'&&req.method==='GET'){
+  const info=backupCustomers();
+  const payload={version:1,exportedAt:new Date().toISOString(),count:readCustomers().length,customers:readCustomers()};
+  res.writeHead(200,{
+   'Content-Type':'application/json; charset=utf-8',
+   'Content-Disposition':`attachment; filename=FIRST_OMS_customers_backup_${new Date().toISOString().slice(0,10)}.json`,
+   'Cache-Control':'no-store',
+   'X-Backup-Count':String(info.count||0)
+  });
+  return res.end(JSON.stringify(payload,null,2));
+ }
+ if(u.pathname==='/api/customers/backup/status'&&req.method==='GET'){
+  return json(res,200,{ok:true,count:readCustomers().length,backupExists:fs.existsSync(CUSTOMER_BACKUP)});
  }
 
  if(u.pathname==='/api/customers'&&req.method==='GET')return json(res,200,readCustomers());
