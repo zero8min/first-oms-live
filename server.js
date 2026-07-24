@@ -4,11 +4,12 @@ function broadcastCustomers(list){
  const payload=`event: customers\ndata: ${JSON.stringify(list)}\n\n`;
  for(const res of [...sseClients]){try{res.write(payload)}catch(e){sseClients.delete(res)}}
 }
-const ROOT=__dirname, DATA=path.join(ROOT,'data','customers.json'), CUSTOMER_BACKUP=path.join(ROOT,'data','customers-backup.json'), CUSTOMER_XLSX=path.join(ROOT,'data','customers.xlsx'), INTEGRATIONS=path.join(ROOT,'data','integrations.json'), BACKUP_DIR=path.join(ROOT,'data','backups'), YT_AUTH=path.join(ROOT,'data','youtube-auth.json');
+const ROOT=__dirname, DATA=path.join(ROOT,'data','customers.json'), CUSTOMER_BACKUP=path.join(ROOT,'data','customers-backup.json'), CUSTOMER_XLSX=path.join(ROOT,'data','customers.xlsx'), INTEGRATIONS=path.join(ROOT,'data','integrations.json'), BACKUP_DIR=path.join(ROOT,'data','backups'), SEND_HISTORY=path.join(ROOT,'data','send-history.json'), YT_AUTH=path.join(ROOT,'data','youtube-auth.json');
 if(!fs.existsSync(path.dirname(DATA)))fs.mkdirSync(path.dirname(DATA),{recursive:true});
 if(!fs.existsSync(DATA))fs.writeFileSync(DATA,'[]','utf8');
 if(!fs.existsSync(YT_AUTH))fs.writeFileSync(YT_AUTH,'{}','utf8');
 if(!fs.existsSync(INTEGRATIONS))fs.writeFileSync(INTEGRATIONS,'{}','utf8');
+if(!fs.existsSync(SEND_HISTORY))fs.writeFileSync(SEND_HISTORY,'[]','utf8');
 const mime={'.html':'text/html; charset=utf-8','.js':'application/javascript; charset=utf-8','.css':'text/css; charset=utf-8','.json':'application/json; charset=utf-8','.png':'image/png','.jpg':'image/jpeg','.jpeg':'image/jpeg','.ico':'image/x-icon'};
 function readCustomers(){try{return JSON.parse(fs.readFileSync(DATA,'utf8'))}catch(e){return[]}}
 function readIntegrations(){try{return JSON.parse(fs.readFileSync(INTEGRATIONS,'utf8'))}catch(e){return{}}}
@@ -112,6 +113,20 @@ async function sendSolapiKakao(to,variables,text){
  return data
 }
 
+
+function readSendHistory(){try{return JSON.parse(fs.readFileSync(SEND_HISTORY,'utf8'))}catch(e){return[]}}
+function appendSendHistory(v){const a=readSendHistory();a.unshift(v);fs.writeFileSync(SEND_HISTORY,JSON.stringify(a.slice(0,5000),null,2),'utf8')}
+async function sendSolapiMms(to,imageBase64,subject,text){
+ const cfg=solapiConfig();if(!cfg.apiKey||!cfg.apiSecret||!cfg.sender)throw new Error('SOLAPI API Key·Secret·승인 발신번호를 확인해 주세요.');
+ const receiver=onlyDigits(to);if(receiver.length<10)throw new Error('수신번호가 올바르지 않습니다.');
+ const clean=String(imageBase64||'').replace(/^data:image\/jpeg;base64,/,'');if(!clean)throw new Error('정산서 이미지가 없습니다.');
+ const bytes=Buffer.from(clean,'base64');if(bytes.length>200*1024)throw new Error(`이미지 용량이 200KB를 넘습니다 (${Math.ceil(bytes.length/1024)}KB).`);
+ const upload=await fetch('https://api.solapi.com/storage/v1/files',{method:'POST',headers:{Authorization:solapiAuth(cfg.apiKey,cfg.apiSecret),'Content-Type':'application/json'},body:JSON.stringify({file:clean,type:'MMS',name:'FIRST_OMS_receipt.jpg'})});
+ const uraw=await upload.text();let ud={};try{ud=JSON.parse(uraw)}catch(e){ud={raw:uraw}}if(!upload.ok||!ud.fileId)throw new Error(ud.errorMessage||ud.message||`이미지 업로드 실패 ${upload.status}`);
+ const payload={messages:[{to:receiver,from:cfg.sender,text:String(text||'정산서 이미지입니다.').slice(0,1900),subject:String(subject||'땡라이브 정산서').slice(0,40),imageId:ud.fileId,autoTypeDetect:true}],showMessageList:true};
+ const r=await fetch('https://api.solapi.com/messages/v4/send-many/detail',{method:'POST',headers:{Authorization:solapiAuth(cfg.apiKey,cfg.apiSecret),'Content-Type':'application/json'},body:JSON.stringify(payload)});
+ const raw=await r.text();let data={};try{data=JSON.parse(raw)}catch(e){data={raw}}if(!r.ok)throw new Error(data.errorMessage||data.message||data.errorCode||('SOLAPI HTTP '+r.status));if(Array.isArray(data.failedMessageList)&&data.failedMessageList.length){const f=data.failedMessageList[0];throw new Error(f.statusMessage||f.errorMessage||'MMS 접수 실패')}return {upload:ud,result:data}
+}
 
 function readYoutubeAuth(){try{return JSON.parse(fs.readFileSync(YT_AUTH,'utf8'))}catch(e){return{}}}
 function saveYoutubeAuth(v){fs.writeFileSync(YT_AUTH,JSON.stringify(v,null,2),'utf8')}
@@ -299,6 +314,12 @@ const server=http.createServer((req,res)=>{
   }).catch(e=>json(res,400,{ok:false,error:e.message}))
  }
 
+ if(u.pathname==='/api/send-history'&&req.method==='GET'){
+  const date=String(u.query.date||'');const history=readSendHistory().filter(x=>!date||x.date===date);return json(res,200,{ok:true,history});
+ }
+ if(u.pathname==='/api/mms/send'&&req.method==='POST'){
+  return readBody(req,1024*1024).then(async body=>{let meta={};try{const d=JSON.parse(body||'{}');meta={sentAt:new Date().toISOString(),date:String(d.date||''),nickname:String(d.nickname||''),name:String(d.name||''),toMasked:onlyDigits(d.to).replace(/^(\d{3})\d+(\d{4})$/,'$1****$2'),total:Number(d.total)||0};if(!d.to||!d.imageBase64)return json(res,400,{ok:false,error:'수신번호 또는 정산서 이미지가 없습니다.'});const result=await sendSolapiMms(d.to,d.imageBase64,d.subject,d.text);appendSendHistory({...meta,ok:true});return json(res,200,{ok:true,result})}catch(e){appendSendHistory({...meta,ok:false,error:e.message});return json(res,500,{ok:false,error:e.message})}}).catch(e=>json(res,400,{ok:false,error:e.message}))
+ }
  if(u.pathname==='/api/sms/send'&&req.method==='POST'){
   return readBody(req).then(async body=>{
    try{

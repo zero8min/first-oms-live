@@ -43,6 +43,7 @@ th{background:#232832;color:#f5d5bd;position:sticky;top:70px} tr:hover td{backgr
 .receipt h3{text-align:center;letter-spacing:1px}.receipt .meta{font-size:12px;color:#555;border-bottom:1px dashed #aaa;padding-bottom:10px;margin-bottom:10px}
 .receipt table{background:white;width:100%;min-width:0!important;table-layout:fixed}.receipt th,.receipt td{color:#111;border-color:#ddd;padding:7px;font-size:12px;white-space:normal;word-break:break-word;overflow-wrap:anywhere}.receipt th{background:#f4eee9;position:static}
 .receipt .total{font-size:18px;font-weight:900;text-align:right;margin-top:12px}.receipt .foot{font-size:11px;color:#666;text-align:center;margin-top:14px}
+.receipt-tools{display:grid;grid-template-columns:minmax(220px,1fr) 180px auto auto;gap:10px;align-items:end;margin-bottom:12px}.history-list{display:flex;flex-direction:column;gap:8px}.history-row{display:grid;grid-template-columns:150px 100px 1fr 140px 100px;gap:8px;padding:10px;border:1px solid var(--line);border-radius:10px;align-items:center}.copy-account{cursor:pointer;text-decoration:underline;text-underline-offset:3px}@media(max-width:800px){.receipt-tools,.history-row{grid-template-columns:1fr}.history-row{gap:3px}}
 .note{background:#2a221c;border:1px solid #6b4b38;color:#f1d2ba;border-radius:12px;padding:12px;margin:12px 0}
 .modal{display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:50;padding:18px;overflow:auto}
 .modal.show{display:block}.modal-box{max-width:700px;margin:40px auto;background:var(--panel);border:1px solid var(--line);border-radius:18px;padding:20px}
@@ -191,8 +192,8 @@ th{background:#232832;color:#f5d5bd;position:sticky;top:70px} tr:hover td{backgr
     <div class="section-title no-print">
       <h2>고객별 정산서</h2>
       <div class="actions">
-        <button class="btn" onclick="sendAllKakao(this)">전체 카카오 알림톡 전송</button>
-        <button class="btn secondary" onclick="sendAllSms(this)">전체 문자 전송</button>
+        <button class="btn" onclick="sendAllMms(this)">전체 정산서 이미지 전송</button>
+        <button class="btn secondary" onclick="loadSendHistory()">전송기록 보기</button>
         <button class="btn" onclick="window.print()">전체 정산서 인쇄/PDF</button>
         <button class="btn secondary" onclick="downloadReceiptList()">정산서 목록 엑셀</button>
       </div>
@@ -208,8 +209,15 @@ th{background:#232832;color:#f5d5bd;position:sticky;top:70px} tr:hover td{backgr
       <div style="margin-top:12px"><label>문자 내용 직접 설정</label><textarea id="setSmsTemplate"></textarea></div>
       <p class="muted">사용 가능: {고객명} {닉네임} {상품내역} {상품합계} {배송비} {결제금액} {은행} {예금주} {계좌번호} {문의안내}</p>
     </div>
+    <div class="card no-print receipt-tools">
+      <div><label>🔍 고객 정산서 검색</label><input id="receiptSearch" placeholder="고객이름 또는 닉네임" oninput="renderReceipts()"></div>
+      <div><label>날짜 선택</label><input id="receiptDate" type="date" onchange="renderReceipts()"></div>
+      <button class="btn secondary" onclick="clearReceiptFilters()">전체 날짜 보기</button>
+      <button class="btn" onclick="loadSendHistory()">전송기록</button>
+    </div>
     <div id="receiptSummary" class="note no-print"></div>
     <div id="receiptCards" class="receipt-wrap"></div>
+    <div id="sendHistoryBox" class="card no-print" style="display:none;margin-top:16px"><div class="section-title"><h3>정산서 이미지 전송기록</h3><button class="btn secondary" onclick="document.getElementById('sendHistoryBox').style.display='none'">닫기</button></div><div id="sendHistoryList" class="history-list"></div></div>
   </section>
 
   <section id="payments" class="page">
@@ -512,34 +520,49 @@ function renderCustomers(){
  list.map(({c,i})=>`<tr><td>${esc(c.name)}</td><td>${esc(c.nick)}</td><td>${esc(c.phone)}</td><td class="address-cell">${esc([c.postalCode,c.address,c.detailAddress].filter(Boolean).join(' '))}</td><td class="address-cell">${esc(c.memo||'')}</td><td class="action-cell"><button class="btn secondary" onclick="editCustomer(${i})">수정</button> <button class="btn bad" onclick="deleteCustomer(${i})">삭제</button></td></tr>`).join('')+
  '</tbody></table></div>';
 }
+function filteredReceipts(){
+ const q=norm($('receiptSearch')?.value||''), d=$('receiptDate')?.value||'';
+ return getReceipts().filter(r=>{
+  const c=r.customer||{};
+  return (!d||r.date===d)&&(!q||[r.nick,c.name,c.nickname,c.nick].some(v=>norm(v).includes(q)));
+ });
+}
+function clearReceiptFilters(){if($('receiptSearch'))$('receiptSearch').value='';if($('receiptDate'))$('receiptDate').value='';renderReceipts()}
 function renderReceipts(){
- const rs=getReceipts(), matched=rs.filter(r=>r.customer).length;
- $('receiptSummary').textContent=`총 ${rs.length}장 · 고객DB 매칭 ${matched}장 · 정보확인 필요 ${rs.length-matched}장`;
- $('receiptCards').innerHTML=rs.length?rs.map((r,i)=>receiptHTML(r,i)).join(''):'<div class="empty">정산서가 없습니다.</div>';
+ const rs=filteredReceipts(), matched=rs.filter(r=>r.customer).length;
+ $('receiptSummary').textContent=`검색된 정산서 ${rs.length}장 · 고객DB 매칭 ${matched}장 · 정보확인 필요 ${rs.length-matched}장`;
+ $('receiptCards').innerHTML=rs.length?rs.map((r,i)=>receiptHTML(r,i)).join(''):'<div class="empty">조건에 맞는 정산서가 없습니다.</div>';
  updateKpi();
 }
+
 function receiptHTML(r,i){
  const c=r.customer, pay=r.payment;
  const payBadge=pay.status==='paid'?'<span class="badge good">입금확인</span>':pay.status==='amount-mismatch'?'<span class="badge warn">금액 확인</span>':'<span class="badge bad">미입금</span>';
- return `<article class="receipt">
+ const account=state.settings?.account||'계좌번호를 설정해 주세요';
+ return `<article class="receipt" data-key="${esc(r.key)}">
  <h3>땡라이브 정산서</h3>
  <div class="meta">정산번호 ${r.date.replaceAll('-','')}-${String(i+1).padStart(3,'0')}<br>방송일 ${r.date}</div>
- <div><b>${c?esc(c.name||r.nick):`<button class="btn bad no-print" onclick="openCustomerForReceipt(${i})">고객정보 확인필요 · 폼 열기</button>`}</b> · ${esc(r.nick)} ${payBadge}</div>
- <div class="meta">${esc(c?.phone||'연락처 미등록')}<br>${esc(c?.address||'주소 미등록')}</div>
+ <div style="font-size:18px"><b>${esc(r.nick)}</b> ${payBadge}<br><span style="font-size:13px;color:#666">${c?esc(c.name||''):`<button class="btn bad no-print" onclick="openCustomerForKey('${esc(r.key)}')">고객정보 확인필요 · 폼 열기</button>`}</span></div>
+ <div class="meta">${esc(c?.phone||'연락처 미등록')}<br>${esc([c?.address,c?.detailAddress].filter(Boolean).join(' ')||'주소 미등록')}</div>
  <table><thead><tr><th>상품</th><th>수량</th><th>단가</th><th>금액</th></tr></thead><tbody>
  ${r.items.map(x=>`<tr><td>${esc(x.item)}</td><td>${x.qty}</td><td>${money(x.unit)}</td><td>${money(x.amount)}</td></tr>`).join('')}
  </tbody></table>
  <div style="margin-top:10px;font-size:13px">상품합계 <b>${money(r.subtotal)}</b><br>배송비 <b>${money(r.fee)}</b></div>
  <div class="total">결제금액 ${money(r.total)}</div>
- <div class="account-box"><b>입금계좌</b><br>${esc(state.settings?.bank||'카카오뱅크')} ${esc(state.settings?.account||'계좌번호를 설정해 주세요')}<br>예금주 ${esc(state.settings?.holder||'김미숙')}</div>
+ <div class="account-box"><b>입금계좌</b><br>${esc(state.settings?.bank||'카카오뱅크')} <span class="copy-account" onclick="copyAccount()" title="눌러서 계좌번호 복사">${esc(account)}</span> <button class="btn secondary no-print" style="padding:4px 8px" onclick="copyAccount()">복사</button><br>예금주 ${esc(state.settings?.holder||'김미숙')}</div>
  <div class="actions no-print" style="margin-top:12px">
-  <button class="btn" onclick="${c?.phone?`sendKakao(${i},this)`:`openCustomerForReceipt(${i})`}">${c?.phone?'카카오 알림톡 전송':'고객정보 등록 후 카카오 전송'}</button><button class="btn secondary" onclick="${c?.phone?`sendSms(${i},this)`:`openCustomerForReceipt(${i})`}">${c?.phone?'문자 전송':'고객정보 등록 후 문자 전송'}</button>
-  <button class="btn warn" onclick="openReceiptEdit(${i})">정산서 수정</button>
-  <button class="btn secondary" onclick="printOne(${i})">이 정산서 인쇄</button>
+  <button class="btn" onclick="${c?.phone?`sendMmsByKey('${esc(r.key)}',this)`:`openCustomerForKey('${esc(r.key)}')`}">${c?.phone?'정산서 이미지 전송':'고객정보 등록 후 이미지 전송'}</button>
+  <button class="btn warn" onclick="openReceiptEditByKey('${esc(r.key)}')">정산서 수정</button>
+  <button class="btn secondary" onclick="printByKey('${esc(r.key)}')">이 정산서 인쇄</button>
  </div>
  <div class="foot">FIRST OMS · 주문내역을 확인해 주세요.</div>
  </article>`;
 }
+function copyAccount(){const a=state.settings?.account||'';if(!a)return alert('계좌번호를 먼저 설정해 주세요.');navigator.clipboard.writeText(a).then(()=>alert('계좌번호를 복사했습니다.')).catch(()=>prompt('계좌번호를 복사하세요.',a))}
+function indexOfReceiptKey(key){return getReceipts().findIndex(r=>r.key===key)}
+function openCustomerForKey(key){const i=indexOfReceiptKey(key);if(i>=0)openCustomerForReceipt(i)}
+function openReceiptEditByKey(key){const i=indexOfReceiptKey(key);if(i>=0)openReceiptEdit(i)}
+function printByKey(key){const i=indexOfReceiptKey(key);if(i>=0)printOne(i)}
 
 function receiptByKey(key){return getReceipts().find(r=>r.key===key)||null}
 function openReceiptEdit(i){
@@ -605,6 +628,29 @@ function kakaoVariables(r){
   '#{문의안내}':x.contact||''
  };
 }
+
+function wrapText(ctx,text,x,y,maxWidth,lineHeight,maxLines=99){
+ const words=String(text||'').split(/\s+/);let line='',lines=0;
+ for(const w of words){const test=line?line+' '+w:w;if(ctx.measureText(test).width>maxWidth&&line){ctx.fillText(line,x,y);y+=lineHeight;lines++;line=w;if(lines>=maxLines)return y}else line=test}
+ if(line&&lines<maxLines){ctx.fillText(line,x,y);y+=lineHeight}return y;
+}
+async function receiptImageBase64(r){
+ const W=900,H=1350,c=document.createElement('canvas');c.width=W;c.height=H;const x=c.getContext('2d');
+ x.fillStyle='#fff';x.fillRect(0,0,W,H);x.fillStyle='#111';x.textAlign='center';x.font='bold 34px sans-serif';x.fillText('땡라이브 정산서',W/2,55);
+ x.textAlign='left';x.font='22px sans-serif';let y=100;x.fillText(`방송일  ${r.date}`,55,y);y+=45;x.font='bold 34px sans-serif';x.fillText(r.nick,55,y);y+=35;x.font='20px sans-serif';x.fillStyle='#555';x.fillText(r.customer?.name||'고객정보 확인필요',55,y);y+=38;x.fillStyle='#111';x.font='18px sans-serif';x.fillText(r.customer?.phone||'',55,y);y+=30;y=wrapText(x,[r.customer?.address,r.customer?.detailAddress].filter(Boolean).join(' '),55,y,790,25,2)+15;
+ x.strokeStyle='#bbb';x.beginPath();x.moveTo(55,y);x.lineTo(845,y);x.stroke();y+=35;x.font='bold 20px sans-serif';x.fillText('상품',55,y);x.fillText('수량',590,y);x.fillText('금액',730,y);y+=28;x.font='18px sans-serif';
+ for(const item of r.items.slice(0,16)){y=wrapText(x,item.item,55,y,500,24,2);x.fillText(String(item.qty),610,y-24);x.fillText(money(item.amount),730,y-24);y+=10;if(y>920)break}
+ y=Math.max(y+15,980);x.strokeStyle='#bbb';x.beginPath();x.moveTo(55,y);x.lineTo(845,y);x.stroke();y+=42;x.font='20px sans-serif';x.fillText(`상품합계  ${money(r.subtotal)}`,55,y);y+=34;x.fillText(`배송비  ${money(r.fee)}`,55,y);y+=48;x.font='bold 32px sans-serif';x.fillText(`결제금액  ${money(r.total)}`,55,y);y+=60;x.fillStyle='#f4eee9';x.fillRect(45,y-30,810,125);x.fillStyle='#111';x.font='bold 22px sans-serif';x.fillText('입금계좌',70,y);y+=36;x.font='22px sans-serif';x.fillText(`${state.settings?.bank||'카카오뱅크'} ${state.settings?.account||'계좌번호 미설정'}`,70,y);y+=34;x.fillText(`예금주 ${state.settings?.holder||'김미숙'}`,70,y);
+ x.textAlign='center';x.fillStyle='#777';x.font='16px sans-serif';x.fillText('FIRST OMS · 주문내역을 확인해 주세요.',W/2,1320);
+ let q=.78,data=c.toDataURL('image/jpeg',q);while(data.length>265000&&q>.35){q-=.08;data=c.toDataURL('image/jpeg',q)}return data.split(',')[1];
+}
+async function sendMmsByKey(key,button,skipConfirm=false){
+ const r=receiptByKey(key),c=r?.customer;if(!r||!c?.phone)throw new Error('고객 전화번호가 없습니다.');
+ if(!skipConfirm&&!confirm(`${r.nick}님 (${c.phone})에게 정산서 이미지를 MMS로 전송할까요?`))return false;
+ const old=button?.textContent||'정산서 이미지 전송';if(button){button.disabled=true;button.textContent='이미지 만드는 중...'}
+ try{const imageBase64=await receiptImageBase64(r);if(button)button.textContent='전송 중...';const response=await fetch('/api/mms/send',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({to:c.phone,imageBase64,subject:'땡라이브 정산서',text:`${r.nick}님 정산서입니다. 총 결제금액 ${money(r.total)}`,date:r.date,nickname:r.nick,name:c.name||'',total:r.total})});const data=await response.json();if(!response.ok||!data.ok)throw new Error(data.error||`MMS API 오류 ${response.status}`);if(!skipConfirm)alert(`${r.nick}님에게 정산서 이미지 전송을 접수했습니다.`);return true}catch(e){if(!skipConfirm)alert('정산서 이미지 전송 실패: '+e.message);throw e}finally{if(button){button.disabled=false;button.textContent=old}}}
+async function sendAllMms(button){const rs=filteredReceipts().filter(r=>r.customer?.phone);if(!rs.length)return alert('전화번호가 등록된 고객 정산서가 없습니다.');if(!confirm(`현재 검색·날짜 조건의 ${rs.length}명에게 정산서 이미지를 전체 전송할까요?`))return;const old=button.textContent;button.disabled=true;let ok=0,fail=[];for(let n=0;n<rs.length;n++){button.textContent=`전송 ${n+1}/${rs.length}`;try{await sendMmsByKey(rs[n].key,null,true);ok++}catch(e){fail.push(`${rs[n].nick}: ${e.message}`)}}button.disabled=false;button.textContent=old;alert(`이미지 전체전송 완료\n성공 ${ok}명 / 실패 ${fail.length}명${fail.length?'\n\n'+fail.slice(0,10).join('\n'):''}`);loadSendHistory()}
+async function loadSendHistory(){const box=$('sendHistoryBox'),list=$('sendHistoryList');box.style.display='block';list.innerHTML='불러오는 중...';try{const d=$('receiptDate')?.value||'';const r=await fetch('/api/send-history'+(d?`?date=${encodeURIComponent(d)}`:''),{cache:'no-store'}),j=await r.json();const rows=j.history||[];list.innerHTML=rows.length?rows.map(h=>`<div class="history-row"><span>${esc(new Date(h.sentAt).toLocaleString('ko-KR'))}</span><b>${esc(h.nickname||h.name||'')}</b><span>${esc(h.toMasked||'')} · ${money(h.total||0)}</span><span>${esc(h.date||'')}</span><span class="badge ${h.ok?'good':'bad'}">${h.ok?'성공':'실패'}</span></div>`).join(''):'<div class="empty">전송기록이 없습니다.</div>'}catch(e){list.innerHTML=`<div class="empty">기록 조회 실패: ${esc(e.message)}</div>`}}
 async function sendKakao(i,button,skipConfirm=false){
  const r=getReceipts()[i], c=r?.customer;
  if(!c?.phone)throw new Error(`${r?.nick||'고객'} 전화번호가 없습니다.`);
