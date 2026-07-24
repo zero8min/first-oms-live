@@ -58,7 +58,12 @@ th{background:#232832;color:#f5d5bd;position:sticky;top:70px} tr:hover td{backgr
 <body>
 <header>
   <div><div class="brand"><b>FIRST OMS</b> 긴급 정산실</div><div class="sub">판매리스트 → 고객매칭 → 정산서 → 입금대조 → 택배리스트</div></div>
-  <button class="btn secondary no-print" onclick="saveAll()">저장</button>
+  <div class="actions no-print">
+    <button class="btn secondary" onclick="recoverOldData()">이전 고객DB 복구</button>
+    <button class="btn secondary" onclick="downloadBackup()">전체 백업</button>
+    <label class="btn secondary upload">백업 복원<input id="backupFile" type="file" accept=".json"></label>
+    <button class="btn secondary" onclick="saveAll()">저장</button>
+  </div>
 </header>
 <main>
   <div class="tabs no-print">
@@ -194,7 +199,14 @@ function loadAll(){try{state=JSON.parse(localStorage.getItem(KEY))||state}catch(
 function readWorkbook(file, cb){
  const r=new FileReader(); r.onload=e=>{try{
   const wb=XLSX.read(e.target.result,{type:'array',cellDates:true});
-  const all=[]; wb.SheetNames.forEach(sn=>all.push(...XLSX.utils.sheet_to_json(wb.Sheets[sn],{header:1,defval:''})));
+  const all=[];
+  wb.SheetNames.forEach(sn=>{
+    const sheetRows=XLSX.utils.sheet_to_json(wb.Sheets[sn],{header:1,defval:'',blankrows:false,raw:false});
+    for(let i=0;i<sheetRows.length;i++){
+      const row=sheetRows[i];
+      if(Array.isArray(row) && row.some(v=>String(v??'').trim()!=='')) all.push(row);
+    }
+  });
   cb(all,file.name);
  }catch(err){alert('파일을 읽지 못했습니다: '+err.message)}}; r.readAsArrayBuffer(file);
 }
@@ -410,6 +422,45 @@ function saveSilently(){localStorage.setItem(KEY,JSON.stringify(state))}
 function updateKpi(){const rs=getReceipts();$('kpiOrderRows').textContent=state.orders.length;$('kpiReceipts').textContent=rs.length;$('kpiMatched').textContent=rs.filter(r=>r.customer).length;$('kpiPaid').textContent=rs.filter(r=>r.payment.status==='paid').length}
 function renderAll(){renderOrders();renderCustomers();renderReceipts();renderPayments();renderShipping();updateKpi()}
 function esc(v){return String(v??'').replace(/[&<>"']/g,s=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[s]))}
+
+function downloadBackup(){
+ const blob=new Blob([JSON.stringify({version:2,exportedAt:new Date().toISOString(),state},null,2)],{type:'application/json'});
+ const a=document.createElement('a'); a.href=URL.createObjectURL(blob);
+ a.download='FIRST_OMS_전체백업_'+today()+'.json'; a.click(); URL.revokeObjectURL(a.href);
+}
+$('backupFile').onchange=e=>{
+ const f=e.target.files[0]; if(!f)return;
+ const r=new FileReader();
+ r.onload=ev=>{try{
+   const obj=JSON.parse(ev.target.result), restored=obj.state||obj;
+   if(!restored||!Array.isArray(restored.customers)) throw new Error('올바른 백업 파일이 아닙니다.');
+   state={orders:Array.isArray(restored.orders)?restored.orders:[],customers:restored.customers,payments:Array.isArray(restored.payments)?restored.payments:[]};
+   autoMatchAll(); saveSilently(); renderAll(); alert('백업을 복원했습니다.');
+ }catch(err){alert('백업 복원 실패: '+err.message)}};
+ r.readAsText(f);
+};
+function recoverOldData(){
+ let found=[];
+ for(let i=0;i<localStorage.length;i++){
+   const key=localStorage.key(i); if(key===KEY)continue;
+   try{
+     const obj=JSON.parse(localStorage.getItem(key)), cand=obj?.state||obj;
+     if(cand && Array.isArray(cand.customers) && cand.customers.length){
+       found.push({key,customers:cand.customers,orders:Array.isArray(cand.orders)?cand.orders:[],payments:Array.isArray(cand.payments)?cand.payments:[]});
+     }
+   }catch(e){}
+ }
+ if(!found.length){alert('이 브라우저에서 복구 가능한 이전 고객DB를 찾지 못했습니다. 기존 주소와 같은 브라우저에서 다시 시도해 주세요.');return}
+ found.sort((a,b)=>b.customers.length-a.customers.length);
+ const pick=found[0];
+ if(confirm(`이전 저장자료 "${pick.key}"에서 고객 ${pick.customers.length}명을 발견했습니다. 현재 자료에 합칠까요?`)){
+   state.customers.push(...pick.customers); dedupeCustomers();
+   if(!state.orders.length) state.orders=pick.orders;
+   if(!state.payments.length) state.payments=pick.payments;
+   autoMatchAll(); saveSilently(); renderAll(); alert('이전 고객DB를 복구했습니다. 바로 전체 백업을 내려받아 주세요.');
+ }
+}
+
 loadAll();
 </script>
 </body>
