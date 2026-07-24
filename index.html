@@ -98,6 +98,7 @@ th{background:#232832;color:#f5d5bd;position:sticky;top:70px} tr:hover td{backgr
       <h2>판매리스트 업로드</h2>
       <div class="actions">
         <label class="btn upload">엑셀 선택<input id="orderFile" type="file" accept=".xlsx,.xls,.csv" multiple></label>
+        <button class="btn secondary" onclick="addOrder()">주문 직접 추가</button>
         <button class="btn secondary" onclick="clearOrders()">주문 초기화</button>
       </div>
     </div>
@@ -306,9 +307,26 @@ function matchPayment(g,c,total){
 }
 function renderOrders(){
  if(!state.orders.length){$('ordersTable').innerHTML='<div class="empty">판매리스트 엑셀을 올려주세요.</div>';return}
- $('ordersTable').innerHTML='<div class="scroll"><table><thead><tr><th>방송일</th><th>닉네임</th><th>상품</th><th>수량</th><th>단가</th><th>금액</th><th>고객매칭</th><th></th></tr></thead><tbody>'+
- state.orders.map((o,i)=>`<tr><td>${o.date}</td><td>${esc(o.nick)}</td><td>${esc(o.item)}</td><td>${o.qty}</td><td>${money(o.unit)}</td><td>${money(o.amount)}</td><td>${matchBadge(o)}</td><td><button class="btn bad" onclick="deleteOrder(${i})">삭제</button></td></tr>`).join('')+
+ $('ordersTable').innerHTML='<div class="scroll"><table><thead><tr><th>방송일</th><th>닉네임</th><th>상품</th><th>수량</th><th>단가</th><th>금액</th><th>배송비</th><th>고객매칭</th><th></th></tr></thead><tbody>'+
+ state.orders.map((o,i)=>`<tr><td><input type="date" value="${esc(o.date)}" onchange="updateOrder(${i},'date',this.value)"></td><td><input value="${esc(o.nick)}" onchange="updateOrder(${i},'nick',this.value)"></td><td><input value="${esc(o.item)}" onchange="updateOrder(${i},'item',this.value)"></td><td><input type="number" min="0" value="${o.qty}" onchange="updateOrder(${i},'qty',this.value)"></td><td><input type="number" min="0" value="${o.unit}" onchange="updateOrder(${i},'unit',this.value)"></td><td><input type="number" min="0" value="${o.amount}" onchange="updateOrder(${i},'amount',this.value,true)"></td><td><input type="number" min="0" value="${o.fee||0}" onchange="updateOrder(${i},'fee',this.value)"></td><td>${matchBadge(o)}</td><td><button class="btn bad" onclick="deleteOrder(${i})">삭제</button></td></tr>`).join('')+
  '</tbody></table></div>';
+}
+function updateOrder(i,key,value,manualAmount=false){
+ const o=state.orders[i]; if(!o)return;
+ if(['qty','unit','amount','fee'].includes(key)) value=Number(value)||0;
+ o[key]=value;
+ if((key==='qty'||key==='unit')&&!manualAmount)o.amount=(Number(o.qty)||0)*(Number(o.unit)||0);
+ autoMatchAll();saveSilently();renderAll();
+}
+function addOrder(){
+ const date=$('broadcastDate').value||today();
+ const nick=prompt('고객 닉네임을 입력해 주세요.'); if(!nick)return;
+ const item=prompt('상품명을 입력해 주세요.'); if(!item)return;
+ const qty=Number(prompt('수량을 입력해 주세요.','1'))||1;
+ const unit=Number(prompt('단가를 입력해 주세요.','0'))||0;
+ const fee=Number($('shippingFee').value)||0;
+ state.orders.push({id:crypto.randomUUID(),date,nick:nick.trim(),item:item.trim(),qty,unit,amount:qty*unit,fee,source:'직접등록'});
+ autoMatchAll();saveSilently();renderAll();go('orders');
 }
 function matchBadge(o){return o.customerId?'<span class="badge good">DB 매칭</span>':o.matchStatus==='duplicate'?'<span class="badge warn">중복 후보</span>':'<span class="badge bad">정보 확인 필요</span>'}
 function renderCustomers(){
@@ -461,7 +479,24 @@ function recoverOldData(){
  }
 }
 
-loadAll();
+async function syncServerCustomers(){
+ try{
+  const r=await fetch('/api/customers',{cache:'no-store'}); if(!r.ok)throw new Error('HTTP '+r.status);
+  const list=await r.json();
+  if(Array.isArray(list)){
+   const serverCustomers=list.map(c=>({
+    id:c.id||crypto.randomUUID(),
+    name:String(c.name||'').trim(),
+    nick:String(c.nick||c.nickname||'').trim(),
+    phone:String(c.phone||'').trim(),
+    address:[c.postalCode,c.address,c.detailAddress].filter(Boolean).join(' ').trim()
+   })).filter(c=>c.name||c.nick);
+   const localOnly=state.customers.filter(l=>!serverCustomers.some(c=>(phoneNorm(c.phone)&&phoneNorm(c.phone)===phoneNorm(l.phone))||(norm(c.nick)&&norm(c.nick)===norm(l.nick))));
+   state.customers=[...serverCustomers,...localOnly]; dedupeCustomers(); autoMatchAll(); saveSilently(); renderAll();
+  }
+ }catch(e){console.warn('고객DB 서버 동기화 실패',e)}
+}
+loadAll();syncServerCustomers();
 </script>
 </body>
 </html>
