@@ -133,6 +133,7 @@ th{background:#232832;color:#f5d5bd;position:sticky;top:70px} tr:hover td{backgr
       <button class="card kpi kpi-btn" onclick="go('receipts')"><small>고객별 정산서</small><strong id="kpiReceipts">0</strong></button>
       <button class="card kpi kpi-btn" onclick="go('customers')"><small>고객DB 매칭</small><strong id="kpiMatched">0</strong></button>
       <button class="card kpi kpi-btn" onclick="go('payments')"><small>입금확인</small><strong id="kpiPaid">0</strong></button>
+      <button class="card kpi kpi-btn" onclick="openSolapiSettings()"><small>솔라피 연결</small><strong id="kpiSolapi">확인</strong></button>
     </div>
     <div class="note">오늘 댓글 자동수집이 멈춘 경우, 판매리스트 엑셀을 올려 고객별 정산서를 만들고 입금대조 후 택배실로 넘기는 비상용 화면입니다.</div>
     <div class="section-title"><h2>빠른 실행</h2></div>
@@ -142,6 +143,7 @@ th{background:#232832;color:#f5d5bd;position:sticky;top:70px} tr:hover td{backgr
       <button class="btn secondary" onclick="go('receipts')">정산서 보기</button>
       <button class="btn secondary" onclick="go('payments')">입금 대조</button>
       <button class="btn secondary" onclick="go('shipping')">택배리스트</button>
+      <button class="btn" onclick="openSolapiSettings()">솔라피 API 입력·연결</button>
     </div>
   </section>
 
@@ -692,7 +694,7 @@ function printOne(i){
  const html=getReceipts(); const card=document.querySelectorAll('.receipt')[i]; if(!card)return;
  const w=window.open('','_blank');w.document.write(`<html><head><title>정산서</title><style>body{font-family:sans-serif;padding:20px}.receipt{max-width:500px;margin:auto}.receipt table{width:100%;border-collapse:collapse}.receipt th,.receipt td{border:1px solid #ccc;padding:7px}.no-print{display:none}.total{text-align:right;font-size:20px;font-weight:bold}</style></head><body>${card.outerHTML}
 <div id="solapiModal" class="modal"><div class="modal-box">
- <div class="section-title"><h3>솔라피 API 설정</h3><button class="btn secondary" onclick="closeSolapiSettings()">닫기</button></div>
+ <div class="section-title"><h3>솔라피 API 직접 입력·연결</h3><button class="btn secondary" onclick="closeSolapiSettings()">닫기</button></div>
  <div class="form-grid">
   <div><label>API Key</label><input id="solapiApiKey" autocomplete="off" placeholder="솔라피 API Key"></div>
   <div><label>API Secret</label><input id="solapiApiSecret" type="password" autocomplete="new-password" placeholder="저장된 값은 다시 표시되지 않습니다"></div>
@@ -701,7 +703,7 @@ function printOne(i){
   <div><label>알림톡 템플릿 ID</label><input id="solapiTemplateId" placeholder="승인 템플릿 ID"></div>
  </div>
  <p id="solapiStatus" class="muted"></p>
- <div class="actions"><button class="btn" onclick="saveSolapiSettings()">API 설정 저장</button><button class="btn secondary" onclick="loadSolapiSettings()">연결상태 확인</button></div>
+ <div class="actions"><button class="btn" onclick="saveSolapiSettings()">API 입력값 저장·연결</button><button class="btn secondary" onclick="loadSolapiSettings()">연결상태 확인</button></div>
  <p class="note">API Secret은 관리자 서버에만 저장되며 화면에는 다시 표시하지 않습니다. Render 재배포에도 절대 잃지 않으려면 Render Environment에도 같은 값을 등록하거나 Persistent Disk를 연결하세요.</p>
 </div></div>
 </body></html>`);w.document.close();w.print();
@@ -800,7 +802,8 @@ function deleteOrder(i){state.orders.splice(i,1);saveSilently();renderAll()}
 function clearOrders(){if(confirm('모든 주문을 초기화할까요?')){state.orders=[];saveSilently();renderAll()}}
 function clearPayments(){if(confirm('입금내역을 초기화할까요?')){state.payments=[];saveSilently();renderAll()}}
 function saveSilently(){localStorage.setItem(KEY,JSON.stringify(state))}
-function updateKpi(){const rs=getReceipts();$('kpiOrderRows').textContent=state.orders.length;$('kpiReceipts').textContent=rs.length;$('kpiMatched').textContent=rs.filter(r=>r.customer).length;$('kpiPaid').textContent=rs.filter(r=>r.payment.status==='paid').length}
+function updateKpi(){const rs=getReceipts();$('kpiOrderRows').textContent=state.orders.length;$('kpiReceipts').textContent=rs.length;$('kpiMatched').textContent=rs.filter(r=>r.customer).length;$('kpiPaid').textContent=rs.filter(r=>r.payment.status==='paid').length;refreshSolapiKpi()}
+async function refreshSolapiKpi(){const el=$('kpiSolapi');if(!el)return;try{const r=await fetch('/api/solapi/config',{cache:'no-store'}),d=await r.json();el.textContent=d.configured?'문자 준비':'미연동'}catch(e){el.textContent='확인필요'}}
 function renderAll(){renderMessageSettings();renderOrders();renderCustomers();renderReceipts();renderPayments();renderShipping();updateKpi()}
 function esc(v){return String(v??'').replace(/[&<>"']/g,s=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[s]))}
 
@@ -832,7 +835,7 @@ $('backupFile').onchange=e=>{
  r.onload=ev=>{try{
    const obj=JSON.parse(ev.target.result), restored=obj.state||obj;
    if(!restored||!Array.isArray(restored.customers)) throw new Error('올바른 백업 파일이 아닙니다.');
-   state={orders:Array.isArray(restored.orders)?restored.orders:[],customers:restored.customers,payments:Array.isArray(restored.payments)?restored.payments:[]};
+   state={orders:Array.isArray(restored.orders)?restored.orders:[],customers:restored.customers,payments:Array.isArray(restored.payments)?restored.payments:[],settings:{...state.settings,...(restored.settings||{})}};
    autoMatchAll(); saveSilently(); renderAll(); alert('백업을 복원했습니다.');
  }catch(err){alert('백업 복원 실패: '+err.message)}};
  r.readAsText(f);
@@ -899,12 +902,30 @@ function startCustomerRealtime(){
  window.customerEventSource=es;
  return true;
 }
-loadAll();syncServerCustomers(false);startCustomerRealtime();
+async function bootFirstOms(){
+ const saved=localStorage.getItem(KEY);
+ if(saved){
+  loadAll();
+ }else{
+  try{
+   const r=await fetch('/data/initial-backup.json?ts='+Date.now(),{cache:'no-store'});
+   if(!r.ok)throw new Error('초기 백업 HTTP '+r.status);
+   const obj=await r.json(), restored=obj.state||obj;
+   if(!restored||!Array.isArray(restored.customers))throw new Error('초기 백업 형식 오류');
+   state={orders:Array.isArray(restored.orders)?restored.orders:[],customers:restored.customers,payments:Array.isArray(restored.payments)?restored.payments:[],settings:{...state.settings,...(restored.settings||{})}};
+   saveSilently();renderMessageSettings();renderAll();
+  }catch(e){console.warn('포함 백업 자동복원 실패',e);loadAll()}
+ }
+ await syncServerCustomers(false);
+ startCustomerRealtime();
+ refreshSolapiKpi();
+}
+bootFirstOms();
 setInterval(()=>{if(!document.hidden)syncServerCustomers(false)},10000);
 </script>
 
 <div id="solapiModal" class="modal"><div class="modal-box">
- <div class="section-title"><h3>솔라피 API 설정</h3><button class="btn secondary" onclick="closeSolapiSettings()">닫기</button></div>
+ <div class="section-title"><h3>솔라피 API 직접 입력·연결</h3><button class="btn secondary" onclick="closeSolapiSettings()">닫기</button></div>
  <div class="form-grid">
   <div><label>API Key</label><input id="solapiApiKey" autocomplete="off" placeholder="솔라피 API Key"></div>
   <div><label>API Secret</label><input id="solapiApiSecret" type="password" autocomplete="new-password" placeholder="저장된 값은 다시 표시되지 않습니다"></div>
@@ -913,7 +934,7 @@ setInterval(()=>{if(!document.hidden)syncServerCustomers(false)},10000);
   <div><label>알림톡 템플릿 ID</label><input id="solapiTemplateId" placeholder="승인 템플릿 ID"></div>
  </div>
  <p id="solapiStatus" class="muted"></p>
- <div class="actions"><button class="btn" onclick="saveSolapiSettings()">API 설정 저장</button><button class="btn secondary" onclick="loadSolapiSettings()">연결상태 확인</button></div>
+ <div class="actions"><button class="btn" onclick="saveSolapiSettings()">API 입력값 저장·연결</button><button class="btn secondary" onclick="loadSolapiSettings()">연결상태 확인</button></div>
  <p class="note">API Secret은 관리자 서버에만 저장되며 화면에는 다시 표시하지 않습니다. Render 재배포에도 절대 잃지 않으려면 Render Environment에도 같은 값을 등록하거나 Persistent Disk를 연결하세요.</p>
 </div></div>
 </body>
