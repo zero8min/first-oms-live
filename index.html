@@ -38,17 +38,43 @@ th{background:#232832;color:#f5d5bd;position:sticky;top:70px} tr:hover td{backgr
 .badge.good{background:#193b29;color:#8be0a5}.badge.warn{background:#49391b;color:#f0c66e}.badge.bad{background:#4a2323;color:#ff9999}
 .muted{color:var(--muted)} .scroll{overflow:auto;max-height:58vh;border-radius:15px;border:1px solid var(--line)}
 .empty{padding:42px;text-align:center;color:var(--muted)}
-.receipt-wrap{display:grid;grid-template-columns:repeat(3,minmax(280px,1fr));gap:14px}
-.receipt{background:#fff;color:#151515;border-radius:14px;padding:20px;box-shadow:0 10px 30px rgba(0,0,0,.25)}
+.receipt-wrap{display:grid;grid-template-columns:repeat(2,minmax(0,560px));justify-content:center;align-items:start;gap:18px;width:100%}
+.receipt{background:#fff;color:#151515;border-radius:14px;padding:20px;box-shadow:0 10px 30px rgba(0,0,0,.25);width:100%;min-width:0;overflow:hidden}
 .receipt h3{text-align:center;letter-spacing:1px}.receipt .meta{font-size:12px;color:#555;border-bottom:1px dashed #aaa;padding-bottom:10px;margin-bottom:10px}
-.receipt table{background:white}.receipt th,.receipt td{color:#111;border-color:#ddd;padding:7px;font-size:12px}.receipt th{background:#f4eee9;position:static}
+.receipt table{background:white;width:100%;min-width:0!important;table-layout:fixed}.receipt th,.receipt td{color:#111;border-color:#ddd;padding:7px;font-size:12px;white-space:normal;word-break:break-word;overflow-wrap:anywhere}.receipt th{background:#f4eee9;position:static}
 .receipt .total{font-size:18px;font-weight:900;text-align:right;margin-top:12px}.receipt .foot{font-size:11px;color:#666;text-align:center;margin-top:14px}
 .note{background:#2a221c;border:1px solid #6b4b38;color:#f1d2ba;border-radius:12px;padding:12px;margin:12px 0}
 .modal{display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:50;padding:18px;overflow:auto}
 .modal.show{display:block}.modal-box{max-width:700px;margin:40px auto;background:var(--panel);border:1px solid var(--line);border-radius:18px;padding:20px}
-.search-bar{display:grid;grid-template-columns:1fr auto auto;gap:8px;margin:12px 0}.settings-box{margin:12px 0}.settings-box textarea{min-height:180px;resize:vertical}.account-box{margin-top:12px;padding:12px;border:1px solid #d9c5b8;background:#fff8f2;border-radius:10px;font-size:13px;line-height:1.6}.search-highlight{background:#6b4b38}
-@media(max-width:1000px){.grid,.form-grid{grid-template-columns:repeat(2,1fr)}.receipt-wrap{grid-template-columns:1fr}}
-@media(max-width:600px){main{padding:14px}.grid,.form-grid{grid-template-columns:1fr}header{padding:13px}.sub{display:none}}
+.search-bar{display:grid;grid-template-columns:1fr auto auto;gap:8px;margin:12px 0}.settings-box{margin:12px 0}.settings-box textarea{min-height:180px;resize:vertical}.account-box{margin-top:12px;padding:12px;border:1px solid #d9c5b8;background:#fff8f2;border-radius:10px;font-size:13px;line-height:1.6}
+.search-highlight{background:#6b4b38}
+/* 고객DB 표: 고정 헤더 때문에 고객 행과 버튼이 위로 겹치던 문제 수정 */
+#customers .scroll{overflow-x:auto;overflow-y:visible;max-height:none}
+#customers table{min-width:1050px;table-layout:fixed}
+#customers th{position:static;top:auto}
+#customers th:nth-child(1),#customers td:nth-child(1){width:10%}
+#customers th:nth-child(2),#customers td:nth-child(2){width:12%}
+#customers th:nth-child(3),#customers td:nth-child(3){width:15%}
+#customers th:nth-child(4),#customers td:nth-child(4){width:28%;white-space:normal;word-break:keep-all}
+#customers th:nth-child(5),#customers td:nth-child(5){width:20%;white-space:normal;word-break:keep-all}
+#customers th:nth-child(6),#customers td:nth-child(6){width:15%;text-align:center;white-space:nowrap}
+#customers td{vertical-align:middle}
+#customers .action-cell .btn{padding:8px 11px;margin:2px}
+
+.admin-customer-form{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.admin-customer-form .full{grid-column:1/-1}
+.admin-address-row{display:grid;grid-template-columns:140px 1fr;gap:8px}
+.postcodeLayer{display:none;position:fixed;inset:0;background:#0008;z-index:80;padding:18px;align-items:center;justify-content:center}
+.postcodeLayer.show{display:flex}
+.postcodeBox{width:min(520px,100%);height:min(680px,88vh);background:#fff;border-radius:18px;overflow:hidden;box-shadow:0 25px 80px #0008}
+.postcodeHead{height:48px;display:flex;align-items:center;padding:0 12px;border-bottom:1px solid #ddd;font-weight:900;color:#111}
+.postcodeHead button{margin-left:auto;width:auto;padding:8px 12px;border-radius:10px;background:#17202a;color:#fff;font-size:13px;border:0}
+#adminPostcodeEmbed{width:100%;height:calc(100% - 48px)}
+@media(max-width:600px){.admin-customer-form{grid-template-columns:1fr}.admin-customer-form .full{grid-column:auto}.admin-address-row{grid-template-columns:1fr}.admin-address-row .btn{width:100%}}
+
+@media(max-width:1150px){.receipt-wrap{grid-template-columns:minmax(0,620px)}}
+@media(max-width:1000px){.grid,.form-grid{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:600px){main{padding:14px}.grid,.form-grid{grid-template-columns:1fr}header{padding:13px}.sub{display:none}.receipt{padding:14px}.receipt th,.receipt td{font-size:11px;padding:6px}}
 @media print{
  body{background:white;color:black}.no-print,header,.tabs,.section-title,.note{display:none!important}
  main{max-width:none;padding:0}.page{display:none!important}#receipts.page{display:block!important}.receipt-wrap{display:block}
@@ -121,7 +147,7 @@ th{background:#232832;color:#f5d5bd;position:sticky;top:70px} tr:hover td{backgr
       <div class="actions">
         <label class="btn upload">고객DB 엑셀 업로드<input id="customerFile" type="file" accept=".xlsx,.xls,.csv"></label>
         <button class="btn secondary" onclick="openCustomerModal()">고객 직접 등록</button>
-        <button class="btn secondary" onclick="syncServerCustomers(true)">고객폼 정보 새로고침</button>
+        <button class="btn secondary" onclick="syncServerCustomers(true)">고객정보 실시간 동기화</button>
         <button class="btn secondary" onclick="downloadCustomerTemplate()">고객DB 양식</button>
       </div>
     </div>
@@ -189,18 +215,30 @@ th{background:#232832;color:#f5d5bd;position:sticky;top:70px} tr:hover td{backgr
 <div id="customerModal" class="modal">
  <div class="modal-box">
   <div class="section-title"><h3>고객 등록/수정</h3><button class="btn secondary" onclick="closeCustomerModal()">닫기</button></div>
-  <div class="form-grid">
-   <div><label>실명</label><input id="cName"></div>
-   <div><label>닉네임</label><input id="cNick"></div>
-   <div><label>전화번호</label><input id="cPhone"></div>
-   <div><label>주소</label><input id="cAddress"></div>
-   <div><label>배송 요청사항</label><input id="cMemo" placeholder="문 앞, 부재 시 연락 등"></div>
+  <div class="note">고객 가입폼과 동일한 항목으로 등록됩니다. 저장 즉시 고객DB·정산서·택배실에 반영됩니다.</div>
+  <div class="admin-customer-form">
+   <div><label>성함 *</label><input id="cName" autocomplete="name" placeholder="받는 분 성함"></div>
+   <div><label>방송 주문 닉네임 *</label><input id="cNick" placeholder="유튜브에서 사용하는 닉네임"></div>
+   <div class="full"><label>연락처 *</label><input id="cPhone" inputmode="tel" autocomplete="tel" placeholder="010-0000-0000"></div>
+   <div class="full"><label>주소 *</label>
+    <div class="admin-address-row"><input id="cPostalCode" placeholder="우편번호"><button type="button" class="btn secondary" onclick="findAdminAddress()">주소검색</button></div>
+    <input id="cAddress" style="margin-top:8px" placeholder="기본주소 (검색이 안 되면 직접 입력 가능)">
+    <input id="cDetailAddress" style="margin-top:8px" placeholder="상세주소">
+    <div id="cAddressStatus" style="font-size:12px;color:#67c587;margin-top:6px"></div>
+   </div>
+   <div class="full"><label>배송메모</label><input id="cMemo" placeholder="문 앞, 연락 후 배송 등"></div>
   </div>
   <input type="hidden" id="cEditIndex">
-  <div class="actions" style="margin-top:16px"><button class="btn" onclick="saveCustomer()">저장</button></div>
+  <div class="actions" style="margin-top:16px"><button class="btn" onclick="saveCustomer()">고객정보 저장</button></div>
  </div>
 </div>
-
+<div id="adminPostcodeLayer" class="postcodeLayer">
+ <div class="postcodeBox">
+  <div class="postcodeHead">주소검색<button type="button" onclick="closeAdminPostcode()">닫기</button></div>
+  <div id="adminPostcodeEmbed"></div>
+ </div>
+</div>
+<script src="https://t1.daumcdn.net/mapjsapi/bundle/postcode/prod/postcode.v2.js"></script>
 <script>
 const KEY='firstOmsEmergencySettlementV1';
 let state={orders:[],customers:[],payments:[],settings:{bank:'카카오뱅크',holder:'김미숙',account:'',contact:'문의는 땡라이브 카카오채널로 부탁드립니다.',smsTemplate:'[땡라이브 정산서]\n{고객명}님\n{상품내역}\n상품합계 {상품합계}\n배송비 {배송비}\n결제금액 {결제금액}\n\n입금계좌: {은행} {계좌번호} {예금주}\n{문의안내}\n감사합니다.'}};
@@ -433,7 +471,7 @@ function receiptHTML(r,i){
  return `<article class="receipt">
  <h3>땡라이브 정산서</h3>
  <div class="meta">정산번호 ${r.date.replaceAll('-','')}-${String(i+1).padStart(3,'0')}<br>방송일 ${r.date}</div>
- <div><b>${esc(c?.name||'고객정보 확인 필요')}</b> · ${esc(r.nick)} ${payBadge}</div>
+ <div><b>${c?esc(c.name||r.nick):`<button class="btn bad no-print" onclick="openCustomerForReceipt(${i})">고객정보 확인필요 · 폼 열기</button>`}</b> · ${esc(r.nick)} ${payBadge}</div>
  <div class="meta">${esc(c?.phone||'연락처 미등록')}<br>${esc(c?.address||'주소 미등록')}</div>
  <table><thead><tr><th>상품</th><th>수량</th><th>단가</th><th>금액</th></tr></thead><tbody>
  ${r.items.map(x=>`<tr><td>${esc(x.item)}</td><td>${x.qty}</td><td>${money(x.unit)}</td><td>${money(x.amount)}</td></tr>`).join('')}
@@ -451,8 +489,7 @@ function receiptHTML(r,i){
 async function sendSms(i,button){
  const r=getReceipts()[i], c=r.customer;
  if(!c?.phone){alert('고객 전화번호가 없습니다.');return}
- const items=r.items.map(x=>`${x.item} ${x.qty}개`).join(', ');
- const msg=`[땡라이브 정산서]\n${c.name||r.nick}님\n${items}\n상품합계 ${money(r.subtotal)}\n배송비 ${money(r.fee)}\n결제금액 ${money(r.total)}\n\n본 번호는 문자 수신 확인이 어렵습니다. 문의는 땡라이브 카카오채널로 부탁드립니다.\n감사합니다.`;
+ const msg=formatSms(r);
  if(!confirm(`${c.name||r.nick}님 (${c.phone})에게 정산서 문자를 바로 전송할까요?\n\n${msg}`))return;
  const old=button?.textContent||'솔라피 문자전송';
  try{
@@ -501,7 +538,7 @@ function renderShipping(){
  const groups=new Map();
  rs.forEach(r=>{
   const k=bundle==='customer'?(r.customer?.id||r.nick):(r.key);
-  if(!groups.has(k))groups.set(k,{name:r.customer?.name||'',nick:r.nick,phone:r.customer?.phone||'',address:r.customer?.address||'',dates:new Set(),items:[],total:0,status:r.payment.status});
+  if(!groups.has(k))groups.set(k,{name:r.customer?.name||'',nick:r.nick,phone:r.customer?.phone||'',address:[r.customer?.postalCode,r.customer?.address,r.customer?.detailAddress].filter(Boolean).join(' '),dates:new Set(),items:[],total:0,status:r.payment.status});
   const g=groups.get(k);g.dates.add(r.date);g.items.push(...r.items);g.total+=r.total;
  });
  const arr=[...groups.values()];
@@ -515,7 +552,7 @@ function downloadShippingList(){
 }
 function printShipping(){go('shipping');window.print()}
 function downloadReceiptList(){
- const rows=getReceipts().map((r,i)=>({'정산번호':r.date.replaceAll('-','')+'-'+String(i+1).padStart(3,'0'),'방송일':r.date,'실명':r.customer?.name||'','닉네임':r.nick,'전화번호':r.customer?.phone||'','주소':r.customer?.address||'','상품내역':r.items.map(x=>x.item+' '+x.qty+'개').join(' / '),'상품합계':r.subtotal,'배송비':r.fee,'결제금액':r.total,'고객매칭':r.customer?'완료':'확인필요','입금상태':r.payment.status==='paid'?'입금완료':'미입금/확인필요'}));
+ const rows=getReceipts().map((r,i)=>({'정산번호':r.date.replaceAll('-','')+'-'+String(i+1).padStart(3,'0'),'방송일':r.date,'실명':r.customer?.name||'','닉네임':r.nick,'전화번호':r.customer?.phone||'','주소':[r.customer?.postalCode,r.customer?.address,r.customer?.detailAddress].filter(Boolean).join(' '),'상품내역':r.items.map(x=>x.item+' '+x.qty+'개').join(' / '),'상품합계':r.subtotal,'배송비':r.fee,'결제금액':r.total,'고객매칭':r.customer?'완료':'확인필요','입금상태':r.payment.status==='paid'?'입금완료':'미입금/확인필요'}));
  exportXlsx(rows,'FIRST_OMS_정산서목록.xlsx','정산서');
 }
 function downloadCustomerTemplate(){exportXlsx([{'실명':'홍길동','닉네임':'길동맘','전화번호':'010-0000-0000','주소':'서울시 ...'}],'FIRST_OMS_고객DB_양식.xlsx','고객DB')}
@@ -523,18 +560,41 @@ function exportXlsx(rows,name,sheet){
  if(!rows.length){alert('출력할 자료가 없습니다.');return}
  const ws=XLSX.utils.json_to_sheet(rows),wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,sheet);XLSX.writeFile(wb,name);
 }
-function openCustomerModal(){ $('cEditIndex').value='';$('cName').value='';$('cNick').value='';$('cPhone').value='';$('cAddress').value='';$('cMemo').value='';$('customerModal').classList.add('show');setTimeout(()=>$('cName').focus(),50)}
+
+function closeAdminPostcode(){const layer=$('adminPostcodeLayer');layer.classList.remove('show');$('adminPostcodeEmbed').innerHTML=''}
+function findAdminAddress(){
+ if(!window.daum||!window.daum.Postcode)return alert('주소검색을 불러오지 못했습니다. 기본주소를 직접 입력해 주세요.');
+ const layer=$('adminPostcodeLayer'),embed=$('adminPostcodeEmbed');layer.classList.add('show');embed.innerHTML='';
+ try{new window.daum.Postcode({oncomplete:function(d){$('cPostalCode').value=d.zonecode||'';$('cAddress').value=d.roadAddress||d.jibunAddress||'';$('cAddressStatus').textContent='주소 선택 완료 · 상세주소를 입력해 주세요.';closeAdminPostcode();setTimeout(()=>$('cDetailAddress').focus(),100)},onresize:function(size){embed.style.height=Math.min(size.height||600,620)+'px'},width:'100%',height:'100%'}).embed(embed)}catch(e){closeAdminPostcode();alert('주소검색 실행 중 오류가 발생했습니다. 기본주소를 직접 입력해 주세요.')}
+}
+function openCustomerModal(){ $('customerModal').dataset.receiptKey='';$('cEditIndex').value='';$('cName').value='';$('cNick').value='';$('cPhone').value='';$('cPostalCode').value='';$('cAddress').value='';$('cDetailAddress').value='';$('cMemo').value='';$('cAddressStatus').textContent='';$('customerModal').classList.add('show');setTimeout(()=>$('cName').focus(),50)}
 function closeCustomerModal(){$('customerModal').classList.remove('show')}
-function editCustomer(i){const c=state.customers[i];$('cEditIndex').value=i;$('cName').value=c.name;$('cNick').value=c.nick;$('cPhone').value=c.phone;$('cAddress').value=[c.postalCode,c.address,c.detailAddress].filter(Boolean).join(' ');$('cMemo').value=c.memo||'';$('customerModal').classList.add('show')}
+
+function openCustomerForReceipt(i){
+ const r=getReceipts()[i];
+ if(!r)return;
+ openCustomerModal();
+ $('cNick').value=r.nick||'';
+ $('cName').value='';
+ $('cPhone').value='';
+ $('cPostalCode').value='';
+ $('cAddress').value='';
+ $('cDetailAddress').value='';
+ $('cMemo').value='';
+ $('cAddressStatus').textContent='정산서의 닉네임을 자동 입력했습니다. 고객 정보를 채우고 저장하세요.';
+ $('customerModal').dataset.receiptKey=r.key||'';
+}
+
+function editCustomer(i){const c=state.customers[i];$('cEditIndex').value=i;$('cName').value=c.name||'';$('cNick').value=c.nick||c.nickname||'';$('cPhone').value=c.phone||'';$('cPostalCode').value=c.postalCode||'';$('cAddress').value=c.address||'';$('cDetailAddress').value=c.detailAddress||'';$('cMemo').value=c.memo||'';$('cAddressStatus').textContent='';$('customerModal').classList.add('show')}
 async function saveCustomer(){
  const oldIndex=$('cEditIndex').value;
  const old=oldIndex===''?null:state.customers[Number(oldIndex)];
- const c={id:old?.id||crypto.randomUUID(),name:$('cName').value.trim(),nickname:$('cNick').value.trim(),nick:$('cNick').value.trim(),phone:$('cPhone').value.trim(),address:$('cAddress').value.trim(),postalCode:old?.postalCode||'',detailAddress:'',memo:$('cMemo').value.trim(),source:old?.source||'관리자'};
- if(!c.name||!c.nickname||!c.phone){alert('실명, 닉네임, 전화번호를 입력해 주세요.');return}
+ const c={id:old?.id||crypto.randomUUID(),name:$('cName').value.trim(),nickname:$('cNick').value.trim(),nick:$('cNick').value.trim(),phone:$('cPhone').value.trim(),postalCode:$('cPostalCode').value.trim(),address:$('cAddress').value.trim(),detailAddress:$('cDetailAddress').value.trim(),memo:$('cMemo').value.trim(),joinedAt:old?.joinedAt||new Date().toLocaleString('ko-KR'),source:'관리자폼'};
+ if(!c.name||!c.nickname||!c.phone||!c.address){alert('성함, 닉네임, 연락처, 기본주소를 모두 입력해 주세요.');return}
  try{
   const r=await fetch('/api/customers',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(c)});
   const data=await r.json(); if(!r.ok)throw new Error(data.error||'고객 저장 실패');
-  await syncServerCustomers(false); closeCustomerModal(); alert('고객정보가 서버 고객DB에 저장되었습니다.');
+  await syncServerCustomers(false); autoMatchAll(); saveSilently(); renderAll(); closeCustomerModal(); alert('고객정보가 저장되어 정산서와 택배실에 바로 반영되었습니다.');
  }catch(e){alert('고객정보 저장 실패: '+e.message)}
 }
 async function deleteCustomer(i){const c=state.customers[i];if(!confirm('이 고객을 삭제할까요?'))return;try{const key=encodeURIComponent(c.nickname||c.nick||'');const r=await fetch('/api/customers/'+key,{method:'DELETE'});if(!r.ok)throw new Error('삭제 실패');await syncServerCustomers(false);alert('서버 고객DB에서 삭제되었습니다.')}catch(e){alert('고객 삭제 실패: '+e.message)}}
@@ -623,7 +683,7 @@ async function syncServerCustomers(showMessage=false){
   }
  }catch(e){console.warn('고객DB 서버 동기화 실패',e);if(showMessage)alert('고객폼 정보 불러오기 실패: '+e.message)}
 }
-loadAll();syncServerCustomers(false);setInterval(()=>syncServerCustomers(false),10000);
+loadAll();syncServerCustomers(false);setInterval(()=>{if(!document.hidden)syncServerCustomers(false)},2000);
 </script>
 </body>
 </html>
