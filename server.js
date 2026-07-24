@@ -1,15 +1,31 @@
-const http=require('http'),fs=require('fs'),path=require('path'),url=require('url'),crypto=require('crypto');
+const http=require('http'),fs=require('fs'),path=require('path'),url=require('url'),crypto=require('crypto'),XLSX=require('xlsx');
 const sseClients=new Set();
 function broadcastCustomers(list){
  const payload=`event: customers\ndata: ${JSON.stringify(list)}\n\n`;
  for(const res of [...sseClients]){try{res.write(payload)}catch(e){sseClients.delete(res)}}
 }
-const ROOT=__dirname, DATA=path.join(ROOT,'data','customers.json'), CUSTOMER_BACKUP=path.join(ROOT,'data','customers-backup.json'), BACKUP_DIR=path.join(ROOT,'data','backups'), YT_AUTH=path.join(ROOT,'data','youtube-auth.json');
+const ROOT=__dirname, DATA=path.join(ROOT,'data','customers.json'), CUSTOMER_BACKUP=path.join(ROOT,'data','customers-backup.json'), CUSTOMER_XLSX=path.join(ROOT,'data','customers.xlsx'), INTEGRATIONS=path.join(ROOT,'data','integrations.json'), BACKUP_DIR=path.join(ROOT,'data','backups'), YT_AUTH=path.join(ROOT,'data','youtube-auth.json');
 if(!fs.existsSync(path.dirname(DATA)))fs.mkdirSync(path.dirname(DATA),{recursive:true});
 if(!fs.existsSync(DATA))fs.writeFileSync(DATA,'[]','utf8');
 if(!fs.existsSync(YT_AUTH))fs.writeFileSync(YT_AUTH,'{}','utf8');
+if(!fs.existsSync(INTEGRATIONS))fs.writeFileSync(INTEGRATIONS,'{}','utf8');
 const mime={'.html':'text/html; charset=utf-8','.js':'application/javascript; charset=utf-8','.css':'text/css; charset=utf-8','.json':'application/json; charset=utf-8','.png':'image/png','.jpg':'image/jpeg','.jpeg':'image/jpeg','.ico':'image/x-icon'};
 function readCustomers(){try{return JSON.parse(fs.readFileSync(DATA,'utf8'))}catch(e){return[]}}
+function readIntegrations(){try{return JSON.parse(fs.readFileSync(INTEGRATIONS,'utf8'))}catch(e){return{}}}
+function saveIntegrations(v){fs.writeFileSync(INTEGRATIONS,JSON.stringify(v,null,2),'utf8')}
+function writeCustomerExcel(list){
+ try{
+  const rows=(list||[]).map(c=>({
+   '등록일시':c.joinedAt||'', '등록경로':c.source||'', '성명':c.name||'', '닉네임':c.nickname||c.nick||'',
+   '전화번호':c.phone||'', '우편번호':c.postalCode||'', '기본주소':c.address||'', '상세주소':c.detailAddress||'',
+   '배송요청사항':c.memo||'', '고객ID':c.id||''
+  }));
+  const wb=XLSX.utils.book_new(), ws=XLSX.utils.json_to_sheet(rows);
+  ws['!cols']=[{wch:22},{wch:12},{wch:12},{wch:18},{wch:16},{wch:10},{wch:36},{wch:28},{wch:28},{wch:28}];
+  XLSX.utils.book_append_sheet(wb,ws,'고객DB');XLSX.writeFile(wb,CUSTOMER_XLSX);return true
+ }catch(e){console.error('고객 엑셀 저장 실패',e);return false}
+}
+
 function backupCustomers(){
  try{
   if(!fs.existsSync(BACKUP_DIR))fs.mkdirSync(BACKUP_DIR,{recursive:true});
@@ -27,6 +43,7 @@ function saveCustomers(v){
  backupCustomers();
  fs.writeFileSync(DATA,JSON.stringify(v,null,2),'utf8');
  fs.writeFileSync(CUSTOMER_BACKUP,JSON.stringify(v,null,2),'utf8');
+ writeCustomerExcel(v);
  broadcastCustomers(v);
 }
 
@@ -43,7 +60,7 @@ function solapiAuth(apiKey,apiSecret){
  return `HMAC-SHA256 apiKey=${apiKey}, date=${date}, salt=${salt}, signature=${signature}`
 }
 async function sendSolapiSms(to,text){
- const apiKey=process.env.SOLAPI_API_KEY,apiSecret=process.env.SOLAPI_API_SECRET,sender=onlyDigits(process.env.SOLAPI_SENDER);
+ const cfg=solapiConfig(),apiKey=cfg.apiKey,apiSecret=cfg.apiSecret,sender=cfg.sender;
  if(!apiKey||!apiSecret||!sender)throw new Error('Render 환경변수 SOLAPI_API_KEY, SOLAPI_API_SECRET, SOLAPI_SENDER를 확인해 주세요.');
  const receiver=onlyDigits(to);
  if(receiver.length<10)throw new Error('수신번호가 올바르지 않습니다.');
@@ -61,12 +78,13 @@ async function sendSolapiSms(to,text){
 
 
 function solapiConfig(){
+ const f=readIntegrations();
  return {
-  apiKey:process.env.SOLAPI_API_KEY||'',
-  apiSecret:process.env.SOLAPI_API_SECRET||'',
-  sender:onlyDigits(process.env.SOLAPI_SENDER),
-  pfId:process.env.SOLAPI_KAKAO_PF_ID||process.env.SOLAPI_PF_ID||'',
-  templateId:process.env.SOLAPI_KAKAO_TEMPLATE_ID||process.env.SOLAPI_TEMPLATE_ID||''
+  apiKey:f.apiKey||process.env.SOLAPI_API_KEY||'',
+  apiSecret:f.apiSecret||process.env.SOLAPI_API_SECRET||'',
+  sender:onlyDigits(f.sender||process.env.SOLAPI_SENDER),
+  pfId:f.pfId||process.env.SOLAPI_KAKAO_PF_ID||process.env.SOLAPI_PF_ID||'',
+  templateId:f.templateId||process.env.SOLAPI_KAKAO_TEMPLATE_ID||process.env.SOLAPI_TEMPLATE_ID||''
  }
 }
 async function sendSolapiKakao(to,variables,text){
@@ -159,6 +177,7 @@ async function liveChatIdForVideo(videoId){
 }
 
 function json(res,code,data){res.writeHead(code,{'Content-Type':'application/json; charset=utf-8','Cache-Control':'no-store'});res.end(JSON.stringify(data))}
+writeCustomerExcel(readCustomers());
 const server=http.createServer((req,res)=>{
  res.setHeader('Access-Control-Allow-Origin','*');
  res.setHeader('Access-Control-Allow-Headers','Content-Type');
@@ -248,6 +267,23 @@ const server=http.createServer((req,res)=>{
   })()
  }
 
+ if(u.pathname==='/api/solapi/config'&&req.method==='GET'){
+  const cfg=solapiConfig();
+  return json(res,200,{ok:true,configured:!!(cfg.apiKey&&cfg.apiSecret&&cfg.sender),apiKey:cfg.apiKey?cfg.apiKey.slice(0,4)+'••••••':'',sender:cfg.sender||'',pfId:cfg.pfId||'',templateId:cfg.templateId||'',hasSecret:!!cfg.apiSecret});
+ }
+ if(u.pathname==='/api/solapi/config'&&req.method==='POST'){
+  return readBody(req).then(body=>{try{
+   const d=JSON.parse(body||'{}'), old=readIntegrations();
+   const next={apiKey:String(d.apiKey||old.apiKey||'').trim(),apiSecret:String(d.apiSecret||old.apiSecret||'').trim(),sender:onlyDigits(d.sender||old.sender),pfId:String(d.pfId||old.pfId||'').trim(),templateId:String(d.templateId||old.templateId||'').trim()};
+   if(!next.apiKey||!next.apiSecret||!next.sender)return json(res,400,{ok:false,error:'API Key, API Secret, 승인 발신번호를 모두 입력해 주세요.'});
+   saveIntegrations(next);return json(res,200,{ok:true,configured:true,sender:next.sender});
+  }catch(e){return json(res,400,{ok:false,error:e.message})}});
+ }
+ if(u.pathname==='/api/customers/export.xlsx'&&req.method==='GET'){
+  writeCustomerExcel(readCustomers());
+  if(!fs.existsSync(CUSTOMER_XLSX))return json(res,500,{ok:false,error:'고객 엑셀 생성 실패'});
+  res.writeHead(200,{'Content-Type':'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet','Content-Disposition':'attachment; filename="FIRST_OMS_customers.xlsx"','Cache-Control':'no-store'});return fs.createReadStream(CUSTOMER_XLSX).pipe(res);
+ }
  if(u.pathname==='/api/kakao/status'&&req.method==='GET'){
   const cfg=solapiConfig();
   return json(res,200,{ok:true,ready:!!(cfg.apiKey&&cfg.apiSecret&&cfg.sender&&cfg.pfId&&cfg.templateId),sender:cfg.sender?cfg.sender.slice(0,3)+'****'+cfg.sender.slice(-4):'',pfId:cfg.pfId?cfg.pfId.slice(0,6)+'…':'',templateId:cfg.templateId?cfg.templateId.slice(0,6)+'…':'',missing:[!cfg.apiKey&&'SOLAPI_API_KEY',!cfg.apiSecret&&'SOLAPI_API_SECRET',!cfg.sender&&'SOLAPI_SENDER',!cfg.pfId&&'SOLAPI_KAKAO_PF_ID',!cfg.templateId&&'SOLAPI_KAKAO_TEMPLATE_ID'].filter(Boolean)})

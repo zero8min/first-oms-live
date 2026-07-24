@@ -1,0 +1,4 @@
+고객 72명 복원 완료.
+고객 등록/수정/삭제 시 서버의 data/customers.json, customers-backup.json, customers.xlsx가 동시에 갱신됩니다.
+관리자 상단의 고객DB 엑셀 받기 버튼으로 PC에도 수시 저장할 수 있습니다.
+중요: Render의 일반 임시 디스크는 재배포 시 초기화될 수 있으므로 "절대" 보존을 위해서는 Render Persistent Disk 또는 외부 DB가 필요합니다. 이 ZIP은 72명 초기 데이터와 엑셀을 포함하지만, 배포 후 새로 추가되는 고객까지 영구 보존하려면 Persistent Disk를 연결하세요.
