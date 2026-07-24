@@ -4,8 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>FIRST OMS 긴급 정산실</title>
-<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js">checkKakaoStatus(false);
-</script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <style>
 :root{
   --bg:#0d0f13;--panel:#171a20;--panel2:#20242c;--text:#f5f5f7;--muted:#aeb4c0;
@@ -166,6 +165,8 @@ th{background:#232832;color:#f5d5bd;position:sticky;top:70px} tr:hover td{backgr
     <div class="section-title no-print">
       <h2>고객별 정산서</h2>
       <div class="actions">
+        <button class="btn" onclick="sendAllKakao(this)">전체 카카오 알림톡 전송</button>
+        <button class="btn secondary" onclick="sendAllSms(this)">전체 문자 전송</button>
         <button class="btn" onclick="window.print()">전체 정산서 인쇄/PDF</button>
         <button class="btn secondary" onclick="downloadReceiptList()">정산서 목록 엑셀</button>
       </div>
@@ -180,12 +181,6 @@ th{background:#232832;color:#f5d5bd;position:sticky;top:70px} tr:hover td{backgr
       </div>
       <div style="margin-top:12px"><label>문자 내용 직접 설정</label><textarea id="setSmsTemplate"></textarea></div>
       <p class="muted">사용 가능: {고객명} {닉네임} {상품내역} {상품합계} {배송비} {결제금액} {은행} {예금주} {계좌번호} {문의안내}</p>
-      <div class="note" style="margin-top:10px">
-        <b>카카오 알림톡 계정 연동</b> · 솔라피에 연결된 비즈니스 채널과 승인 템플릿을 사용합니다.<br>
-        <span id="kakaoStatus">연동상태 확인 중...</span>
-        <button class="btn secondary" style="margin-left:8px" onclick="checkKakaoStatus(true)">연동상태 확인</button>
-      </div>
-      <p class="muted">알림톡은 승인된 템플릿 문구로 전송되며, 실패하면 같은 내용이 문자로 자동 대체됩니다.</p>
     </div>
     <div id="receiptSummary" class="note no-print"></div>
     <div id="receiptCards" class="receipt-wrap"></div>
@@ -487,53 +482,79 @@ function receiptHTML(r,i){
  <div class="total">결제금액 ${money(r.total)}</div>
  <div class="account-box"><b>입금계좌</b><br>${esc(state.settings?.bank||'카카오뱅크')} ${esc(state.settings?.account||'계좌번호를 설정해 주세요')}<br>예금주 ${esc(state.settings?.holder||'김미숙')}</div>
  <div class="actions no-print" style="margin-top:12px">
-  ${c?.phone?`<button class="btn" onclick="sendKakao(${i},this)">카카오 알림톡 전송</button> <button class="btn secondary" onclick="sendSms(${i},this)">문자로 전송</button>`:'<button class="btn bad" disabled>전화번호 없음</button>'}
+  ${c?.phone?`<button class="btn" onclick="sendKakao(${i},this)">카카오 알림톡 전송</button><button class="btn secondary" onclick="sendSms(${i},this)">문자 전송</button>`:'<button class="btn bad" disabled>전화번호 없음</button>'}
   <button class="btn secondary" onclick="printOne(${i})">이 정산서 인쇄</button>
  </div>
  <div class="foot">FIRST OMS · 주문내역을 확인해 주세요.</div>
  </article>`;
 }
-function formatKakaoVariables(r){
+function kakaoVariables(r){
  const c=r.customer||{}, x=state.settings||{};
- const items=r.items.map(v=>`${v.item} ${v.qty}개`).join(', ');
  return {
-  '#{고객명}':String(c.name||r.nick||''),
-  '#{닉네임}':String(r.nick||''),
-  '#{상품내역}':String(items),
-  '#{상품합계}':String(money(r.subtotal)),
-  '#{배송비}':String(money(r.fee)),
-  '#{결제금액}':String(money(r.total)),
-  '#{은행}':String(x.bank||'카카오뱅크'),
-  '#{예금주}':String(x.holder||'김미숙'),
-  '#{계좌번호}':String(x.account||'계좌번호 미설정'),
-  '#{문의안내}':String(x.contact||'')
+  '#{고객명}':c.name||r.nick,
+  '#{닉네임}':r.nick,
+  '#{상품내역}':r.items.map(v=>`${v.item} ${v.qty}개`).join(', '),
+  '#{상품합계}':money(r.subtotal),
+  '#{배송비}':money(r.fee),
+  '#{결제금액}':money(r.total),
+  '#{은행}':x.bank||'카카오뱅크',
+  '#{예금주}':x.holder||'김미숙',
+  '#{계좌번호}':x.account||'계좌번호 미설정',
+  '#{문의안내}':x.contact||''
  };
 }
-async function checkKakaoStatus(showAlert=false){
- try{
-  const r=await fetch('/api/kakao/status',{cache:'no-store'}),d=await r.json();
-  const el=$('kakaoStatus');
-  if(d.ready){if(el)el.innerHTML='<span class="badge good">연동완료</span> 카카오채널·알림톡 템플릿 사용 가능';if(showAlert)alert('카카오 알림톡 연동이 완료되어 있습니다.');}
-  else{if(el)el.innerHTML='<span class="badge bad">설정필요</span> 누락: '+(d.missing||[]).join(', ');if(showAlert)alert('Render 환경변수 누락: '+(d.missing||[]).join(', '));}
- }catch(e){if($('kakaoStatus'))$('kakaoStatus').textContent='연동상태 확인 실패: '+e.message;}
-}
-async function sendKakao(i,button){
- const r=getReceipts()[i], c=r.customer;
- if(!c?.phone){alert('고객 전화번호가 없습니다.');return}
- const msg=formatSms(r), variables=formatKakaoVariables(r);
- if(!confirm(`${c.name||r.nick}님 (${c.phone})에게 카카오 알림톡을 바로 전송할까요?\n\n알림톡 실패 시 문자로 자동 대체됩니다.`))return;
+async function sendKakao(i,button,skipConfirm=false){
+ const r=getReceipts()[i], c=r?.customer;
+ if(!c?.phone)throw new Error(`${r?.nick||'고객'} 전화번호가 없습니다.`);
+ const msg=formatSms(r);
+ if(!skipConfirm&&!confirm(`${c.name||r.nick}님 (${c.phone})에게 카카오 알림톡을 전송할까요?\n\n${msg}`))return false;
  const old=button?.textContent||'카카오 알림톡 전송';
  try{
-  if(button){button.disabled=true;button.textContent='알림톡 전송 중...'}
-  const response=await fetch('/api/kakao/send',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({to:c.phone,text:msg,variables})});
+  if(button){button.disabled=true;button.textContent='전송 중...'}
+  const response=await fetch('/api/kakao/send',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({to:c.phone,text:msg,variables:kakaoVariables(r)})});
   const data=await response.json().catch(()=>({}));
   if(!response.ok||!data.ok)throw new Error(data.error||`카카오 API 오류 ${response.status}`);
-  if(button)button.textContent='알림톡 접수완료';
-  alert(`${c.name||r.nick}님에게 카카오 알림톡 전송을 접수했습니다.\n실패 시 문자로 자동 대체됩니다.`);
+  if(button)button.textContent='전송완료';
+  if(!skipConfirm)alert(`${c.name||r.nick}님에게 카카오 알림톡 전송을 접수했습니다.`);
+  return true;
  }catch(e){
   if(button){button.disabled=false;button.textContent=old}
-  alert('카카오 알림톡 전송 실패: '+e.message+'\n\n솔라피 카카오채널 연결, 승인 템플릿, Render 환경변수를 확인해 주세요.');
+  if(!skipConfirm)alert('카카오 알림톡 전송 실패: '+e.message);
+  throw e;
  }
+}
+async function sendAllKakao(button){
+ const rs=getReceipts().filter(r=>r.customer?.phone);
+ if(!rs.length){alert('전화번호가 등록된 고객 정산서가 없습니다.');return}
+ if(!confirm(`전화번호가 있는 ${rs.length}명에게 카카오 알림톡을 전체 전송할까요?`))return;
+ const old=button.textContent;button.disabled=true;let ok=0,fail=[];
+ for(const r of rs){
+  const i=getReceipts().findIndex(x=>x.key===r.key);
+  button.textContent=`전송 중 ${ok+fail.length+1}/${rs.length}`;
+  try{await sendKakao(i,null,true);ok++}catch(e){fail.push(`${r.customer?.name||r.nick}: ${e.message}`)}
+  await new Promise(resolve=>setTimeout(resolve,250));
+ }
+ button.disabled=false;button.textContent=old;
+ alert(`카카오 알림톡 전체전송 완료\n성공 ${ok}명 / 실패 ${fail.length}명${fail.length?'\n\n'+fail.slice(0,10).join('\n'):''}`);
+}
+async function sendAllSms(button){
+ const rs=getReceipts().filter(r=>r.customer?.phone);
+ if(!rs.length){alert('전화번호가 등록된 고객 정산서가 없습니다.');return}
+ if(!confirm(`전화번호가 있는 ${rs.length}명에게 문자를 전체 전송할까요?`))return;
+ const old=button.textContent;button.disabled=true;let ok=0,fail=[];
+ for(const r of rs){
+  const c=r.customer,msg=formatSms(r);
+  button.textContent=`전송 중 ${ok+fail.length+1}/${rs.length}`;
+  try{
+   const response=await fetch('/api/sms/send',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({to:c.phone,text:msg})});
+   const data=await response.json().catch(()=>({}));
+   if(!response.ok||!data.ok)throw new Error(data.error||`문자 API 오류 ${response.status}`);
+   ok++;
+  }catch(e){fail.push(`${c.name||r.nick}: ${e.message}`)}
+  await new Promise(resolve=>setTimeout(resolve,250));
+ }
+ button.disabled=false;button.textContent=old;
+ alert(`문자 전체전송 완료\n성공 ${ok}명 / 실패 ${fail.length}명${fail.length?'\n\n'+fail.slice(0,10).join('\n'):''}`);
 }
 async function sendSms(i,button){
  const r=getReceipts()[i], c=r.customer;
@@ -732,7 +753,26 @@ async function syncServerCustomers(showMessage=false){
   }
  }catch(e){console.warn('고객DB 서버 동기화 실패',e);if(showMessage)alert('고객폼 정보 불러오기 실패: '+e.message)}
 }
-loadAll();syncServerCustomers(false);setInterval(()=>{if(!document.hidden)syncServerCustomers(false)},2000);
+function applyServerCustomers(list){
+ if(!Array.isArray(list))return;
+ const serverCustomers=list.map(c=>({
+  ...c,id:c.id||crypto.randomUUID(),name:String(c.name||'').trim(),
+  nickname:String(c.nickname||c.nick||'').trim(),nick:String(c.nickname||c.nick||'').trim(),
+  phone:String(c.phone||'').trim(),postalCode:String(c.postalCode||'').trim(),
+  address:String(c.address||'').trim(),detailAddress:String(c.detailAddress||'').trim(),memo:String(c.memo||'').trim()
+ })).filter(c=>c.name||c.nick);
+ state.customers=serverCustomers;dedupeCustomers();autoMatchAll();saveSilently();renderAll();
+}
+function startCustomerRealtime(){
+ if(!window.EventSource)return false;
+ const es=new EventSource('/api/customers/stream');
+ es.addEventListener('customers',ev=>{try{applyServerCustomers(JSON.parse(ev.data))}catch(e){console.warn('고객 실시간 반영 실패',e)}});
+ es.onerror=()=>console.warn('고객 실시간 연결 재시도 중');
+ window.customerEventSource=es;
+ return true;
+}
+loadAll();syncServerCustomers(false);startCustomerRealtime();
+setInterval(()=>{if(!document.hidden)syncServerCustomers(false)},10000);
 </script>
 </body>
 </html>

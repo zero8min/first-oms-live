@@ -1,4 +1,9 @@
 const http=require('http'),fs=require('fs'),path=require('path'),url=require('url'),crypto=require('crypto');
+const sseClients=new Set();
+function broadcastCustomers(list){
+ const payload=`event: customers\ndata: ${JSON.stringify(list)}\n\n`;
+ for(const res of [...sseClients]){try{res.write(payload)}catch(e){sseClients.delete(res)}}
+}
 const ROOT=__dirname, DATA=path.join(ROOT,'data','customers.json'), CUSTOMER_BACKUP=path.join(ROOT,'data','customers-backup.json'), BACKUP_DIR=path.join(ROOT,'data','backups'), YT_AUTH=path.join(ROOT,'data','youtube-auth.json');
 if(!fs.existsSync(path.dirname(DATA)))fs.mkdirSync(path.dirname(DATA),{recursive:true});
 if(!fs.existsSync(DATA))fs.writeFileSync(DATA,'[]','utf8');
@@ -22,6 +27,7 @@ function saveCustomers(v){
  backupCustomers();
  fs.writeFileSync(DATA,JSON.stringify(v,null,2),'utf8');
  fs.writeFileSync(CUSTOMER_BACKUP,JSON.stringify(v,null,2),'utf8');
+ broadcastCustomers(v);
 }
 
 function readBody(req,max=1024*1024){
@@ -283,6 +289,19 @@ const server=http.createServer((req,res)=>{
   return json(res,200,{ok:true,count:readCustomers().length,backupExists:fs.existsSync(CUSTOMER_BACKUP)});
  }
 
+ if(u.pathname==='/api/customers/stream'&&req.method==='GET'){
+  res.writeHead(200,{
+   'Content-Type':'text/event-stream; charset=utf-8',
+   'Cache-Control':'no-cache, no-transform',
+   'Connection':'keep-alive',
+   'X-Accel-Buffering':'no'
+  });
+  res.write(`event: customers\ndata: ${JSON.stringify(readCustomers())}\n\n`);
+  sseClients.add(res);
+  const keep=setInterval(()=>{try{res.write(': keepalive\n\n')}catch(e){}},15000);
+  req.on('close',()=>{clearInterval(keep);sseClients.delete(res)});
+  return;
+ }
  if(u.pathname==='/api/customers'&&req.method==='GET')return json(res,200,readCustomers());
 
  if(u.pathname.startsWith('/api/customers/')&&req.method==='DELETE'){
