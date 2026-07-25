@@ -6,6 +6,8 @@ function broadcastCustomers(list){
 }
 const ROOT=__dirname, DATA=path.join(ROOT,'data','customers.json'), CUSTOMER_BACKUP=path.join(ROOT,'data','customers-backup.json'), CUSTOMER_XLSX=path.join(ROOT,'data','customers.xlsx'), INTEGRATIONS=path.join(ROOT,'data','integrations.json'), BACKUP_DIR=path.join(ROOT,'data','backups'), SEND_HISTORY=path.join(ROOT,'data','send-history.json'), YT_AUTH=path.join(ROOT,'data','youtube-auth.json');
 const STATE_DATA=path.join(ROOT,'data','server-state.json'), STATE_BACKUP=path.join(ROOT,'data','server-state-backup.json'), STATE_XLSX=path.join(ROOT,'data','sales-list.xlsx'), SALES_ARCHIVE_DIR=path.join(ROOT,'data','sales-archives'), STATE_BACKUP_DIR=path.join(ROOT,'data','state-backups');
+const ACCOUNTS=path.join(ROOT,'data','accounts.json'), ACCOUNTS_BACKUP=path.join(ROOT,'data','accounts-backup.json'), ACCOUNTS_XLSX=path.join(ROOT,'data','accounts.xlsx'), ACCOUNT_BACKUP_DIR=path.join(ROOT,'data','account-backups');
+const sessions=new Map();
 if(!fs.existsSync(path.dirname(DATA)))fs.mkdirSync(path.dirname(DATA),{recursive:true});
 if(!fs.existsSync(DATA))fs.writeFileSync(DATA,'[]','utf8');
 if(!fs.existsSync(YT_AUTH))fs.writeFileSync(YT_AUTH,'{}','utf8');
@@ -13,6 +15,7 @@ if(!fs.existsSync(INTEGRATIONS))fs.writeFileSync(INTEGRATIONS,'{}','utf8');
 if(!fs.existsSync(SEND_HISTORY))fs.writeFileSync(SEND_HISTORY,'[]','utf8');
 if(!fs.existsSync(STATE_DATA))fs.writeFileSync(STATE_DATA,JSON.stringify({orders:[],customers:readCustomers(),payments:[],settings:{},csRecords:[],shippingRecords:[]},null,2),'utf8');
 for(const d of [SALES_ARCHIVE_DIR,STATE_BACKUP_DIR])if(!fs.existsSync(d))fs.mkdirSync(d,{recursive:true});
+if(!fs.existsSync(ACCOUNT_BACKUP_DIR))fs.mkdirSync(ACCOUNT_BACKUP_DIR,{recursive:true});
 const mime={'.html':'text/html; charset=utf-8','.js':'application/javascript; charset=utf-8','.css':'text/css; charset=utf-8','.json':'application/json; charset=utf-8','.png':'image/png','.jpg':'image/jpeg','.jpeg':'image/jpeg','.ico':'image/x-icon'};
 function readCustomers(){try{return JSON.parse(fs.readFileSync(DATA,'utf8'))}catch(e){return[]}}
 function readIntegrations(){try{return JSON.parse(fs.readFileSync(INTEGRATIONS,'utf8'))}catch(e){return{}}}
@@ -88,6 +91,35 @@ function saveState(st){
  return next
 }
 function listSalesArchives(){try{return fs.readdirSync(SALES_ARCHIVE_DIR).filter(x=>x.endsWith('.json')).sort().reverse().map(x=>{const d=JSON.parse(fs.readFileSync(path.join(SALES_ARCHIVE_DIR,x),'utf8'));return {date:d.date,count:d.count,file:x}})}catch(e){return[]}}
+
+
+function passwordHash(password,salt=crypto.randomBytes(16).toString('hex')){
+ const hash=crypto.scryptSync(String(password),salt,64).toString('hex');return `${salt}:${hash}`
+}
+function verifyPassword(password,stored){
+ try{const [salt,hex]=String(stored||'').split(':');if(!salt||!hex)return false;const a=Buffer.from(hex,'hex'),b=crypto.scryptSync(String(password),salt,64);return a.length===b.length&&crypto.timingSafeEqual(a,b)}catch(e){return false}
+}
+function readAccounts(){try{const v=JSON.parse(fs.readFileSync(ACCOUNTS,'utf8'));return Array.isArray(v)?v:[]}catch(e){return[]}}
+function writeAccountsExcel(list){
+ try{const rows=(list||[]).map(a=>({'거래처코드':a.code||'','아이디':a.username||'','거래처명':a.company||'','대표자':a.ownerName||'','연락처':a.phone||'','권한':a.role||'tenant','상태':a.status||'pending','가입일':a.createdAt||'','최근로그인':a.lastLoginAt||''}));const wb=XLSX.utils.book_new(),ws=XLSX.utils.json_to_sheet(rows);XLSX.utils.book_append_sheet(wb,ws,'거래처계정');XLSX.writeFile(wb,ACCOUNTS_XLSX)}catch(e){console.error('계정 엑셀 실패',e)}
+}
+function saveAccounts(list){
+ const old=readAccounts(),stamp=new Date().toISOString().replace(/[:.]/g,'-');
+ try{fs.writeFileSync(ACCOUNTS_BACKUP,JSON.stringify(old,null,2));fs.writeFileSync(path.join(ACCOUNT_BACKUP_DIR,`accounts-${stamp}.json`),JSON.stringify(old,null,2));const fsx=fs.readdirSync(ACCOUNT_BACKUP_DIR).filter(x=>x.endsWith('.json')).sort();while(fsx.length>50){try{fs.unlinkSync(path.join(ACCOUNT_BACKUP_DIR,fsx.shift()))}catch(e){}}}catch(e){}
+ fs.writeFileSync(ACCOUNTS,JSON.stringify(list,null,2));fs.writeFileSync(ACCOUNTS_BACKUP,JSON.stringify(list,null,2));writeAccountsExcel(list)
+}
+function ensureOwnerAccount(){
+ let list=readAccounts();if(list.some(a=>a.role==='superadmin'))return;
+ const username=process.env.FIRST_ADMIN_ID||'firstadmin',password=process.env.FIRST_ADMIN_PASSWORD||'FirstOms!2026';
+ list.push({id:crypto.randomUUID(),code:'FIRST-MASTER',username,passwordHash:passwordHash(password),company:'FIRST OMS',ownerName:'최고관리자',phone:'',role:'superadmin',status:'active',createdAt:new Date().toISOString()});saveAccounts(list);
+ console.log(`[LOGIN] 최고관리자 아이디: ${username}${process.env.FIRST_ADMIN_PASSWORD?'':' / 초기 비밀번호: FirstOms!2026 (로그인 후 환경변수로 변경 권장)'}`)
+}
+function cookies(req){return Object.fromEntries(String(req.headers.cookie||'').split(';').map(x=>x.trim()).filter(Boolean).map(x=>{const i=x.indexOf('=');return [decodeURIComponent(x.slice(0,i)),decodeURIComponent(x.slice(i+1))]}))}
+function currentUser(req){const sid=cookies(req).ddaeng_session,ss=sessions.get(sid);if(!ss||ss.expiresAt<Date.now()){if(sid)sessions.delete(sid);return null}return readAccounts().find(a=>a.id===ss.userId&&a.status==='active')||null}
+function issueSession(req,res,user){const sid=crypto.randomBytes(32).toString('hex');sessions.set(sid,{userId:user.id,expiresAt:Date.now()+1000*60*60*24*7});const secure=String(req.headers['x-forwarded-proto']||'').includes('https')?'; Secure':'';res.setHeader('Set-Cookie',`ddaeng_session=${sid}; Path=/; HttpOnly; SameSite=Lax; Max-Age=604800${secure}`)}
+function clearSession(req,res){const sid=cookies(req).ddaeng_session;if(sid)sessions.delete(sid);res.setHeader('Set-Cookie','ddaeng_session=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0')}
+function newTenantCode(list){let n=1;const used=new Set(list.map(a=>a.code));while(used.has(`FIRST-${String(n).padStart(4,'0')}`))n++;return `FIRST-${String(n).padStart(4,'0')}`}
+ensureOwnerAccount();
 
 function readBody(req,max=1024*1024){
  return new Promise((resolve,reject)=>{
@@ -241,6 +273,16 @@ const server=http.createServer((req,res)=>{
  if(req.method==='OPTIONS'){res.writeHead(204);return res.end()}
  const u=url.parse(req.url,true);
  if(u.pathname==='/api/health')return json(res,200,{ok:true,time:new Date().toISOString()});
+ if(u.pathname==='/api/auth/login'&&req.method==='POST')return readBody(req).then(body=>{try{const d=JSON.parse(body||'{}'),list=readAccounts(),a=list.find(x=>x.username===String(d.username||'').trim());if(!a||!verifyPassword(d.password,a.passwordHash))return json(res,401,{ok:false,error:'아이디 또는 비밀번호가 맞지 않습니다.'});if(a.status!=='active')return json(res,403,{ok:false,error:a.status==='pending'?'최고관리자 승인 대기 중입니다.':'사용이 정지된 계정입니다.'});a.lastLoginAt=new Date().toISOString();saveAccounts(list);issueSession(req,res,a);return json(res,200,{ok:true,user:{id:a.id,username:a.username,company:a.company,code:a.code,role:a.role}})}catch(e){return json(res,400,{ok:false,error:e.message})}});
+ if(u.pathname==='/api/auth/signup'&&req.method==='POST')return readBody(req).then(body=>{try{const d=JSON.parse(body||'{}'),list=readAccounts(),username=String(d.username||'').trim();if(!username||String(d.password||'').length<8||!d.company||!d.ownerName||!d.phone)return json(res,400,{ok:false,error:'거래처명·대표자·연락처·아이디와 8자 이상 비밀번호를 입력해 주세요.'});if(list.some(x=>x.username===username))return json(res,409,{ok:false,error:'이미 사용 중인 아이디입니다.'});const a={id:crypto.randomUUID(),code:newTenantCode(list),username,passwordHash:passwordHash(d.password),company:String(d.company).trim(),ownerName:String(d.ownerName).trim(),phone:onlyDigits(d.phone),role:'tenant',status:'pending',createdAt:new Date().toISOString()};list.push(a);saveAccounts(list);return json(res,200,{ok:true,code:a.code,status:a.status})}catch(e){return json(res,400,{ok:false,error:e.message})}});
+ if(u.pathname==='/api/auth/logout'&&req.method==='POST'){clearSession(req,res);return json(res,200,{ok:true})}
+ if(u.pathname==='/api/auth/me'&&req.method==='GET'){const a=currentUser(req);return a?json(res,200,{ok:true,user:{id:a.id,username:a.username,company:a.company,code:a.code,role:a.role}}):json(res,401,{ok:false})}
+ const publicPaths=new Set(['/login.html','/signup.html','/join.html','/favicon.ico']);
+ const publicApi=(u.pathname==='/api/health'||u.pathname.startsWith('/api/auth/')||(u.pathname==='/api/customers'&&req.method==='POST'));
+ const user=currentUser(req);
+ if(!publicPaths.has(u.pathname)&&!publicApi&&!user){if(u.pathname.startsWith('/api/'))return json(res,401,{ok:false,error:'로그인이 필요합니다.'});res.writeHead(302,{Location:'/login.html'});return res.end()}
+ if(u.pathname==='/api/admin/accounts'&&req.method==='GET'){if(user.role!=='superadmin')return json(res,403,{ok:false,error:'최고관리자 권한이 필요합니다.'});return json(res,200,{ok:true,accounts:readAccounts().map(({passwordHash,...a})=>a)})}
+ if(u.pathname==='/api/admin/accounts/status'&&req.method==='POST'){if(user.role!=='superadmin')return json(res,403,{ok:false,error:'최고관리자 권한이 필요합니다.'});return readBody(req).then(body=>{try{const d=JSON.parse(body||'{}'),list=readAccounts(),a=list.find(x=>x.id===d.id);if(!a)return json(res,404,{ok:false,error:'계정을 찾을 수 없습니다.'});if(!['active','pending','suspended'].includes(d.status))return json(res,400,{ok:false,error:'상태값 오류'});a.status=d.status;saveAccounts(list);return json(res,200,{ok:true})}catch(e){return json(res,400,{ok:false,error:e.message})}})}
 
 
  if(u.pathname==='/api/youtube/status'&&req.method==='GET'){

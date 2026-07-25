@@ -1,0 +1,15 @@
+[
+  {
+    "id": "0241313d-2ecc-4257-acc6-dc39130456d0",
+    "code": "FIRST-MASTER",
+    "username": "testadmin",
+    "passwordHash": "1bdb6649438a721ccc2176cb486112d7:d3ee0ed58cb5ae1890b83c654212c626e67ac8ba3ea0b6566d32b61662b4b2b385962cc9ba327eae0105d858f0202e45590317ee4b063c0b962db5d9bbce250e",
+    "company": "FIRST OMS",
+    "ownerName": "최고관리자",
+    "phone": "",
+    "role": "superadmin",
+    "status": "active",
+    "createdAt": "2026-07-25T07:01:40.917Z",
+    "lastLoginAt": "2026-07-25T07:01:42.991Z"
+  }
+]

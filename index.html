@@ -111,6 +111,7 @@ th{background:#232832;color:#f5d5bd;position:sticky;top:70px} tr:hover td{backgr
 <header>
   <div><div class="brand"><b>FIRST OMS</b> 땡라이브 정산서버 v6.0</div><div class="sub">고객DB·판매리스트 3중 자동보존 · 정산 · 입금 · 택배</div></div>
   <div class="actions no-print">
+    <span id="loginUser" class="sub">로그인 확인 중</span><button id="accountAdminBtn" class="btn secondary" style="display:none" onclick="location.href='/superadmin.html'">거래처 계정관리</button><button class="btn secondary" onclick="runFunctionCheck()">기능점검</button><button class="btn secondary" onclick="logoutNow()">로그아웃</button>
     <button class="btn secondary" onclick="recoverOldData()">이전 고객DB 복구</button>
     <a class="btn secondary" href="/api/customers/export.xlsx">고객DB 엑셀 받기</a><button class="btn secondary" onclick="downloadCustomerBackup()">고객정보 백업</button>
     <button class="btn secondary" onclick="downloadBackup()">전체 백업</button>
@@ -966,6 +967,7 @@ async function bootFirstOms(){
    state={...state,...remote,settings:{...state.settings,...(remote.settings||{})}};
    localStorage.setItem(KEY,JSON.stringify(state));renderMessageSettings();renderAll();
   }else throw new Error('서버 상태 없음');
+  }else throw new Error('서버 응답 오류');
  }catch(e){
   const saved=localStorage.getItem(KEY);
   if(saved)loadAll();else{try{const r=await fetch('/data/initial-backup.json?ts='+Date.now(),{cache:'no-store'});const obj=await r.json(),restored=obj.state||obj;state={...state,...restored,settings:{...state.settings,...(restored.settings||{})}};saveSilently();renderAll()}catch(x){loadAll()}}
@@ -974,6 +976,17 @@ async function bootFirstOms(){
 }
 bootFirstOms();
 setInterval(()=>{if(!document.hidden)syncServerCustomers(false)},10000);
+
+async function loadLoginUser(){try{const r=await fetch('/api/auth/me');if(!r.ok){location.href='/login.html';return}const d=await r.json();const u=d.user||{};const el=document.getElementById('loginUser');if(el)el.textContent=`${u.company||u.username} · ${u.code||''}`;const b=document.getElementById('accountAdminBtn');if(b&&u.role==='superadmin')b.style.display='inline-block'}catch(e){location.href='/login.html'}}
+async function logoutNow(){try{await fetch('/api/auth/logout',{method:'POST'})}finally{location.href='/login.html'}}
+loadLoginUser();
+
+async function runFunctionCheck(){
+ const tests=[['로그인 상태','/api/auth/me'],['서버 상태','/api/health'],['판매·정산 데이터','/api/state'],['고객DB','/api/customers'],['고객DB 백업','/api/customers/backup/status'],['솔라피 설정','/api/solapi/config']];
+ const result=[];for(const [name,path] of tests){try{const r=await fetch(path,{cache:'no-store'});result.push(`${r.ok?'✅':'⚠️'} ${name} (${r.status})`)}catch(e){result.push(`❌ ${name}: ${e.message}`)}}
+ const required=['go','renderOrders','renderCustomers','renderReceipts','renderPayments','renderShipping','saveAll','downloadBackup','openCustomerModal','sendAllMms','logoutNow'];
+ const missing=required.filter(n=>typeof window[n]!=='function');result.push(missing.length?`❌ 버튼함수 누락: ${missing.join(', ')}`:'✅ 주요 버튼함수 연결 정상');alert('땡라이브 기능점검 결과\n\n'+result.join('\n'))
+}
 </script>
 
 <div id="solapiModal" class="modal"><div class="modal-box">
