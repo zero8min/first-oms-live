@@ -5,11 +5,14 @@ function broadcastCustomers(list){
  for(const res of [...sseClients]){try{res.write(payload)}catch(e){sseClients.delete(res)}}
 }
 const ROOT=__dirname, DATA=path.join(ROOT,'data','customers.json'), CUSTOMER_BACKUP=path.join(ROOT,'data','customers-backup.json'), CUSTOMER_XLSX=path.join(ROOT,'data','customers.xlsx'), INTEGRATIONS=path.join(ROOT,'data','integrations.json'), BACKUP_DIR=path.join(ROOT,'data','backups'), SEND_HISTORY=path.join(ROOT,'data','send-history.json'), YT_AUTH=path.join(ROOT,'data','youtube-auth.json');
+const STATE_DATA=path.join(ROOT,'data','server-state.json'), STATE_BACKUP=path.join(ROOT,'data','server-state-backup.json'), STATE_XLSX=path.join(ROOT,'data','sales-list.xlsx'), SALES_ARCHIVE_DIR=path.join(ROOT,'data','sales-archives'), STATE_BACKUP_DIR=path.join(ROOT,'data','state-backups');
 if(!fs.existsSync(path.dirname(DATA)))fs.mkdirSync(path.dirname(DATA),{recursive:true});
 if(!fs.existsSync(DATA))fs.writeFileSync(DATA,'[]','utf8');
 if(!fs.existsSync(YT_AUTH))fs.writeFileSync(YT_AUTH,'{}','utf8');
 if(!fs.existsSync(INTEGRATIONS))fs.writeFileSync(INTEGRATIONS,'{}','utf8');
 if(!fs.existsSync(SEND_HISTORY))fs.writeFileSync(SEND_HISTORY,'[]','utf8');
+if(!fs.existsSync(STATE_DATA))fs.writeFileSync(STATE_DATA,JSON.stringify({orders:[],customers:readCustomers(),payments:[],settings:{},csRecords:[],shippingRecords:[]},null,2),'utf8');
+for(const d of [SALES_ARCHIVE_DIR,STATE_BACKUP_DIR])if(!fs.existsSync(d))fs.mkdirSync(d,{recursive:true});
 const mime={'.html':'text/html; charset=utf-8','.js':'application/javascript; charset=utf-8','.css':'text/css; charset=utf-8','.json':'application/json; charset=utf-8','.png':'image/png','.jpg':'image/jpeg','.jpeg':'image/jpeg','.ico':'image/x-icon'};
 function readCustomers(){try{return JSON.parse(fs.readFileSync(DATA,'utf8'))}catch(e){return[]}}
 function readIntegrations(){try{return JSON.parse(fs.readFileSync(INTEGRATIONS,'utf8'))}catch(e){return{}}}
@@ -47,6 +50,44 @@ function saveCustomers(v){
  writeCustomerExcel(v);
  broadcastCustomers(v);
 }
+
+function readState(){try{return JSON.parse(fs.readFileSync(STATE_DATA,'utf8'))}catch(e){return {orders:[],customers:readCustomers(),payments:[],settings:{},csRecords:[],shippingRecords:[]}}}
+function writeStateExcel(st){
+ try{
+  const wb=XLSX.utils.book_new();
+  const orders=(st.orders||[]).map(o=>({'방송일':o.date||'','닉네임':o.nick||'','상품번호':o.productNo||'','상품명':o.item||'','수량':o.qty||0,'단가':o.unit||0,'금액':o.amount||0,'배송비':o.fee||0,'원본파일':o.source||''}));
+  const ws=XLSX.utils.json_to_sheet(orders);XLSX.utils.book_append_sheet(wb,ws,'판매리스트');
+  XLSX.writeFile(wb,STATE_XLSX);return true
+ }catch(e){console.error('판매리스트 엑셀 저장 실패',e);return false}
+}
+function backupState(st){
+ try{
+  const text=JSON.stringify(st,null,2), stamp=new Date().toISOString().replace(/[:.]/g,'-');
+  fs.writeFileSync(STATE_BACKUP,text,'utf8');
+  fs.writeFileSync(path.join(STATE_BACKUP_DIR,`state-${stamp}.json`),text,'utf8');
+  const files=fs.readdirSync(STATE_BACKUP_DIR).filter(x=>/^state-.*\.json$/.test(x)).sort();
+  while(files.length>100){const old=files.shift();try{fs.unlinkSync(path.join(STATE_BACKUP_DIR,old))}catch(e){}}
+ }catch(e){console.error('전체 상태 백업 실패',e)}
+}
+function archiveSalesByDate(st){
+ try{
+  const by={};for(const o of (st.orders||[])){const d=o.date||'날짜없음';(by[d]||(by[d]=[])).push(o)}
+  for(const [d,rows] of Object.entries(by)){
+   fs.writeFileSync(path.join(SALES_ARCHIVE_DIR,`${d}.json`),JSON.stringify({date:d,count:rows.length,orders:rows},null,2),'utf8');
+   const wb=XLSX.utils.book_new(),ws=XLSX.utils.json_to_sheet(rows);XLSX.utils.book_append_sheet(wb,ws,'판매리스트');XLSX.writeFile(wb,path.join(SALES_ARCHIVE_DIR,`${d}.xlsx`));
+  }
+ }catch(e){console.error('날짜별 판매리스트 보존 실패',e)}
+}
+function saveState(st){
+ const next={...readState(),...st,customers:Array.isArray(st.customers)?st.customers:readCustomers(),updatedAt:new Date().toISOString()};
+ backupState(readState());
+ fs.writeFileSync(STATE_DATA,JSON.stringify(next,null,2),'utf8');
+ fs.writeFileSync(STATE_BACKUP,JSON.stringify(next,null,2),'utf8');
+ writeStateExcel(next);archiveSalesByDate(next);
+ if(Array.isArray(next.customers))saveCustomers(next.customers);
+ return next
+}
+function listSalesArchives(){try{return fs.readdirSync(SALES_ARCHIVE_DIR).filter(x=>x.endsWith('.json')).sort().reverse().map(x=>{const d=JSON.parse(fs.readFileSync(path.join(SALES_ARCHIVE_DIR,x),'utf8'));return {date:d.date,count:d.count,file:x}})}catch(e){return[]}}
 
 function readBody(req,max=1024*1024){
  return new Promise((resolve,reject)=>{
@@ -314,6 +355,19 @@ const server=http.createServer((req,res)=>{
   }).catch(e=>json(res,400,{ok:false,error:e.message}))
  }
 
+ if(u.pathname==='/api/state'&&req.method==='GET')return json(res,200,{ok:true,state:readState(),archives:listSalesArchives()});
+ if(u.pathname==='/api/state'&&req.method==='POST'){
+  return readBody(req,20*1024*1024).then(body=>{try{const st=JSON.parse(body||'{}');const saved=saveState(st);return json(res,200,{ok:true,updatedAt:saved.updatedAt,orders:(saved.orders||[]).length,customers:(saved.customers||[]).length})}catch(e){return json(res,400,{ok:false,error:e.message})}})
+ }
+ if(u.pathname==='/api/state/backup'&&req.method==='GET'){
+  const st=readState();const payload={version:6,exportedAt:new Date().toISOString(),state:st};
+  res.writeHead(200,{'Content-Type':'application/json; charset=utf-8','Content-Disposition':`attachment; filename=ddaenglive_full_backup_${new Date().toISOString().slice(0,10)}.json`,'Cache-Control':'no-store'});return res.end(JSON.stringify(payload,null,2));
+ }
+ if(u.pathname==='/api/sales/archives'&&req.method==='GET')return json(res,200,{ok:true,archives:listSalesArchives()});
+ if(u.pathname.startsWith('/api/sales/archive/')&&req.method==='GET'){
+  const date=decodeURIComponent(u.pathname.split('/').pop()).replace(/[^0-9-]/g,'');const f=path.join(SALES_ARCHIVE_DIR,date+'.json');
+  if(!fs.existsSync(f))return json(res,404,{ok:false,error:'해당 날짜 판매리스트가 없습니다.'});return json(res,200,{ok:true,...JSON.parse(fs.readFileSync(f,'utf8'))});
+ }
  if(u.pathname==='/api/send-history'&&req.method==='GET'){
   const date=String(u.query.date||'');const history=readSendHistory().filter(x=>!date||x.date===date);return json(res,200,{ok:true,history});
  }
@@ -363,8 +417,8 @@ const server=http.createServer((req,res)=>{
 
  if(u.pathname.startsWith('/api/customers/')&&req.method==='DELETE'){
   const nickname=decodeURIComponent(u.pathname.split('/').pop());
-  let list=readCustomers().filter(x=>x.nickname!==nickname);
-  saveCustomers(list);return json(res,200,{ok:true})
+  let list=readCustomers().map(x=>x.nickname===nickname?{...x,active:false,archivedAt:new Date().toISOString()}:x);
+  saveCustomers(list);const st=readState();st.customers=list;saveState(st);return json(res,200,{ok:true,softDeleted:true})
  }
 
  if(u.pathname==='/api/customers'&&req.method==='POST'){

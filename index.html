@@ -109,7 +109,7 @@ th{background:#232832;color:#f5d5bd;position:sticky;top:70px} tr:hover td{backgr
 </head>
 <body>
 <header>
-  <div><div class="brand"><b>FIRST OMS</b> 긴급 정산실</div><div class="sub">판매리스트 → 고객매칭 → 정산서 → 입금대조 → 택배리스트</div></div>
+  <div><div class="brand"><b>FIRST OMS</b> 땡라이브 정산서버 v6.0</div><div class="sub">고객DB·판매리스트 3중 자동보존 · 정산 · 입금 · 택배</div></div>
   <div class="actions no-print">
     <button class="btn secondary" onclick="recoverOldData()">이전 고객DB 복구</button>
     <a class="btn secondary" href="/api/customers/export.xlsx">고객DB 엑셀 받기</a><button class="btn secondary" onclick="downloadCustomerBackup()">고객정보 백업</button>
@@ -127,6 +127,7 @@ th{background:#232832;color:#f5d5bd;position:sticky;top:70px} tr:hover td{backgr
     <button type="button" class="tab" data-page="payments" onclick="go('payments')">입금대조</button>
     <button type="button" class="tab" data-page="shipping" onclick="go('shipping')">택배실</button>
   </div>
+  <div id="serverSaveStatus" class="note no-print" style="margin-top:0">고객DB와 판매리스트를 서버 JSON · 백업 JSON · 엑셀로 자동 보존합니다.</div>
 
   <section id="dashboard" class="page active">
     <div class="grid">
@@ -843,11 +844,20 @@ async function saveCustomer(){
   await syncServerCustomers(false); autoMatchAll(); saveSilently(); renderAll(); closeCustomerModal(); alert('고객정보가 저장되어 정산서와 택배실에 바로 반영되었습니다.');
  }catch(e){alert('고객정보 저장 실패: '+e.message)}
 }
-async function deleteCustomer(i){const c=state.customers[i];if(!confirm('이 고객을 삭제할까요?'))return;try{const key=encodeURIComponent(c.nickname||c.nick||'');const r=await fetch('/api/customers/'+key,{method:'DELETE'});if(!r.ok)throw new Error('삭제 실패');await syncServerCustomers(false);alert('서버 고객DB에서 삭제되었습니다.')}catch(e){alert('고객 삭제 실패: '+e.message)}}
+async function deleteCustomer(i){const c=state.customers[i];if(!confirm('고객정보는 완전 삭제되지 않습니다. 목록에서 보관처리할까요?'))return;try{const key=encodeURIComponent(c.nickname||c.nick||'');const r=await fetch('/api/customers/'+key,{method:'DELETE'});if(!r.ok)throw new Error('보관 실패');await syncServerCustomers(false);alert('고객정보를 삭제하지 않고 보관 처리했습니다.')}catch(e){alert('고객 보관 실패: '+e.message)}}
 function deleteOrder(i){state.orders.splice(i,1);saveSilently();renderAll()}
 function clearOrders(){if(confirm('모든 주문을 초기화할까요?')){state.orders=[];saveSilently();renderAll()}}
 function clearPayments(){if(confirm('입금내역을 초기화할까요?')){state.payments=[];saveSilently();renderAll()}}
-function saveSilently(){localStorage.setItem(KEY,JSON.stringify(state))}
+let stateSaveTimer=null;
+function saveSilently(){
+ localStorage.setItem(KEY,JSON.stringify(state));
+ clearTimeout(stateSaveTimer);
+ stateSaveTimer=setTimeout(async()=>{try{
+  const r=await fetch('/api/state',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(state)});
+  if(!r.ok)throw new Error('서버 저장 실패 '+r.status);
+  const d=await r.json();const el=document.getElementById('serverSaveStatus');if(el)el.textContent=`자동보존 완료 · 주문 ${d.orders}건 · 고객 ${d.customers}명 · ${new Date().toLocaleTimeString('ko-KR')}`;
+ }catch(e){console.error(e);const el=document.getElementById('serverSaveStatus');if(el)el.textContent='⚠ 서버 자동보존 재시도 중 — 브라우저에는 저장됨';}},350);
+}
 function updateKpi(){const rs=getReceipts();$('kpiOrderRows').textContent=state.orders.length;$('kpiReceipts').textContent=rs.length;$('kpiMatched').textContent=rs.filter(r=>r.customer).length;$('kpiPaid').textContent=rs.filter(r=>r.payment.status==='paid').length;refreshSolapiKpi()}
 async function refreshSolapiKpi(){const el=$('kpiSolapi');if(!el)return;try{const r=await fetch('/api/solapi/config',{cache:'no-store'}),d=await r.json();el.textContent=d.configured?'문자 준비':'미연동'}catch(e){el.textContent='확인필요'}}
 function renderAll(){renderMessageSettings();renderOrders();renderCustomers();renderReceipts();renderPayments();renderShipping();updateKpi()}
@@ -870,10 +880,11 @@ async function downloadCustomerBackup(){
  }
 }
 
-function downloadBackup(){
- const blob=new Blob([JSON.stringify({version:2,exportedAt:new Date().toISOString(),state},null,2)],{type:'application/json'});
- const a=document.createElement('a'); a.href=URL.createObjectURL(blob);
- a.download='FIRST_OMS_전체백업_'+today()+'.json'; a.click(); URL.revokeObjectURL(a.href);
+async function downloadBackup(){
+ try{
+  const r=await fetch('/api/state/backup',{cache:'no-store'});if(!r.ok)throw new Error('HTTP '+r.status);
+  const blob=await r.blob(),a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='땡라이브서버_전체백업_'+today()+'.json';a.click();URL.revokeObjectURL(a.href);
+ }catch(e){const blob=new Blob([JSON.stringify({version:6,exportedAt:new Date().toISOString(),state},null,2)],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='땡라이브서버_전체백업_'+today()+'.json';a.click();URL.revokeObjectURL(a.href)}
 }
 $('backupFile').onchange=e=>{
  const f=e.target.files[0]; if(!f)return;
@@ -949,22 +960,17 @@ function startCustomerRealtime(){
  return true;
 }
 async function bootFirstOms(){
- const saved=localStorage.getItem(KEY);
- if(saved){
-  loadAll();
- }else{
-  try{
-   const r=await fetch('/data/initial-backup.json?ts='+Date.now(),{cache:'no-store'});
-   if(!r.ok)throw new Error('초기 백업 HTTP '+r.status);
-   const obj=await r.json(), restored=obj.state||obj;
-   if(!restored||!Array.isArray(restored.customers))throw new Error('초기 백업 형식 오류');
-   state={orders:Array.isArray(restored.orders)?restored.orders:[],customers:restored.customers,payments:Array.isArray(restored.payments)?restored.payments:[],settings:{...state.settings,...(restored.settings||{})}};
-   saveSilently();renderMessageSettings();renderAll();
-  }catch(e){console.warn('포함 백업 자동복원 실패',e);loadAll()}
+ try{
+  const r=await fetch('/api/state?ts='+Date.now(),{cache:'no-store'});
+  if(r.ok){const d=await r.json(),remote=d.state;if(remote&&Array.isArray(remote.orders)&&Array.isArray(remote.customers)){
+   state={...state,...remote,settings:{...state.settings,...(remote.settings||{})}};
+   localStorage.setItem(KEY,JSON.stringify(state));renderMessageSettings();renderAll();
+  }else throw new Error('서버 상태 없음');
+ }catch(e){
+  const saved=localStorage.getItem(KEY);
+  if(saved)loadAll();else{try{const r=await fetch('/data/initial-backup.json?ts='+Date.now(),{cache:'no-store'});const obj=await r.json(),restored=obj.state||obj;state={...state,...restored,settings:{...state.settings,...(restored.settings||{})}};saveSilently();renderAll()}catch(x){loadAll()}}
  }
- await syncServerCustomers(false);
- startCustomerRealtime();
- refreshSolapiKpi();
+ await syncServerCustomers(false);startCustomerRealtime();refreshSolapiKpi();
 }
 bootFirstOms();
 setInterval(()=>{if(!document.hidden)syncServerCustomers(false)},10000);
