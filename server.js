@@ -151,20 +151,30 @@ function saveAccounts(list){
  for(const account of list)ensureTenantStorage(account);
  return true
 }
-const DEFAULT_ADMIN_ID='firstadmin',DEFAULT_ADMIN_PASSWORD='FirstOms!2026';
+const DEFAULT_ADMIN_ID='firstadmin',DEFAULT_ADMIN_PASSWORD='@31062224',OWNER_CREDENTIAL_VERSION='7.9';
 function ensureOwnerAccount(){
  let list=readAccounts(),changed=false;
  let owner=list.find(a=>a.role==='superadmin'||a.code==='FIRST-MASTER');
  if(!owner){
-  owner={id:crypto.randomUUID(),code:'FIRST-MASTER',username:DEFAULT_ADMIN_ID,passwordHash:passwordHash(DEFAULT_ADMIN_PASSWORD),company:'FIRST OMS',ownerName:'최고관리자',phone:'',role:'superadmin',status:'active',mustChangePassword:true,createdAt:new Date().toISOString(),bootstrapVersion:'7.3'};
+  owner={id:crypto.randomUUID(),code:'FIRST-MASTER',username:DEFAULT_ADMIN_ID,passwordHash:passwordHash(DEFAULT_ADMIN_PASSWORD),company:'FIRST OMS',ownerName:'최고관리자',phone:'',role:'superadmin',status:'active',mustChangePassword:false,createdAt:new Date().toISOString(),bootstrapVersion:'7.9',credentialSetupVersion:OWNER_CREDENTIAL_VERSION};
   list.push(owner);changed=true;
  }else{
   if(owner.role!=='superadmin'){owner.role='superadmin';changed=true}
   if(owner.status!=='active'){owner.status='active';changed=true}
   if(owner.code!=='FIRST-MASTER'){owner.code='FIRST-MASTER';changed=true}
-  // 기존 최고관리자 아이디·비밀번호는 재배포/재시작 때 절대 덮어쓰지 않는다.
-  if(!owner.username){owner.username=DEFAULT_ADMIN_ID;changed=true}
-  if(!owner.passwordHash){owner.passwordHash=passwordHash(DEFAULT_ADMIN_PASSWORD);owner.mustChangePassword=true;changed=true}
+  // v7.9에서 주인님 최고관리자 계정을 최초 1회 확정한다.
+  // credentialSetupVersion이 저장된 뒤에는 재배포/재시작해도 변경한 비밀번호를 덮어쓰지 않는다.
+  if(owner.credentialSetupVersion!==OWNER_CREDENTIAL_VERSION){
+   owner.username=DEFAULT_ADMIN_ID;
+   owner.passwordHash=passwordHash(DEFAULT_ADMIN_PASSWORD);
+   owner.mustChangePassword=false;
+   owner.credentialSetupVersion=OWNER_CREDENTIAL_VERSION;
+   owner.passwordChangedAt=new Date().toISOString();
+   changed=true;
+  }else{
+   if(!owner.username){owner.username=DEFAULT_ADMIN_ID;changed=true}
+   if(!owner.passwordHash){owner.passwordHash=passwordHash(DEFAULT_ADMIN_PASSWORD);owner.mustChangePassword=false;changed=true}
+  }
  }
  if(changed)saveAccounts(list);else for(const a of list)ensureTenantStorage(a);
  console.log('[LOGIN] 최고관리자 계정 준비 완료');
