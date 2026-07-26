@@ -159,13 +159,8 @@ function ensureOwnerAccount(){
   owner={id:crypto.randomUUID(),code:'FIRST-MASTER',username:DEFAULT_ADMIN_ID,passwordHash:passwordHash(DEFAULT_ADMIN_PASSWORD),company:'FIRST OMS',ownerName:'최고관리자',phone:'',role:'superadmin',status:'active',mustChangePassword:true,createdAt:new Date().toISOString(),bootstrapVersion:'7.3'};
   list.push(owner);changed=true;
  }else{
-  // 아직 최초 비밀번호를 변경하지 않은 관리자 계정은 배포 후에도 기본 로그인값으로 확실히 복구한다.
-  // 사용자가 비밀번호를 변경해 passwordChangedAt이 생긴 뒤에는 절대 덮어쓰지 않는다.
-  if(!owner.passwordChangedAt){
-   if(owner.username!==DEFAULT_ADMIN_ID){owner.username=DEFAULT_ADMIN_ID;changed=true}
-   if(!verifyPassword(DEFAULT_ADMIN_PASSWORD,owner.passwordHash)){owner.passwordHash=passwordHash(DEFAULT_ADMIN_PASSWORD);changed=true}
-   if(owner.mustChangePassword!==true){owner.mustChangePassword=true;changed=true}
-  }
+  // 기존 최고관리자 계정의 아이디·비밀번호는 배포/재시작 시 절대 덮어쓰지 않는다.
+  // 기본 계정은 최고관리자가 아예 없을 때에만 최초 1회 생성된다.
   if(owner.role!=='superadmin'){owner.role='superadmin';changed=true}
   if(owner.status!=='active'){owner.status='active';changed=true}
   if(owner.code!=='FIRST-MASTER'){owner.code='FIRST-MASTER';changed=true}
