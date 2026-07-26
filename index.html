@@ -6,6 +6,8 @@
 <title>FIRST OMS 긴급 정산실</title>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx-populate@1.21.0/browser/xlsx-populate.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"></script>
 <style>
 :root{
   --bg:#0d0f13;--panel:#171a20;--panel2:#20242c;--text:#f5f5f7;--muted:#aeb4c0;
@@ -103,6 +105,15 @@ th{background:#232832;color:#f5d5bd;position:sticky;top:70px} tr:hover td{backgr
 @media(max-width:600px){main{padding:14px}.grid,.form-grid{grid-template-columns:1fr}header{padding:13px}.sub{display:none}.receipt{padding:14px}.receipt th,.receipt td{font-size:11px;padding:6px}}
 
 .receipt-list-table{min-width:1100px}.receipt-list-table th,.receipt-list-table td{vertical-align:middle}.receipt-list-table .nick{font-size:16px;font-weight:900}.receipt-detail-modal{display:none;position:fixed;inset:0;background:rgba(0,0,0,.78);z-index:120;padding:18px;overflow:auto}.receipt-detail-modal.show{display:block}.receipt-detail-box{max-width:720px;margin:20px auto}.receipt-detail-actions{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;justify-content:flex-end}.sms-draft-status{font-size:12px;color:#67c587;margin-top:6px}
+
+.shipping-scan-box{margin:14px 0;padding:14px;border:1px solid var(--line);border-radius:14px;background:#11151b}
+.shipping-scan-row{display:grid;grid-template-columns:minmax(220px,1fr) auto auto;gap:8px;align-items:end}
+.shipping-scan-status{margin-top:9px;font-weight:800}
+.packed-row td{background:rgba(72,187,120,.10)!important}
+.shipping-code{font-family:monospace;font-size:12px;white-space:nowrap}
+.shipping-table{min-width:1280px;table-layout:fixed}
+.shipping-table th,.shipping-table td{vertical-align:middle}
+@media(max-width:700px){.shipping-scan-row{grid-template-columns:1fr}.shipping-scan-row .btn{width:100%}}
 @media print{
  body{background:white;color:black}.no-print,header,.tabs,.section-title,.note{display:none!important}
  main{max-width:none;padding:0}.page{display:none!important}#receipts.page{display:block!important}.receipt-wrap{display:block}
@@ -129,11 +140,35 @@ th{background:#232832;color:#f5d5bd;position:sticky;top:70px} tr:hover td{backgr
 .star-btn.active{background:#f0b83e!important;color:#201500!important;border-color:#ffd66b!important;box-shadow:0 0 0 2px rgba(240,184,62,.25),0 0 16px rgba(240,184,62,.45)}
 .receipt-list-table tr.important-row td{background:rgba(240,184,62,.08)}
 @media(max-width:760px){.receipt-list-table{min-width:1280px}.receipt-detail-box{width:96vw!important;padding:10px!important}.receipt-image-preview{width:100%}}
+
+/* v6.9 화면 밀림·열 겹침 긴급 수정 */
+header{position:relative!important;top:auto!important;align-items:flex-start!important;flex-wrap:wrap!important;gap:12px!important}
+header>div:first-child{flex:0 0 auto;min-width:230px}
+header>.actions{flex:1 1 760px;justify-content:flex-end;align-items:center}
+main{padding-top:18px}
+.page th{position:static!important;top:auto!important}
+#receipts .scroll,#payments .scroll,#customers .scroll{max-height:none!important;overflow-x:auto!important;overflow-y:visible!important}
+#receiptCards{display:block!important;width:100%!important}
+#receiptCards>.scroll{width:100%!important}
+.receipt-list-table{width:1380px!important;min-width:1380px!important;max-width:none!important;table-layout:fixed!important}
+.receipt-list-table col:nth-child(1){width:68px}.receipt-list-table col:nth-child(2){width:145px}.receipt-list-table col:nth-child(3){width:115px}.receipt-list-table col:nth-child(4){width:150px}.receipt-list-table col:nth-child(5){width:345px}.receipt-list-table col:nth-child(6){width:125px}.receipt-list-table col:nth-child(7){width:100px}.receipt-list-table col:nth-child(8){width:120px}.receipt-list-table col:nth-child(9){width:105px}.receipt-list-table col:nth-child(10){width:107px}
+.receipt-list-table th,.receipt-list-table td{height:auto!important;min-height:52px;line-height:1.35;overflow:hidden!important;text-overflow:ellipsis!important}
+.receipt-list-table td:nth-child(5){white-space:normal!important;word-break:keep-all!important;overflow-wrap:anywhere!important}
+.receipt-list-table td:nth-child(8),.receipt-list-table td:nth-child(9),.receipt-list-table td:nth-child(10){overflow:visible!important;text-overflow:clip!important}
+.receipt-list-table .btn{display:inline-flex!important;align-items:center;justify-content:center;min-width:86px!important;white-space:nowrap!important}
+#paymentsTable table{width:100%!important;min-width:820px!important;table-layout:fixed!important}
+#paymentsTable col:nth-child(1){width:25%}#paymentsTable col:nth-child(2){width:18%}#paymentsTable col:nth-child(3){width:27%}#paymentsTable col:nth-child(4){width:30%}
+#paymentsTable th,#paymentsTable td{position:static!important;white-space:normal!important;word-break:keep-all!important;vertical-align:middle!important}
+#customers table{width:1050px!important;min-width:1050px!important;table-layout:fixed!important}
+#customers th,#customers td{position:static!important;top:auto!important}
+.section-title{flex-wrap:wrap}.receipt-tools{position:relative!important;z-index:1!important}
+@media(max-width:900px){header>.actions{justify-content:flex-start}.receipt-list-table{width:1300px!important;min-width:1300px!important}}
+
 </style>
 </head>
 <body>
 <header>
-  <div><div class="brand"><b>FIRST OMS</b> 땡라이브 정산서버 v6.0</div><div class="sub">고객DB·판매리스트 3중 자동보존 · 정산 · 입금 · 택배</div></div>
+  <div><div class="brand"><b>FIRST OMS</b> 땡라이브 정산서버 v7.0</div><div class="sub">고객DB·판매리스트 3중 자동보존 · 정산 · 입금 · 택배</div></div>
   <div class="actions no-print">
     <span id="loginUser" class="sub">로그인 확인 중</span><button id="accountAdminBtn" class="btn secondary" style="display:none" onclick="location.href='/superadmin.html'">거래처 계정관리</button><button class="btn secondary" onclick="runFunctionCheck()">기능점검</button><button class="btn secondary" onclick="logoutNow()">로그아웃</button>
     <button class="btn secondary" onclick="recoverOldData()">이전 고객DB 복구</button>
@@ -270,6 +305,15 @@ th{background:#232832;color:#f5d5bd;position:sticky;top:70px} tr:hover td{backgr
       <div><label>출력 대상</label><select id="shippingFilter" onchange="renderShipping()"><option value="paid">입금완료만</option><option value="all">전체 정산서</option></select></div>
       <div><label>합배송 기준</label><select id="bundleMode" onchange="renderShipping()"><option value="date">방송일자별 분리</option><option value="customer">고객별 합배송</option></select></div>
     </div>
+    <div class="shipping-scan-box no-print">
+      <div class="shipping-scan-row">
+        <div><label>택배 QR·바코드 스캔</label><input id="shippingScanInput" placeholder="USB 스캐너로 찍거나 코드를 직접 입력" autocomplete="off"></div>
+        <button class="btn" type="button" onclick="processShippingScan()">스캔 처리</button>
+        <button class="btn secondary" type="button" onclick="startCameraScanner()">카메라 스캔</button>
+      </div>
+      <div id="shippingScanStatus" class="shipping-scan-status muted">스캔하면 해당 고객이 포장완료로 표시됩니다.</div>
+      <video id="shippingScanVideo" playsinline style="display:none;width:100%;max-width:520px;margin-top:10px;border-radius:12px"></video>
+    </div>
     <div id="shippingTable"></div>
   </section>
 </main>
@@ -320,7 +364,7 @@ th{background:#232832;color:#f5d5bd;position:sticky;top:70px} tr:hover td{backgr
 <script src="https://t1.daumcdn.net/mapjsapi/bundle/postcode/prod/postcode.v2.js"></script>
 <script>
 const KEY='firstOmsEmergencySettlementV1';
-let state={orders:[],customers:[],payments:[],settings:{bank:'카카오뱅크',holder:'김미숙',account:'',contact:'문의는 땡라이브 카카오채널로 부탁드립니다.',smsTemplate:'[땡라이브 정산서]\n{고객명}님\n{상품내역}\n상품합계 {상품합계}\n배송비 {배송비}\n결제금액 {결제금액}\n\n입금계좌: {은행} {계좌번호} {예금주}\n{문의안내}\n감사합니다.'}};
+let state={orders:[],customers:[],payments:[],shippingScans:{},settings:{bank:'카카오뱅크',holder:'김미숙',account:'',contact:'문의는 땡라이브 카카오채널로 부탁드립니다.',smsTemplate:'[땡라이브 정산서]\n{고객명}님\n{상품내역}\n상품합계 {상품합계}\n배송비 {배송비}\n결제금액 {결제금액}\n\n입금계좌: {은행} {계좌번호} {예금주}\n{문의안내}\n감사합니다.'}};
 const $=id=>document.getElementById(id);
 const money=n=>(Number(n)||0).toLocaleString('ko-KR')+'원';
 const cleanBrokenText=v=>String(v??'').replace(/\uFFFD/g,' ').replace(/[�]+/g,' ').replace(/\?{2,}/g,' ').replace(/\s+/g,' ').trim();
@@ -577,7 +621,7 @@ function renderReceipts(){
  const matched=rs.filter(r=>r.customer).length;
  $('receiptSummary').textContent=`검색된 정산서 ${rs.length}장 · 고객DB 매칭 ${matched}장 · 정보확인 필요 ${rs.length-matched}장`;
  if(!rs.length){$('receiptCards').innerHTML='<div class="empty">조건에 맞는 정산서가 없습니다.</div>';updateKpi();return;}
- $('receiptCards').innerHTML=`<div class="scroll" style="grid-column:1/-1;width:100%"><table class="receipt-list-table"><thead><tr><th>중요</th><th>닉네임</th><th>이름</th><th>연락처</th><th>주소</th><th>합계</th><th>입금</th><th>고객정보</th><th>문자전송</th><th>상세</th></tr></thead><tbody>${rs.map(r=>{
+ $('receiptCards').innerHTML=`<div class="scroll" style="grid-column:1/-1;width:100%"><table class="receipt-list-table"><colgroup><col><col><col><col><col><col><col><col><col><col></colgroup><thead><tr><th>중요</th><th>닉네임</th><th>이름</th><th>연락처</th><th>주소</th><th>합계</th><th>입금</th><th>고객정보</th><th>문자전송</th><th>상세</th></tr></thead><tbody>${rs.map(r=>{
    const c=r.customer||{};const paid=r.payment?.status==='paid';
    const infoBtn=c&&c.id?`<button class="btn secondary" onclick="editCustomerById('${esc(c.id)}')">정보수정</button>`:`<button class="btn warn" onclick="openCustomerForKey('${esc(r.key)}')">정보등록</button>`;
    const smsBtn=c.phone?`<button class="btn" onclick="sendMmsByKey('${esc(r.key)}',this)">문자전송</button>`:`<button class="btn secondary" disabled>전화번호 없음</button>`;
@@ -807,7 +851,31 @@ async function saveSolapiSettings(){
 }
 function printOne(i){
  const html=getReceipts(); const card=document.querySelectorAll('.receipt')[i]; if(!card)return;
- const w=window.open('','_blank');w.document.write(`<html><head><title>정산서</title><style>body{font-family:sans-serif;padding:20px}.receipt{max-width:500px;margin:auto}.receipt table{width:100%;border-collapse:collapse}.receipt th,.receipt td{border:1px solid #ccc;padding:7px}.no-print{display:none}.total{text-align:right;font-size:20px;font-weight:bold}</style></head><body>${card.outerHTML}
+ const w=window.open('','_blank');w.document.write(`<html><head><title>정산서</title><style>body{font-family:sans-serif;padding:20px}.receipt{max-width:500px;margin:auto}.receipt table{width:100%;border-collapse:collapse}.receipt th,.receipt td{border:1px solid #ccc;padding:7px}.no-print{display:none}.total{text-align:right;font-size:20px;font-weight:bold}
+/* v6.9 화면 밀림·열 겹침 긴급 수정 */
+header{position:relative!important;top:auto!important;align-items:flex-start!important;flex-wrap:wrap!important;gap:12px!important}
+header>div:first-child{flex:0 0 auto;min-width:230px}
+header>.actions{flex:1 1 760px;justify-content:flex-end;align-items:center}
+main{padding-top:18px}
+.page th{position:static!important;top:auto!important}
+#receipts .scroll,#payments .scroll,#customers .scroll{max-height:none!important;overflow-x:auto!important;overflow-y:visible!important}
+#receiptCards{display:block!important;width:100%!important}
+#receiptCards>.scroll{width:100%!important}
+.receipt-list-table{width:1380px!important;min-width:1380px!important;max-width:none!important;table-layout:fixed!important}
+.receipt-list-table col:nth-child(1){width:68px}.receipt-list-table col:nth-child(2){width:145px}.receipt-list-table col:nth-child(3){width:115px}.receipt-list-table col:nth-child(4){width:150px}.receipt-list-table col:nth-child(5){width:345px}.receipt-list-table col:nth-child(6){width:125px}.receipt-list-table col:nth-child(7){width:100px}.receipt-list-table col:nth-child(8){width:120px}.receipt-list-table col:nth-child(9){width:105px}.receipt-list-table col:nth-child(10){width:107px}
+.receipt-list-table th,.receipt-list-table td{height:auto!important;min-height:52px;line-height:1.35;overflow:hidden!important;text-overflow:ellipsis!important}
+.receipt-list-table td:nth-child(5){white-space:normal!important;word-break:keep-all!important;overflow-wrap:anywhere!important}
+.receipt-list-table td:nth-child(8),.receipt-list-table td:nth-child(9),.receipt-list-table td:nth-child(10){overflow:visible!important;text-overflow:clip!important}
+.receipt-list-table .btn{display:inline-flex!important;align-items:center;justify-content:center;min-width:86px!important;white-space:nowrap!important}
+#paymentsTable table{width:100%!important;min-width:820px!important;table-layout:fixed!important}
+#paymentsTable col:nth-child(1){width:25%}#paymentsTable col:nth-child(2){width:18%}#paymentsTable col:nth-child(3){width:27%}#paymentsTable col:nth-child(4){width:30%}
+#paymentsTable th,#paymentsTable td{position:static!important;white-space:normal!important;word-break:keep-all!important;vertical-align:middle!important}
+#customers table{width:1050px!important;min-width:1050px!important;table-layout:fixed!important}
+#customers th,#customers td{position:static!important;top:auto!important}
+.section-title{flex-wrap:wrap}.receipt-tools{position:relative!important;z-index:1!important}
+@media(max-width:900px){header>.actions{justify-content:flex-start}.receipt-list-table{width:1300px!important;min-width:1300px!important}}
+
+</style></head><body>${card.outerHTML}
 <div id="solapiModal" class="modal"><div class="modal-box">
  <div class="section-title"><h3>솔라피 API 직접 입력·연결</h3><button class="btn secondary" onclick="closeSolapiSettings()">닫기</button></div>
  <div class="form-grid">
@@ -880,7 +948,7 @@ $('paymentFile').onchange=e=>{const f=e.target.files&&e.target.files[0];if(f)rea
 function renderPayments(){
  const rs=getReceipts();
  if(!state.payments.length){$('paymentsTable').innerHTML='<div class="empty">은행 거래내역 엑셀을 올려주세요.</div>';return}
- $('paymentsTable').innerHTML='<div class="scroll"><table><thead><tr><th>입금자</th><th>입금액</th><th>거래일시</th><th>대조결과</th></tr></thead><tbody>'+
+ $('paymentsTable').innerHTML='<div class="scroll"><table><colgroup><col><col><col><col></colgroup><thead><tr><th>입금자</th><th>입금액</th><th>거래일시</th><th>대조결과</th></tr></thead><tbody>'+
  state.payments.map(p=>{
   const matches=rs.filter(r=>[r.nick,r.customer?.nick,r.customer?.name].filter(Boolean).map(norm).includes(norm(p.payer)));
   let result='<span class="badge bad">미확인 입금</span>';
@@ -889,6 +957,11 @@ function renderPayments(){
   else if(matches.length>1)result='<span class="badge warn">동명이인/복수 후보</span>';
   return `<tr><td>${esc(p.payer)}</td><td>${money(p.amount)}</td><td>${esc(p.date)}</td><td>${result}</td></tr>`;
  }).join('')+'</tbody></table></div>';
+}
+function shippingCodeFor(g){
+ const raw=[g.name,g.nick,g.phone,g.address].join('|');let h=2166136261;
+ for(let i=0;i<raw.length;i++){h^=raw.charCodeAt(i);h=Math.imul(h,16777619)}
+ return 'FIRST-'+(h>>>0).toString(36).toUpperCase().padStart(7,'0');
 }
 function renderShipping(){
  const filter=$('shippingFilter').value, bundle=$('bundleMode').value; let rs=getReceipts();
@@ -899,16 +972,42 @@ function renderShipping(){
   if(!groups.has(k))groups.set(k,{name:r.customer?.name||'',nick:r.nick,phone:r.customer?.phone||'',address:[r.customer?.postalCode,r.customer?.address,r.customer?.detailAddress].filter(Boolean).join(' '),dates:new Set(),items:[],total:0,status:r.payment.status});
   const g=groups.get(k);g.dates.add(r.date);g.items.push(...r.items);g.total+=r.total;
  });
- const arr=[...groups.values()];
- $('shippingTable').innerHTML=arr.length?'<div class="scroll"><table><thead><tr><th>고객명</th><th>닉네임</th><th>연락처</th><th>주소</th><th>방송일</th><th>상품/수량</th><th>결제금액</th></tr></thead><tbody>'+
- arr.map(g=>`<tr><td>${esc(g.name)}</td><td>${esc(g.nick)}</td><td>${esc(g.phone)}</td><td>${esc(g.address)}</td><td>${[...g.dates].join(', ')}</td><td>${g.items.map(x=>esc(x.item)+' '+x.qty+'개').join('<br>')}</td><td>${money(g.total)}</td></tr>`).join('')+'</tbody></table></div>':'<div class="empty">출력할 택배 대상이 없습니다.</div>';
+ const arr=[...groups.values()].map(g=>({...g,code:shippingCodeFor(g)}));
+ state.shippingScans=state.shippingScans||{};
+ $('shippingTable').innerHTML=arr.length?'<div class="scroll"><table class="shipping-table"><thead><tr><th>포장</th><th>택배코드</th><th>고객명</th><th>닉네임</th><th>연락처</th><th>주소</th><th>방송일</th><th>상품/수량</th><th>결제금액</th></tr></thead><tbody>'+ 
+ arr.map(g=>{const packed=!!state.shippingScans[g.code];return `<tr class="${packed?'packed-row':''}"><td>${packed?'<span class="badge good">포장완료</span>':'<span class="badge warn">대기</span>'}</td><td class="shipping-code">${esc(g.code)}</td><td>${esc(g.name)}</td><td>${esc(g.nick)}</td><td>${esc(g.phone)}</td><td>${esc(g.address)}</td><td>${[...g.dates].join(', ')}</td><td>${g.items.map(x=>esc(x.item)+' '+x.qty+'개').join('<br>')}</td><td>${money(g.total)}</td></tr>`}).join('')+'</tbody></table></div>':'<div class="empty">출력할 택배 대상이 없습니다.</div>';
  window.currentShipping=arr;
 }
+function processShippingScan(value){
+ const input=$('shippingScanInput'),code=String(value||input?.value||'').trim().toUpperCase();
+ const status=$('shippingScanStatus');if(!code){status.textContent='스캔할 코드가 없습니다.';return}
+ const found=(window.currentShipping||[]).find(g=>g.code.toUpperCase()===code||String(g.phone||'').replace(/\D/g,'')===code.replace(/\D/g,''));
+ if(!found){status.textContent='목록에서 일치하는 택배코드를 찾지 못했습니다: '+code;return}
+ state.shippingScans=state.shippingScans||{};state.shippingScans[found.code]={at:new Date().toISOString(),name:found.name,nick:found.nick};
+ saveSilently();renderShipping();status.textContent=`포장완료 처리: ${found.name||found.nick} · ${found.code}`;if(input){input.value='';input.focus()}
+}
+$('shippingScanInput')?.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();processShippingScan()}});
+let shippingScanStream=null,shippingScanTimer=null;
+async function startCameraScanner(){
+ const status=$('shippingScanStatus'),video=$('shippingScanVideo');
+ if(!('BarcodeDetector' in window)){status.textContent='이 브라우저는 카메라 바코드 인식을 지원하지 않습니다. USB 스캐너 또는 직접 입력을 사용해 주세요.';return}
+ try{
+  shippingScanStream=await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:'environment'}}});video.srcObject=shippingScanStream;video.style.display='block';await video.play();
+  const detector=new BarcodeDetector({formats:['qr_code','code_128','code_39','ean_13','ean_8']});status.textContent='카메라를 QR 또는 바코드에 맞춰주세요.';
+  const tick=async()=>{try{const codes=await detector.detect(video);if(codes.length){processShippingScan(codes[0].rawValue);stopCameraScanner();return}}catch(e){}shippingScanTimer=requestAnimationFrame(tick)};tick();
+ }catch(e){status.textContent='카메라를 열지 못했습니다: '+e.message}
+}
+function stopCameraScanner(){if(shippingScanTimer)cancelAnimationFrame(shippingScanTimer);shippingScanTimer=null;if(shippingScanStream)shippingScanStream.getTracks().forEach(t=>t.stop());shippingScanStream=null;const v=$('shippingScanVideo');if(v){v.pause();v.srcObject=null;v.style.display='none'}}
 function downloadShippingList(){
- renderShipping(); const rows=(window.currentShipping||[]).map((g,i)=>({'번호':i+1,'받는분':g.name,'닉네임':g.nick,'연락처':g.phone,'주소':g.address,'방송일':[...g.dates].join(', '),'상품내역':g.items.map(x=>x.item+' '+x.qty+'개').join(' / '),'총수량':g.items.reduce((a,x)=>a+Number(x.qty),0),'결제금액':g.total}));
+ renderShipping(); const rows=(window.currentShipping||[]).map((g,i)=>({'번호':i+1,'포장상태':state.shippingScans?.[g.code]?'포장완료':'대기','택배코드':g.code,'받는분':g.name,'닉네임':g.nick,'연락처':g.phone,'주소':g.address,'방송일':[...g.dates].join(', '),'상품내역':g.items.map(x=>x.item+' '+x.qty+'개').join(' / '),'총수량':g.items.reduce((a,x)=>a+Number(x.qty),0),'결제금액':g.total}));
  exportXlsx(rows,'FIRST_OMS_택배리스트.xlsx','택배리스트');
 }
-function printShipping(){go('shipping');window.print()}
+function printShipping(){
+ renderShipping();const arr=window.currentShipping||[];if(!arr.length)return alert('출력할 택배 대상이 없습니다.');
+ const rows=arr.map((g,i)=>`<tr><td>${i+1}</td><td><div id="qr-${i}" class="qr"></div><svg id="bc-${i}"></svg><div class="code">${esc(g.code)}</div></td><td>${esc(g.name)}</td><td>${esc(g.nick)}</td><td>${esc(g.phone)}</td><td>${esc(g.address)}</td><td>${g.items.map(x=>esc(x.item)+' '+x.qty+'개').join('<br>')}</td><td>${money(g.total)}</td><td>${state.shippingScans?.[g.code]?'포장완료':'대기'}</td></tr>`).join('');
+ const data=JSON.stringify(arr.map(g=>g.code));const w=window.open('','_blank');
+ w.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>FIRST OMS 택배리스트</title><script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"><\/script><script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"><\/script><style>body{font-family:Arial,sans-serif;padding:14px;color:#111}h1{font-size:22px;margin:0 0 12px}table{width:100%;border-collapse:collapse;table-layout:fixed}th,td{border:1px solid #555;padding:6px;font-size:10px;vertical-align:middle;word-break:break-word}th{background:#eee}.qr img,.qr canvas{width:58px!important;height:58px!important}.code{font-family:monospace;font-size:9px;margin-top:2px}svg{width:120px;height:38px}@page{size:A4 landscape;margin:8mm}</style></head><body><h1>FIRST OMS 택배리스트</h1><table><thead><tr><th>번호</th><th>QR/바코드</th><th>고객명</th><th>닉네임</th><th>연락처</th><th>주소</th><th>상품/수량</th><th>금액</th><th>포장</th></tr></thead><tbody>${rows}</tbody></table><script>const codes=${data};window.onload=()=>{codes.forEach((c,i)=>{new QRCode(document.getElementById('qr-'+i),{text:c,width:58,height:58});JsBarcode('#bc-'+i,c,{format:'CODE128',displayValue:false,height:28,margin:0})});setTimeout(()=>window.print(),500)};<\/script></body></html>`);w.document.close();
+}
 function downloadReceiptList(){
  const rows=getReceipts().map((r,i)=>({'정산번호':r.date.replaceAll('-','')+'-'+String(i+1).padStart(3,'0'),'방송일':r.date,'실명':r.customer?.name||'','닉네임':r.nick,'전화번호':r.customer?.phone||'','주소':[r.customer?.postalCode,r.customer?.address,r.customer?.detailAddress].filter(Boolean).join(' '),'상품내역':r.items.map(x=>x.item+' '+x.qty+'개').join(' / '),'상품합계':r.subtotal,'배송비':r.fee,'결제금액':r.total,'고객매칭':r.customer?'완료':'확인필요','입금상태':r.payment.status==='paid'?'입금완료':'미입금/확인필요'}));
  exportXlsx(rows,'FIRST_OMS_정산서목록.xlsx','정산서');
