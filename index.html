@@ -164,11 +164,17 @@ main{padding-top:18px}
 .section-title{flex-wrap:wrap}.receipt-tools{position:relative!important;z-index:1!important}
 @media(max-width:900px){header>.actions{justify-content:flex-start}.receipt-list-table{width:1300px!important;min-width:1300px!important}}
 
+
+.shipping-table th:nth-child(6),.shipping-table td:nth-child(6){min-width:260px;white-space:normal;word-break:keep-all;line-height:1.45}
+.shipping-table th:nth-child(7),.shipping-table td:nth-child(7){min-width:110px;white-space:nowrap}
+.payment-filter-bar{display:flex;gap:8px;flex-wrap:wrap;margin:14px 0}.payment-filter-bar .btn.active{outline:3px solid #c9a56a}
+.payment-check{width:20px;height:20px}.locked-input{background:#eceff3!important;color:#555!important}.payment-manual-select{min-width:130px}
+@media(max-width:800px){.shipping-table{min-width:1450px}.payment-filter-bar .btn{flex:1 1 42%}}
 </style>
 </head>
 <body><div id="tenantGuard" style="display:none;position:sticky;top:0;z-index:99999;background:#7b2d2d;color:#fff;padding:10px 16px;font-weight:900;text-align:center;box-shadow:0 2px 8px #0005"></div>
 <header>
-  <div><div class="brand"><b>FIRST OMS</b> 땡라이브 정산서버 v7.0</div><div class="sub">고객DB·판매리스트 3중 자동보존 · 정산 · 입금 · 택배</div></div>
+  <div><div class="brand"><b>FIRST OMS</b> 땡라이브 정산서버 v7.10</div><div class="sub">고객DB·판매리스트 3중 자동보존 · 정산 · 입금 · 택배</div></div>
   <div class="actions no-print">
     <span id="loginUser" class="sub">로그인 확인 중</span><button id="accountAdminBtn" class="btn secondary" style="display:none" onclick="location.href='/superadmin.html'">거래처 계정관리</button><button class="btn secondary" onclick="location.href='/change-password.html'">비밀번호 변경</button><button class="btn secondary" onclick="runFunctionCheck()">기능점검</button><button class="btn secondary" onclick="logoutNow()">로그아웃</button>
     <button class="btn secondary" onclick="recoverOldData()">이전 고객DB 복구</button>
@@ -221,7 +227,8 @@ main{padding-top:18px}
     <div class="form-grid card">
       <div><label>방송일자</label><input type="date" id="broadcastDate"></div>
       <div><label>전체 배송비</label><input type="number" id="shippingFee" value="4000"></div>
-      <div><label>&nbsp;</label><button class="btn" type="button" onclick="applyShippingFeeToAll()">전체 주문에 배송비 적용</button></div>
+      <div><label>&nbsp;</label><button class="btn" id="shippingFeeConfirmBtn" type="button" onclick="confirmShippingFee()">배송비 확인·고정</button></div>
+      <div><label>&nbsp;</label><button class="btn secondary" id="shippingFeeEditBtn" type="button" onclick="unlockShippingFee()" style="display:none">배송비 수정</button></div>
       <div><label>중복 처리</label><select id="duplicateMode"><option value="append">기존 주문에 추가</option><option value="replaceDate">같은 날짜 주문 교체</option></select></div>
       <div><label>자동 고객매칭</label><select id="autoMatch"><option value="yes">사용</option><option value="no">사용 안 함</option></select></div>
     </div>
@@ -290,7 +297,9 @@ main{padding-top:18px}
       </div>
     </div>
     <p class="muted">입금자명·입금액·거래일시를 자동 탐색합니다. 고객DB의 실명 또는 닉네임과 금액을 함께 대조하며, 동명이인·금액불일치는 확인필요로 분리합니다.</p>
-    <div class="card" style="margin:14px 0"><label>미입금 요청문자 내용</label><textarea id="unpaidSmsTemplate" oninput="saveUnpaidTemplateDraft()" placeholder="미입금 고객에게 보낼 내용을 입력하세요"></textarea><div class="muted" style="margin-top:6px">고객명은 {고객명}, 닉네임은 {닉네임}, 금액은 {금액}으로 자동 치환됩니다.</div></div><div id="paymentUploadStatus" class="payment-upload-status muted"></div><div id="paymentsTable"></div><div id="unpaidCustomersTable" style="margin-top:16px"></div>
+    <div class="card" style="margin:14px 0"><label>미입금·금액불일치 안내문자 내용</label><textarea id="unpaidSmsTemplate" oninput="saveUnpaidTemplateDraft()" placeholder="고객에게 보낼 내용을 입력하세요"></textarea><div class="muted" style="margin-top:6px">{고객명} {닉네임} {금액} {대조결과}가 자동 치환됩니다.</div><div class="actions" style="margin-top:10px"><button class="btn" onclick="sendSelectedPaymentSms(this)">선택 고객 문자전송</button></div></div>
+    <div class="payment-filter-bar" id="paymentFilterBar"><button class="btn secondary active" data-filter="all" onclick="setPaymentFilter('all',this)">전체</button><button class="btn secondary" data-filter="paid" onclick="setPaymentFilter('paid',this)">입금자</button><button class="btn secondary" data-filter="unpaid" onclick="setPaymentFilter('unpaid',this)">미입금자</button><button class="btn secondary" data-filter="amount-mismatch" onclick="setPaymentFilter('amount-mismatch',this)">금액불일치</button><button class="btn secondary" data-filter="review" onclick="setPaymentFilter('review',this)">정보확인필요</button></div>
+    <div id="paymentUploadStatus" class="payment-upload-status muted"></div><div id="paymentsTable"></div>
   </section>
 
   <section id="shipping" class="page">
@@ -364,7 +373,7 @@ main{padding-top:18px}
 <script src="https://t1.daumcdn.net/mapjsapi/bundle/postcode/prod/postcode.v2.js"></script>
 <script>
 const KEY='firstOmsEmergencySettlementV1';
-let state={orders:[],customers:[],payments:[],shippingScans:{},settings:{bank:'카카오뱅크',holder:'김미숙',account:'',contact:'문의는 땡라이브 카카오채널로 부탁드립니다.',smsTemplate:'[땡라이브 정산서]\n{고객명}님\n{상품내역}\n상품합계 {상품합계}\n배송비 {배송비}\n결제금액 {결제금액}\n\n입금계좌: {은행} {계좌번호} {예금주}\n{문의안내}\n감사합니다.'}};
+let state={orders:[],customers:[],payments:[],paymentOverrides:{},shippingScans:{},settings:{bank:'카카오뱅크',holder:'김미숙',account:'',contact:'문의는 땡라이브 카카오채널로 부탁드립니다.',smsTemplate:'[땡라이브 정산서]\n{고객명}님\n{상품내역}\n상품합계 {상품합계}\n배송비 {배송비}\n결제금액 {결제금액}\n\n입금계좌: {은행} {계좌번호} {예금주}\n{문의안내}\n감사합니다.'}};
 const $=id=>document.getElementById(id);
 const money=n=>(Number(n)||0).toLocaleString('ko-KR')+'원';
 const cleanBrokenText=v=>String(v??'').replace(/\uFFFD/g,' ').replace(/[�]+/g,' ').replace(/\?{2,}/g,' ').replace(/\s+/g,' ').trim();
@@ -445,6 +454,7 @@ function colMap(header, aliases){
  return m;
 }
 const orderAliases={
+ number:['번호','상품번호','순번','#'],
  nick:['닉네임','고객닉네임','구매자','고객명','성명'],
  item:['품목','상품명','상품','제품명'],
  qty:['수량','개수','주문수량'],
@@ -457,13 +467,13 @@ function importOrders(rows,filename){
  const bdate=$('broadcastDate').value||today(), fee=Number($('shippingFee').value)||0;
  let parsed=[];
  rows.slice(hi+1).forEach((r,idx)=>{
-  const nick=map.nick>=0?r[map.nick]:'', item=map.item>=0?r[map.item]:'';
+  const nick=map.nick>=0?r[map.nick]:'', item=map.item>=0?r[map.item]:'', number=map.number>=0?r[map.number]:(idx+1);
   if(!String(nick).trim()||!String(item).trim())return;
   const qty=Number(String(map.qty>=0?r[map.qty]:1).replace(/[^0-9.-]/g,''))||1;
   const unit=Number(String(map.unit>=0?r[map.unit]:0).replace(/[^0-9.-]/g,''))||0;
   const amount=Number(String(map.amount>=0?r[map.amount]:0).replace(/[^0-9.-]/g,''))||qty*unit;
   const dateVal=map.date>=0&&r[map.date]?formatDate(r[map.date]):bdate;
-  parsed.push({id:crypto.randomUUID(),date:dateVal,nick:String(nick).trim(),item:String(item).trim(),qty,unit,amount,fee,source:filename});
+  parsed.push({id:crypto.randomUUID(),number:String(number||idx+1).replace(/^#/,'').trim(),date:dateVal,nick:String(nick).trim(),item:String(item).trim(),qty,unit,amount,fee,source:filename});
  });
  if($('duplicateMode').value==='replaceDate'){
   const dates=[...new Set(parsed.map(x=>x.date))]; state.orders=state.orders.filter(o=>!dates.includes(o.date));
@@ -519,18 +529,20 @@ function getReceipts(){
  }).sort((a,b)=>b.date.localeCompare(a.date)||a.nick.localeCompare(b.nick,'ko'));
 }
 function matchPayment(g,c,total){
+ const override=state.paymentOverrides?.[g.key];
+ if(override&&override.status)return {status:override.status,payment:override.payment||null,reason:'관리자 수기변경',manual:true};
  const names=[g.nick,c?.nick,c?.name].filter(Boolean).map(norm);
  const candidates=state.payments.filter(p=>names.includes(norm(p.payer)));
  const exact=candidates.filter(p=>Number(p.amount)===Number(total));
  if(exact.length===1)return {status:'paid',payment:exact[0]};
- if(exact.length>1)return {status:'review',reason:'동일 금액 입금 여러 건'};
+ if(exact.length>1)return {status:'review',payment:exact[0],reason:'동일 금액 입금 여러 건'};
  if(candidates.length)return {status:'amount-mismatch',payment:candidates[0],reason:'이름 일치·금액 불일치'};
  return {status:'unpaid'};
 }
 function renderOrders(){
  if(!state.orders.length){$('ordersTable').innerHTML='<div class="empty">판매리스트 엑셀을 올려주세요.</div>';return}
- $('ordersTable').innerHTML='<div class="scroll"><table class="orders-fixed-table"><colgroup><col><col><col><col><col><col><col><col><col></colgroup><thead><tr><th>방송일</th><th>닉네임</th><th>상품</th><th>수량</th><th>단가</th><th>금액</th><th>배송비</th><th>고객매칭</th><th>관리</th></tr></thead><tbody>'+
- state.orders.map((o,i)=>`<tr><td><input type="date" value="${esc(o.date)}" onchange="updateOrder(${i},'date',this.value)"></td><td><input value="${esc(o.nick)}" onchange="updateOrder(${i},'nick',this.value)"></td><td><input value="${esc(o.item)}" onchange="updateOrder(${i},'item',this.value)"></td><td><input type="number" min="0" value="${o.qty}" onchange="updateOrder(${i},'qty',this.value)"></td><td><input type="number" min="0" value="${o.unit}" onchange="updateOrder(${i},'unit',this.value)"></td><td><input type="number" min="0" value="${o.amount}" onchange="updateOrder(${i},'amount',this.value,true)"></td><td><input type="number" min="0" value="${o.fee||0}" onchange="updateOrder(${i},'fee',this.value)"></td><td>${matchBadge(o)}</td><td><button class="btn bad" onclick="deleteOrder(${i})">삭제</button></td></tr>`).join('')+
+ $('ordersTable').innerHTML='<div class="scroll"><table class="orders-fixed-table"><colgroup><col><col><col><col><col><col><col><col><col></colgroup><thead><tr><th>방송일</th><th>닉네임</th><th>번호</th><th>상품</th><th>수량</th><th>단가</th><th>금액</th><th>배송비</th><th>고객매칭</th><th>관리</th></tr></thead><tbody>'+
+ state.orders.map((o,i)=>`<tr><td><input type="date" value="${esc(o.date)}" onchange="updateOrder(${i},'date',this.value)"></td><td><input value="${esc(o.nick)}" onchange="updateOrder(${i},'nick',this.value)"></td><td><input value="${esc(o.number||i+1)}" onchange="updateOrder(${i},'number',this.value)"></td><td><input value="${esc(o.item)}" onchange="updateOrder(${i},'item',this.value)"></td><td><input type="number" min="0" value="${o.qty}" onchange="updateOrder(${i},'qty',this.value)"></td><td><input type="number" min="0" value="${o.unit}" onchange="updateOrder(${i},'unit',this.value)"></td><td><input type="number" min="0" value="${o.amount}" onchange="updateOrder(${i},'amount',this.value,true)"></td><td><input type="number" min="0" value="${o.fee||0}" onchange="updateOrder(${i},'fee',this.value)"></td><td>${matchBadge(o)}</td><td><button class="btn bad" onclick="deleteOrder(${i})">삭제</button></td></tr>`).join('')+
  '</tbody></table></div>';
 }
 function updateOrder(i,key,value,manualAmount=false){
@@ -541,6 +553,13 @@ function updateOrder(i,key,value,manualAmount=false){
  autoMatchAll();saveSilently();renderAll();
 }
 
+function confirmShippingFee(){
+ const fee=Number($('shippingFee').value)||0;if(fee<0)return alert('배송비를 확인해 주세요.');
+ if(!confirm(`배송비 ${money(fee)}를 현재 판매리스트 전체에 적용하고 고정할까요?`))return;
+ state.settings=state.settings||{};state.settings.shippingFeeLocked=true;state.settings.shippingFee=fee;applyShippingFeeToAll();syncShippingFeeLockUI();
+}
+function unlockShippingFee(){if(!confirm('배송비 고정을 풀고 수정할까요?'))return;state.settings.shippingFeeLocked=false;saveSilently();syncShippingFeeLockUI()}
+function syncShippingFeeLockUI(){const locked=!!state.settings?.shippingFeeLocked,el=$('shippingFee');if(!el)return;el.disabled=locked;el.classList.toggle('locked-input',locked);$('shippingFeeConfirmBtn').style.display=locked?'none':'';$('shippingFeeEditBtn').style.display=locked?'':'none';if(state.settings?.shippingFee!=null)el.value=state.settings.shippingFee}
 function applyShippingFeeToAll(){
  const fee=Number($('shippingFee').value)||0;
  if(!state.orders.length){alert('먼저 판매리스트를 업로드해 주세요.');return}
@@ -658,7 +677,7 @@ function receiptHTML(r,i){
  <div style="font-size:18px"><b>${esc(r.nick)}</b> ${payBadge}<br><span style="font-size:13px;color:#666">${c?esc(c.name||''):`<button class="btn bad no-print" onclick="openCustomerForKey('${esc(r.key)}')">고객정보 확인필요 · 폼 열기</button>`}</span></div>
  <div class="meta">${esc(c?.phone||'연락처 미등록')}<br>${esc([c?.address,c?.detailAddress].filter(Boolean).join(' ')||'주소 미등록')}</div>
  <table><thead><tr><th>상품</th><th>수량</th><th>단가</th><th>금액</th></tr></thead><tbody>
- ${r.items.map(x=>`<tr><td>${esc(x.item)}</td><td>${x.qty}</td><td>${money(x.unit)}</td><td>${money(x.amount)}</td></tr>`).join('')}
+ ${r.items.map(x=>`<tr><td>#${esc(x.number||'')} ${esc(x.item)}</td><td>${x.qty}</td><td>${money(x.unit)}</td><td>${money(x.amount)}</td></tr>`).join('')}
  </tbody></table>
  <div style="margin-top:10px;font-size:13px">상품합계 <b>${money(r.subtotal)}</b><br>배송비 <b>${money(r.fee)}</b></div>
  <div class="total">결제금액 ${money(r.total)}</div>
@@ -945,23 +964,20 @@ function readPaymentWorkbook(file){
  }catch(err){if(status)status.textContent='불러오기 실패: '+err.message;alert('입금명세 파일을 읽지 못했습니다: '+err.message)}finally{$('paymentFile').value=''}};fr.readAsArrayBuffer(file);
 }
 $('paymentFile').onchange=e=>{const f=e.target.files&&e.target.files[0];if(f)readPaymentWorkbook(f)};
+let paymentFilter='all';
+function setPaymentFilter(v,btn){paymentFilter=v;document.querySelectorAll('#paymentFilterBar .btn').forEach(x=>x.classList.toggle('active',x===btn));renderPayments()}
+function paymentStatusLabel(st){return st==='paid'?'입금완료':st==='amount-mismatch'?'금액불일치':st==='review'?'정보확인필요':'미입금'}
+function setManualPayment(key,status){state.paymentOverrides=state.paymentOverrides||{};const r=getReceipts().find(x=>x.key===key);if(!r)return;state.paymentOverrides[key]={status,payment:r.payment?.payment||null,updatedAt:new Date().toISOString()};saveSilently();renderAll()}
 function renderPayments(){
- const rs=getReceipts();
- if(!state.payments.length){$('paymentsTable').innerHTML='<div class="empty">은행 거래내역 엑셀을 올려주세요.</div>';return}
- $('paymentsTable').innerHTML='<div class="scroll"><table><colgroup><col><col><col><col></colgroup><thead><tr><th>입금자</th><th>입금액</th><th>거래일시</th><th>대조결과</th></tr></thead><tbody>'+
- state.payments.map(p=>{
-  const matches=rs.filter(r=>[r.nick,r.customer?.nick,r.customer?.name].filter(Boolean).map(norm).includes(norm(p.payer)));
-  let result='<span class="badge bad">미확인 입금</span>';
-  if(matches.length===1&&matches[0].total===Number(p.amount))result=`<span class="badge good">입금확인</span> ${esc(matches[0].nick)}`;
-  else if(matches.length===1)result=`<span class="badge warn">금액 불일치</span> 청구 ${money(matches[0].total)}`;
-  else if(matches.length>1)result='<span class="badge warn">동명이인/복수 후보</span>';
-  return `<tr><td>${esc(p.payer)}</td><td>${money(p.amount)}</td><td>${esc(p.date)}</td><td>${result}</td></tr>`;
- }).join('')+'</tbody></table></div>';
- const unpaid=rs.filter(r=>r.payment.status!=='paid');
- const box=$('unpaidCustomersTable');
- if(box)box.innerHTML=unpaid.length?'<div class="section-title"><h3>미입금 고객</h3></div><div class="scroll"><table><thead><tr><th>닉네임</th><th>고객명</th><th>금액</th><th>요청문자</th></tr></thead><tbody>'+unpaid.map(r=>`<tr><td>${esc(r.nick)}</td><td>${esc(r.customer?.name||'정보확인필요')}</td><td>${money(r.total)}</td><td><button class="btn" onclick="sendUnpaidRequestByKey('${esc(r.key)}',this)">입금 요청문자</button></td></tr>`).join('')+'</tbody></table></div>':'<div class="empty">미입금 고객이 없습니다.</div>';
- const t=$('unpaidSmsTemplate');if(t&&!t.value)t.value=state.settings?.unpaidSmsTemplate||'{고객명}님 입금이 확인되지 않아 입금요청 드립니다. 다른 이름으로 입금하신 경우, 입금자명 보내주시기 바랍니다.';
+ const rs=getReceipts();let rows=rs;if(paymentFilter!=='all')rows=rows.filter(r=>r.payment.status===paymentFilter);
+ const counts={all:rs.length,paid:rs.filter(r=>r.payment.status==='paid').length,unpaid:rs.filter(r=>r.payment.status==='unpaid').length,'amount-mismatch':rs.filter(r=>r.payment.status==='amount-mismatch').length,review:rs.filter(r=>r.payment.status==='review').length};
+ document.querySelectorAll('#paymentFilterBar [data-filter]').forEach(b=>{const k=b.dataset.filter;b.textContent=({all:'전체',paid:'입금자',unpaid:'미입금자','amount-mismatch':'금액불일치',review:'정보확인필요'}[k])+' '+counts[k]});
+ const box=$('paymentsTable');if(!rows.length){box.innerHTML='<div class="empty">선택한 조건의 고객이 없습니다.</div>';return}
+ box.innerHTML='<div class="scroll"><table style="min-width:1250px"><thead><tr><th><input type="checkbox" class="payment-check" onchange="document.querySelectorAll(\'.payment-row-check\').forEach(x=>x.checked=this.checked)"></th><th>고객명</th><th>입금자</th><th>입금액</th><th>거래일시</th><th>대조결과(수기변경)</th><th>문자전송</th><th>상세</th></tr></thead><tbody>'+rows.map(r=>{const p=r.payment?.payment||{};const c=r.customer||{};return `<tr><td><input class="payment-check payment-row-check" type="checkbox" value="${esc(r.key)}"></td><td><b>${esc(c.name||r.nick)}</b><br><span class="muted">${esc(r.nick)}</span></td><td>${esc(p.payer||'-')}</td><td>${p.amount!=null?money(p.amount):'-'}<br><span class="muted">청구 ${money(r.total)}</span></td><td>${esc(p.date||'-')}</td><td><select class="payment-manual-select" onchange="setManualPayment('${esc(r.key)}',this.value)"><option value="paid" ${r.payment.status==='paid'?'selected':''}>입금완료</option><option value="unpaid" ${r.payment.status==='unpaid'?'selected':''}>미입금</option><option value="amount-mismatch" ${r.payment.status==='amount-mismatch'?'selected':''}>금액불일치</option><option value="review" ${r.payment.status==='review'?'selected':''}>정보확인필요</option></select></td><td><button class="btn" onclick="sendPaymentStatusSms('${esc(r.key)}',this)">문자전송</button></td><td><button class="btn secondary" onclick="openReceiptDetail('${esc(r.key)}')">정산서 보기</button></td></tr>`}).join('')+'</tbody></table></div>';
+ const t=$('unpaidSmsTemplate');if(t&&!t.value)t.value=state.settings?.unpaidSmsTemplate||'{고객명}님, 현재 대조결과는 {대조결과}입니다. 확인금액 {금액}입니다. 다른 이름으로 입금하셨다면 입금자명을 알려주세요.';
 }
+async function sendPaymentStatusSms(key,button){const r=getReceipts().find(x=>x.key===key);if(!r)return alert('정산서를 찾을 수 없습니다.');const c=r.customer;if(!c?.phone)return alert('고객 연락처가 없습니다.');const tpl=$('unpaidSmsTemplate')?.value||'';const text=tpl.replaceAll('{고객명}',c.name||r.nick).replaceAll('{닉네임}',r.nick).replaceAll('{금액}',money(r.total)).replaceAll('{대조결과}',paymentStatusLabel(r.payment.status));if(!confirm(`${c.name||r.nick}님에게 아래 문자를 전송할까요?\n\n${text}`))return;const old=button.textContent;button.disabled=true;button.textContent='전송 중...';try{const response=await fetch('/api/sms/send',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({to:c.phone,text,date:r.date,nickname:r.nick,name:c.name||'',total:r.total})});const d=await response.json();if(!response.ok||!d.ok)throw new Error(d.error||'전송 실패');alert('문자를 전송했습니다.')}catch(e){alert('전송 실패: '+e.message)}finally{button.disabled=false;button.textContent=old}}
+async function sendSelectedPaymentSms(button){const keys=[...document.querySelectorAll('.payment-row-check:checked')].map(x=>x.value);if(!keys.length)return alert('문자를 보낼 고객을 선택해 주세요.');if(!confirm(`선택한 ${keys.length}명에게 문자를 전송할까요?`))return;button.disabled=true;let ok=0,fail=0;for(const key of keys){const r=getReceipts().find(x=>x.key===key),c=r?.customer;if(!c?.phone){fail++;continue}const tpl=$('unpaidSmsTemplate')?.value||'';const text=tpl.replaceAll('{고객명}',c.name||r.nick).replaceAll('{닉네임}',r.nick).replaceAll('{금액}',money(r.total)).replaceAll('{대조결과}',paymentStatusLabel(r.payment.status));try{const resp=await fetch('/api/sms/send',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({to:c.phone,text,date:r.date,nickname:r.nick,name:c.name||'',total:r.total})});if(resp.ok)ok++;else fail++}catch(e){fail++}}button.disabled=false;alert(`문자전송 완료: 성공 ${ok}명 / 실패 ${fail}명`)}
 function saveUnpaidTemplateDraft(){state.settings=state.settings||{};state.settings.unpaidSmsTemplate=$('unpaidSmsTemplate')?.value||'';saveSilently()}
 async function sendUnpaidRequestByKey(key,button){
  const r=getReceipts().find(x=>x.key===key);if(!r)return alert('정산서를 찾을 수 없습니다.');const c=r.customer;if(!c?.phone)return alert('고객 연락처가 없습니다.');
@@ -979,20 +995,13 @@ function shippingCodeFor(g){
  return 'FIRST-'+(h>>>0).toString(36).toUpperCase().padStart(7,'0');
 }
 function renderShipping(){
- const filter=$('shippingFilter').value, bundle=$('bundleMode').value; let rs=getReceipts();
- if(filter==='paid')rs=rs.filter(r=>r.payment.status==='paid');
- const groups=new Map();
- rs.forEach(r=>{
-  const k=bundle==='customer'?(r.customer?.id||r.nick):(r.key);
-  if(!groups.has(k))groups.set(k,{name:r.customer?.name||'',nick:r.nick,phone:r.customer?.phone||'',address:[r.customer?.postalCode,r.customer?.address,r.customer?.detailAddress].filter(Boolean).join(' '),dates:new Set(),items:[],total:0,status:r.payment.status});
-  const g=groups.get(k);g.dates.add(r.date);g.items.push(...r.items);g.total+=r.total;
- });
- const arr=[...groups.values()].map(g=>({...g,code:shippingCodeFor(g)}));
- state.shippingScans=state.shippingScans||{};
- $('shippingTable').innerHTML=arr.length?'<div class="scroll"><table class="shipping-table"><thead><tr><th>포장</th><th>택배코드</th><th>고객명</th><th>닉네임</th><th>연락처</th><th>주소</th><th>방송일</th><th>상품/수량</th><th>결제금액</th></tr></thead><tbody>'+ 
- arr.map(g=>{const packed=!!state.shippingScans[g.code];return `<tr class="${packed?'packed-row':''}"><td>${packed?'<span class="badge good">포장완료</span>':'<span class="badge warn">대기</span>'}</td><td class="shipping-code">${esc(g.code)}</td><td>${esc(g.name)}</td><td>${esc(g.nick)}</td><td>${esc(g.phone)}</td><td>${esc(g.address)}</td><td>${[...g.dates].join(', ')}</td><td>${g.items.map(x=>esc(x.item)+' '+x.qty+'개').join('<br>')}</td><td>${money(g.total)}</td></tr>`}).join('')+'</tbody></table></div>':'<div class="empty">출력할 택배 대상이 없습니다.</div>';
- window.currentShipping=arr;
+ const filter=$('shippingFilter').value, bundle=$('bundleMode').value; let rs=getReceipts();if(filter==='paid')rs=rs.filter(r=>r.payment.status==='paid');
+ const groups=new Map();rs.forEach(r=>{const k=bundle==='customer'?(r.customer?.id||r.nick):r.key;if(!groups.has(k))groups.set(k,{name:r.customer?.name||'',nick:r.nick,phone:r.customer?.phone||'',address:[r.customer?.postalCode,r.customer?.address,r.customer?.detailAddress].filter(Boolean).join(' '),dates:new Set(),items:[],subtotal:0,fee:0,total:0,status:r.payment.status});const g=groups.get(k);g.dates.add(r.date);g.items.push(...r.items);g.subtotal+=r.subtotal;g.fee+=r.fee;g.total+=r.total});
+ const arr=[...groups.values()].map(g=>({...g,code:shippingCodeFor(g)}));state.shippingScans=state.shippingScans||{};
+ $('shippingTable').innerHTML=arr.length?'<div class="scroll"><table class="shipping-table"><thead><tr><th>포장</th><th>택배코드</th><th>고객명</th><th>닉네임</th><th>연락처</th><th>주소</th><th>방송일</th><th>#상품/수량/단가/금액</th><th>상품합계</th><th>배송비</th><th>토탈금액</th></tr></thead><tbody>'+arr.map(g=>{const packed=!!state.shippingScans[g.code];return `<tr class="${packed?'packed-row':''}"><td>${packed?'<span class="badge good">포장완료</span><br><small>'+new Date(state.shippingScans[g.code].at).toLocaleString('ko-KR')+'</small>':'<span class="badge warn">대기</span>'}<br><button class="btn secondary" style="padding:5px 8px;margin-top:5px" onclick="togglePackingStatus('${esc(g.code)}')">${packed?'미완료로 변경':'수기 완료'}</button></td><td class="shipping-code">${esc(g.code)}</td><td>${esc(g.name)}</td><td>${esc(g.nick)}</td><td>${esc(g.phone)}</td><td class="address-cell">${esc(g.address)}</td><td>${[...g.dates].join(', ')}</td><td>${g.items.map((x,i)=>`#${esc(x.number||i+1)} ${esc(x.item)} / ${x.qty}개 / ${money(x.unit)} / ${money(x.amount)}`).join('<br>')}</td><td>${money(g.subtotal)}</td><td>${money(g.fee)}</td><td><b>${money(g.total)}</b></td></tr>`}).join('')+'</tbody></table></div>':'<div class="empty">출력할 택배 대상이 없습니다.</div>';window.currentShipping=arr;
 }
+
+function togglePackingStatus(code){state.shippingScans=state.shippingScans||{};if(state.shippingScans[code]){if(!confirm('포장완료를 미완료로 변경할까요?'))return;delete state.shippingScans[code]}else{const worker=prompt('작업자 이름을 입력해 주세요. (선택사항)','관리자')||'관리자';state.shippingScans[code]={at:new Date().toISOString(),source:'admin-manual',worker}}saveSilently();renderShipping()}
 function processShippingScan(value){
  const input=$('shippingScanInput'),code=String(value||input?.value||'').trim().toUpperCase();
  const status=$('shippingScanStatus');if(!code){status.textContent='스캔할 코드가 없습니다.';return}
@@ -1013,16 +1022,8 @@ async function startCameraScanner(){
  }catch(e){status.textContent='카메라를 열지 못했습니다: '+e.message}
 }
 function stopCameraScanner(){if(shippingScanTimer)cancelAnimationFrame(shippingScanTimer);shippingScanTimer=null;if(shippingScanStream)shippingScanStream.getTracks().forEach(t=>t.stop());shippingScanStream=null;const v=$('shippingScanVideo');if(v){v.pause();v.srcObject=null;v.style.display='none'}}
-function downloadShippingList(){
- renderShipping(); const rows=(window.currentShipping||[]).map((g,i)=>({'번호':i+1,'포장상태':state.shippingScans?.[g.code]?'포장완료':'대기','택배코드':g.code,'받는분':g.name,'닉네임':g.nick,'연락처':g.phone,'주소':g.address,'방송일':[...g.dates].join(', '),'상품내역':g.items.map(x=>x.item+' '+x.qty+'개').join(' / '),'총수량':g.items.reduce((a,x)=>a+Number(x.qty),0),'결제금액':g.total}));
- exportXlsx(rows,'FIRST_OMS_택배리스트.xlsx','택배리스트');
-}
-function printShipping(){
- renderShipping();const arr=window.currentShipping||[];if(!arr.length)return alert('출력할 택배 대상이 없습니다.');
- const rows=arr.map((g,i)=>`<tr><td>${i+1}</td><td><div id="qr-${i}" class="qr"></div><svg id="bc-${i}"></svg><div class="code">${esc(g.code)}</div></td><td>${esc(g.name)}</td><td>${esc(g.nick)}</td><td>${esc(g.phone)}</td><td>${esc(g.address)}</td><td>${g.items.map(x=>esc(x.item)+' '+x.qty+'개').join('<br>')}</td><td>${money(g.total)}</td><td>${state.shippingScans?.[g.code]?'포장완료':'대기'}</td></tr>`).join('');
- const data=JSON.stringify(arr.map(g=>g.code));const w=window.open('','_blank');
- w.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>FIRST OMS 택배리스트</title><script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"><\/script><script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"><\/script><style>body{font-family:Arial,sans-serif;padding:14px;color:#111}h1{font-size:22px;margin:0 0 12px}table{width:100%;border-collapse:collapse;table-layout:fixed}th,td{border:1px solid #555;padding:6px;font-size:10px;vertical-align:middle;word-break:break-word}th{background:#eee}.qr img,.qr canvas{width:58px!important;height:58px!important}.code{font-family:monospace;font-size:9px;margin-top:2px}svg{width:120px;height:38px}@page{size:A4 landscape;margin:8mm}</style></head><body><h1>FIRST OMS 택배리스트</h1><table><thead><tr><th>번호</th><th>QR/바코드</th><th>고객명</th><th>닉네임</th><th>연락처</th><th>주소</th><th>상품/수량</th><th>금액</th><th>포장</th></tr></thead><tbody>${rows}</tbody></table><script>const codes=${data};window.onload=()=>{codes.forEach((c,i)=>{new QRCode(document.getElementById('qr-'+i),{text:c,width:150,height:150})});setTimeout(()=>window.print(),500)};<\/script></body></html>`);w.document.close();
-}
+function downloadShippingList(){renderShipping();const rows=(window.currentShipping||[]).map((g,i)=>({'번호':i+1,'포장상태':state.shippingScans?.[g.code]?'포장완료':'대기','택배코드':g.code,'받는분':g.name,'닉네임':g.nick,'연락처':g.phone,'주소':g.address,'방송일':[...g.dates].join(', '),'상품내역':g.items.map((x,j)=>`#${x.number||j+1} ${x.item} ${x.qty}개 단가 ${x.unit} 금액 ${x.amount}`).join(' / '),'상품합계':g.subtotal,'배송비':g.fee,'토탈금액':g.total}));exportXlsx(rows,'FIRST_OMS_택배리스트.xlsx','택배리스트')}
+function printShipping(){renderShipping();const arr=window.currentShipping||[];if(!arr.length)return alert('출력할 택배 대상이 없습니다.');const data=JSON.stringify(arr.map(g=>({code:g.code,url:location.origin+'/packing.html?code='+encodeURIComponent(g.code)})));const pages=arr.map((g,i)=>`<section class="page"><header><div><h1>땡라이브 고객별 포장리스트</h1><b>${esc(g.name||g.nick)}</b> · ${esc(g.nick)}</div><div id="qr-${i}" class="qr"></div></header><div class="meta"><div><b>연락처</b> ${esc(g.phone)}</div><div><b>방송일</b> ${[...g.dates].join(', ')}</div><div class="address"><b>주소</b> ${esc(g.address)}</div><div><b>택배코드</b> ${esc(g.code)}</div></div><table><thead><tr><th>번호</th><th>상품명</th><th>수량</th><th>단가</th><th>금액</th><th>확인</th></tr></thead><tbody>${g.items.map((x,j)=>`<tr><td>#${esc(x.number||j+1)}</td><td>${esc(x.item)}</td><td>${x.qty}</td><td>${money(x.unit)}</td><td>${money(x.amount)}</td><td>□</td></tr>`).join('')}</tbody></table><div class="totals"><div>상품 합계 <b>${money(g.subtotal)}</b></div><div>택배비 <b>${money(g.fee)}</b></div><div class="grand">토탈 금액 <b>${money(g.total)}</b></div></div><footer>QR을 휴대폰 기본 카메라로 스캔하면 이 고객의 포장리스트가 열립니다.</footer></section>`).join('');const w=window.open('','_blank');w.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>고객별 택배리스트</title><script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"><\/script><style>*{box-sizing:border-box}body{margin:0;font-family:Arial,'Noto Sans KR',sans-serif;color:#111}.page{width:210mm;min-height:297mm;padding:14mm;page-break-after:always;position:relative}.page:last-child{page-break-after:auto}header{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:3px solid #111;padding-bottom:12px}h1{font-size:25px;margin:0 0 8px}.qr img,.qr canvas{width:110px!important;height:110px!important}.meta{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:18px 0;font-size:14px}.address{grid-column:1/-1;line-height:1.5}table{width:100%;border-collapse:collapse;table-layout:fixed}th,td{border:1px solid #555;padding:11px 8px;text-align:center;word-break:keep-all}th:nth-child(2),td:nth-child(2){text-align:left;width:42%}.totals{margin:18px 0 0 auto;width:330px;font-size:16px;line-height:2;text-align:right}.grand{font-size:23px;border-top:2px solid #111;margin-top:4px;padding-top:5px}footer{position:absolute;bottom:12mm;left:14mm;right:14mm;text-align:center;color:#555}@page{size:A4 portrait;margin:0}</style></head><body>${pages}<script>const d=${data};window.onload=()=>{d.forEach((x,i)=>new QRCode(document.getElementById('qr-'+i),{text:x.url,width:180,height:180}));setTimeout(()=>window.print(),700)};<\/script></body></html>`);w.document.close()}
 function downloadReceiptList(){
  const rows=getReceipts().map((r,i)=>({'정산번호':r.date.replaceAll('-','')+'-'+String(i+1).padStart(3,'0'),'방송일':r.date,'실명':r.customer?.name||'','닉네임':r.nick,'전화번호':r.customer?.phone||'','주소':[r.customer?.postalCode,r.customer?.address,r.customer?.detailAddress].filter(Boolean).join(' '),'상품내역':r.items.map(x=>x.item+' '+x.qty+'개').join(' / '),'상품합계':r.subtotal,'배송비':r.fee,'결제금액':r.total,'고객매칭':r.customer?'완료':'확인필요','입금상태':r.payment.status==='paid'?'입금완료':'미입금/확인필요'}));
  exportXlsx(rows,'FIRST_OMS_정산서목록.xlsx','정산서');
@@ -1086,7 +1087,7 @@ function saveSilently(){
 }
 function updateKpi(){const rs=getReceipts();$('kpiOrderRows').textContent=state.orders.length;$('kpiReceipts').textContent=rs.length;$('kpiMatched').textContent=rs.filter(r=>r.customer).length;$('kpiPaid').textContent=rs.filter(r=>r.payment.status==='paid').length;refreshSolapiKpi()}
 async function refreshSolapiKpi(){const el=$('kpiSolapi');if(!el)return;try{const r=await fetch('/api/solapi/config',{cache:'no-store'}),d=await r.json();el.textContent=d.configured?'문자 준비':'미연동'}catch(e){el.textContent='확인필요'}}
-function renderAll(){renderMessageSettings();renderOrders();renderCustomers();renderReceipts();renderPayments();renderShipping();updateKpi()}
+function renderAll(){syncShippingFeeLockUI();renderMessageSettings();renderOrders();renderCustomers();renderReceipts();renderPayments();renderShipping();updateKpi()}
 function esc(v){return String(v??'').replace(/[&<>"']/g,s=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[s]))}
 
 async function downloadCustomerBackup(){
