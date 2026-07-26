@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>FIRST OMS 긴급 정산실</title>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx-populate@1.21.0/browser/xlsx-populate.min.js"></script>
 <style>
 :root{
   --bg:#0d0f13;--panel:#171a20;--panel2:#20242c;--text:#f5f5f7;--muted:#aeb4c0;
@@ -107,6 +108,27 @@ th{background:#232832;color:#f5d5bd;position:sticky;top:70px} tr:hover td{backgr
  main{max-width:none;padding:0}.page{display:none!important}#receipts.page{display:block!important}.receipt-wrap{display:block}
  .receipt{box-shadow:none;border:1px solid #aaa;break-inside:avoid;page-break-inside:avoid;margin:0 0 8mm;border-radius:0}
 }
+
+/* v6.7 정산목록 열 고정 및 버튼 노출 */
+.receipt-list-table{width:100%;min-width:1380px;table-layout:fixed;border-collapse:collapse}
+.receipt-list-table th,.receipt-list-table td{vertical-align:middle;box-sizing:border-box;overflow:hidden;text-overflow:ellipsis}
+.receipt-list-table th:nth-child(1),.receipt-list-table td:nth-child(1){width:64px;text-align:center}
+.receipt-list-table th:nth-child(2),.receipt-list-table td:nth-child(2){width:140px}
+.receipt-list-table th:nth-child(3),.receipt-list-table td:nth-child(3){width:110px}
+.receipt-list-table th:nth-child(4),.receipt-list-table td:nth-child(4){width:150px;white-space:nowrap}
+.receipt-list-table th:nth-child(5),.receipt-list-table td:nth-child(5){width:360px;white-space:normal;word-break:keep-all}
+.receipt-list-table th:nth-child(6),.receipt-list-table td:nth-child(6){width:120px;text-align:right;white-space:nowrap}
+.receipt-list-table th:nth-child(7),.receipt-list-table td:nth-child(7){width:100px;text-align:center}
+.receipt-list-table th:nth-child(8),.receipt-list-table td:nth-child(8){width:120px;text-align:center}
+.receipt-list-table th:nth-child(9),.receipt-list-table td:nth-child(9){width:110px;text-align:center}
+.receipt-list-table th:nth-child(10),.receipt-list-table td:nth-child(10){width:110px;text-align:center}
+.receipt-list-table .btn{min-width:88px;padding:9px 10px;margin:2px 0}
+.receipt-image-preview{display:block;max-width:100%;width:760px;height:auto;margin:0 auto;border-radius:14px;background:#fff;box-shadow:0 14px 40px rgba(0,0,0,.35)}
+.payment-upload-status{margin-top:10px;font-weight:700}
+.star-btn{padding:7px 10px;min-width:44px;transition:.15s}
+.star-btn.active{background:#f0b83e!important;color:#201500!important;border-color:#ffd66b!important;box-shadow:0 0 0 2px rgba(240,184,62,.25),0 0 16px rgba(240,184,62,.45)}
+.receipt-list-table tr.important-row td{background:rgba(240,184,62,.08)}
+@media(max-width:760px){.receipt-list-table{min-width:1280px}.receipt-detail-box{width:96vw!important;padding:10px!important}.receipt-image-preview{width:100%}}
 </style>
 </head>
 <body>
@@ -233,7 +255,7 @@ th{background:#232832;color:#f5d5bd;position:sticky;top:70px} tr:hover td{backgr
       </div>
     </div>
     <p class="muted">입금자명·입금액·거래일시를 자동 탐색합니다. 고객DB의 실명 또는 닉네임과 금액을 함께 대조하며, 동명이인·금액불일치는 확인필요로 분리합니다.</p>
-    <div id="paymentsTable"></div>
+    <div id="paymentUploadStatus" class="payment-upload-status muted"></div><div id="paymentsTable"></div>
   </section>
 
   <section id="shipping" class="page">
@@ -301,7 +323,10 @@ const KEY='firstOmsEmergencySettlementV1';
 let state={orders:[],customers:[],payments:[],settings:{bank:'카카오뱅크',holder:'김미숙',account:'',contact:'문의는 땡라이브 카카오채널로 부탁드립니다.',smsTemplate:'[땡라이브 정산서]\n{고객명}님\n{상품내역}\n상품합계 {상품합계}\n배송비 {배송비}\n결제금액 {결제금액}\n\n입금계좌: {은행} {계좌번호} {예금주}\n{문의안내}\n감사합니다.'}};
 const $=id=>document.getElementById(id);
 const money=n=>(Number(n)||0).toLocaleString('ko-KR')+'원';
-const norm=v=>String(v??'').trim().replace(/\s+/g,'').toLowerCase();
+const cleanBrokenText=v=>String(v??'').replace(/\uFFFD/g,' ').replace(/[�]+/g,' ').replace(/\?{2,}/g,' ').replace(/\s+/g,' ').trim();
+const hasBrokenText=v=>/[�]|\uFFFD|\?{2,}/.test(String(v??''));
+const safeCustomerText=(v,fallback='미등록')=>{const x=cleanBrokenText(v);return x||fallback};
+const norm=v=>cleanBrokenText(v).replace(/[^0-9a-zA-Z가-힣]/g,'').toLowerCase();
 const phoneNorm=v=>String(v??'').replace(/\D/g,'');
 const today=()=>new Date().toISOString().slice(0,10);
 $('broadcastDate').value=today();
@@ -424,11 +449,14 @@ function dedupeCustomers(){
  const seen=new Map(); state.customers=state.customers.filter(c=>{const k=norm(c.nick)+'|'+norm(c.name)+'|'+phoneNorm(c.phone);if(seen.has(k))return false;seen.set(k,1);return true});
 }
 function findCustomerByNick(nick){
- const n=norm(nick); const exact=state.customers.filter(c=>norm(c.nick)===n);
+ const n=norm(nick);if(!n)return {customer:null,status:'unmatched'};
+ const active=state.customers.filter(c=>c.active!==false);
+ const exact=active.filter(c=>[c.nick,c.nickname,c.name].some(v=>norm(v)===n));
  if(exact.length===1)return {customer:exact[0],status:'matched'};
  if(exact.length>1)return {customer:null,status:'duplicate'};
- const byName=state.customers.filter(c=>norm(c.name)===n);
- if(byName.length===1)return {customer:byName[0],status:'matched-name'};
+ // 깨진 문자가 들어간 기존 자료도 정상 닉네임의 한글·숫자 부분으로 다시 연결합니다.
+ const fuzzy=active.filter(c=>{const vals=[c.nick,c.nickname,c.name].map(norm).filter(Boolean);return vals.some(v=>(n.length>=2&&v.includes(n))||(v.length>=2&&n.includes(v)))});
+ if(fuzzy.length===1)return {customer:fuzzy[0],status:'matched-fuzzy'};
  return {customer:null,status:'unmatched'};
 }
 function autoMatchAll(){state.orders.forEach(o=>{const m=findCustomerByNick(o.nick);o.customerId=m.customer?.id||null;o.matchStatus=m.status})}
@@ -549,23 +577,30 @@ function renderReceipts(){
  const matched=rs.filter(r=>r.customer).length;
  $('receiptSummary').textContent=`검색된 정산서 ${rs.length}장 · 고객DB 매칭 ${matched}장 · 정보확인 필요 ${rs.length-matched}장`;
  if(!rs.length){$('receiptCards').innerHTML='<div class="empty">조건에 맞는 정산서가 없습니다.</div>';updateKpi();return;}
- $('receiptCards').innerHTML=`<div class="scroll" style="grid-column:1/-1;width:100%"><table class="receipt-list-table"><thead><tr><th>중요</th><th>닉네임</th><th>이름</th><th>연락처</th><th>주소</th><th>합계</th><th>입금</th><th>관리</th></tr></thead><tbody>${rs.map(r=>{
+ $('receiptCards').innerHTML=`<div class="scroll" style="grid-column:1/-1;width:100%"><table class="receipt-list-table"><thead><tr><th>중요</th><th>닉네임</th><th>이름</th><th>연락처</th><th>주소</th><th>합계</th><th>입금</th><th>고객정보</th><th>문자전송</th><th>상세</th></tr></thead><tbody>${rs.map(r=>{
    const c=r.customer||{};const paid=r.payment?.status==='paid';
-   return `<tr><td><button class="btn secondary" style="padding:7px 10px" onclick="toggleReceiptStar('${esc(r.key)}',this)">${r.starred?'★':'☆'}</button></td><td class="nick">${esc(r.nick)}</td><td>${esc(c.name||'미등록')}</td><td>${esc(c.phone||'미등록')}</td><td class="address-cell">${esc([c.address,c.detailAddress].filter(Boolean).join(' ')||'미등록')}</td><td><b>${money(r.total)}</b></td><td>${paid?'<span class="badge good">입금</span>':'<span class="badge bad">미입금</span>'}</td><td class="action-cell"><button class="btn secondary" onclick="openReceiptDetail('${esc(r.key)}')">상세</button> <button class="btn" onclick="${c.phone?`sendMmsByKey('${esc(r.key)}',this)`:`openCustomerForKey('${esc(r.key)}')`}">${c.phone?'문자':'정보등록'}</button></td></tr>`;
+   const infoBtn=c&&c.id?`<button class="btn secondary" onclick="editCustomerById('${esc(c.id)}')">정보수정</button>`:`<button class="btn warn" onclick="openCustomerForKey('${esc(r.key)}')">정보등록</button>`;
+   const smsBtn=c.phone?`<button class="btn" onclick="sendMmsByKey('${esc(r.key)}',this)">문자전송</button>`:`<button class="btn secondary" disabled>전화번호 없음</button>`;
+   const cleanName=safeCustomerText(c.name);const cleanPhone=safeCustomerText(c.phone);const cleanAddress=safeCustomerText([c.postalCode,c.address,c.detailAddress].map(cleanBrokenText).filter(Boolean).join(' '));
+   return `<tr class="${r.starred?'important-row':''}"><td><button class="btn star-btn ${r.starred?'active':''}" aria-pressed="${r.starred?'true':'false'}" title="중요 고객 표시" onclick="toggleReceiptStar('${esc(r.key)}',this)">${r.starred?'★':'☆'}</button></td><td class="nick" title="${esc(cleanBrokenText(r.nick))}">${esc(cleanBrokenText(r.nick))}</td><td>${esc(cleanName)}</td><td>${esc(cleanPhone)}</td><td class="address-cell" title="${esc(cleanAddress)}">${esc(cleanAddress)}</td><td><b>${money(r.total)}</b></td><td>${paid?'<span class="badge good">입금</span>':'<span class="badge bad">미입금</span>'}</td><td>${infoBtn}</td><td>${smsBtn}</td><td><button class="btn secondary" onclick="openReceiptDetail('${esc(r.key)}')">상세</button></td></tr>`;
  }).join('')}</tbody></table></div>`;
  updateKpi();
 }
 function toggleReceiptStar(key,btn){
- const ids=getReceipts().find(r=>r.key===key)?.items.map(x=>x.id)||[];const next=btn.textContent.trim()!=='★';state.orders.forEach(o=>{if(ids.includes(o.id))o.starred=next});saveSilently();renderReceipts();
+ const receipt=getReceipts().find(r=>r.key===key);if(!receipt)return;
+ const ids=receipt.items.map(x=>x.id),next=!receipt.starred;
+ state.orders.forEach(o=>{if(ids.includes(o.id))o.starred=next});
+ if(btn){btn.textContent=next?'★':'☆';btn.classList.toggle('active',next);btn.setAttribute('aria-pressed',next?'true':'false')}
+ saveSilently();renderReceipts();
 }
-function openReceiptDetail(key){
+async function openReceiptDetail(key){
  const r=receiptByKey(key);if(!r)return alert('정산서를 찾을 수 없습니다.');
  let modal=document.getElementById('receiptDetailModal');
- if(!modal){modal=document.createElement('div');modal.id='receiptDetailModal';modal.className='receipt-detail-modal';modal.innerHTML='<div class="receipt-detail-box"><div class="receipt-detail-actions no-print"><button class="btn warn" id="detailEditBtn">수정</button><button class="btn secondary" id="detailPrintBtn">인쇄</button><button class="btn bad" onclick="closeReceiptDetail()">닫기</button></div><div id="receiptDetailBody"></div></div>';document.body.appendChild(modal);modal.addEventListener('click',e=>{if(e.target===modal)closeReceiptDetail()});}
- document.getElementById('receiptDetailBody').innerHTML=receiptHTML(r,getReceipts().findIndex(x=>x.key===key));
+ if(!modal){modal=document.createElement('div');modal.id='receiptDetailModal';modal.className='receipt-detail-modal';modal.innerHTML='<div class="receipt-detail-box" style="max-width:920px"><div class="receipt-detail-actions no-print"><button class="btn warn" id="detailEditBtn">수정</button><button class="btn secondary" id="detailPrintBtn">인쇄</button><button class="btn bad" onclick="closeReceiptDetail()">닫기</button></div><div id="receiptDetailBody"><div class="empty">정산서 이미지를 만드는 중입니다.</div></div></div>';document.body.appendChild(modal);modal.addEventListener('click',e=>{if(e.target===modal)closeReceiptDetail()});}
+ modal.classList.add('show');
  document.getElementById('detailEditBtn').onclick=()=>openReceiptEditByKey(key);
  document.getElementById('detailPrintBtn').onclick=()=>printByKey(key);
- modal.classList.add('show');
+ try{const base64=await receiptImageBase64(r);document.getElementById('receiptDetailBody').innerHTML=`<img class="receipt-image-preview" alt="${esc(r.nick)} 정산서 이미지" src="${base64}">`;}catch(e){document.getElementById('receiptDetailBody').innerHTML=receiptHTML(r,indexOfReceiptKey(key));}
 }
 function closeReceiptDetail(){document.getElementById('receiptDetailModal')?.classList.remove('show');}
 
@@ -789,16 +824,59 @@ function printOne(i){
 </body></html>`);w.document.close();w.print();
 }
 const paymentAliases={payer:['입금자','입금자명','보낸분','거래내용','내용','적요','성명'],amount:['입금액','금액','거래금액','입금'],date:['거래일시','거래일','날짜','시간']};
-function importPayments(rows){
- const hi=findHeader(rows,paymentAliases), map=colMap(rows[hi]||[],paymentAliases);let n=0;
+function importPayments(rows,headerIndex=null,sheetName=''){
+ const hi=headerIndex===null?findHeader(rows,paymentAliases):headerIndex, map=colMap(rows[hi]||[],paymentAliases);let n=0;
  rows.slice(hi+1).forEach(r=>{
   const payer=map.payer>=0?r[map.payer]:'', amount=Number(String(map.amount>=0?r[map.amount]:0).replace(/[^0-9.-]/g,''));
   if(!String(payer).trim()||!amount||amount<0)return;
   state.payments.push({id:crypto.randomUUID(),payer:String(payer).trim(),amount,date:String(map.date>=0?r[map.date]:'').trim()});n++;
  });
- saveSilently();renderAll();go('payments');alert(n+'건 입금내역을 불러왔습니다.');
+ saveSilently();renderAll();go('payments');alert((sheetName?sheetName+' 시트에서 ':'')+n+'건 입금내역을 불러왔습니다.');
 }
-$('paymentFile').onchange=e=>readWorkbook(e.target.files[0],importPayments);
+function paymentRowsFromPopulate(workbook){
+ const found=[];
+ workbook.sheets().forEach(sheet=>{
+  let rows=[];try{const used=sheet.usedRange();rows=used?used.value():[]}catch(e){rows=[]}
+  if(!Array.isArray(rows))return;
+  for(let i=0;i<Math.min(rows.length,150);i++){
+   const map=colMap(rows[i]||[],paymentAliases);if(map.payer<0||map.amount<0)continue;
+   let count=0;for(const r of rows.slice(i+1)){const payer=cleanBrokenText(r?.[map.payer]);const amount=Number(String(r?.[map.amount]??'').replace(/[^0-9.-]/g,''));if(payer&&amount>0)count++}
+   found.push({rows,hi:i,count,sheet:sheet.name()});
+  }
+ });
+ return found.sort((a,b)=>b.count-a.count)[0]||null;
+}
+function paymentRowsFromSheetJs(buffer){
+ const wb=XLSX.read(buffer,{type:'array',cellDates:true});let best=null;
+ for(const sn of wb.SheetNames){const ws=wb.Sheets[sn];if(!ws)continue;const rows=XLSX.utils.sheet_to_json(ws,{header:1,defval:'',blankrows:true,raw:false});
+  for(let i=0;i<Math.min(rows.length,150);i++){const map=colMap(rows[i]||[],paymentAliases);if(map.payer<0||map.amount<0)continue;let count=0;
+   for(const r of rows.slice(i+1)){const payer=cleanBrokenText(r[map.payer]);const amount=Number(String(r[map.amount]??'').replace(/[^0-9.-]/g,''));if(payer&&amount>0)count++;}
+   if(!best||count>best.count)best={rows,hi:i,count,sheet:sn};
+  }
+ }
+ return best;
+}
+async function readEncryptedPaymentWorkbook(buffer,password){
+ if(!window.XlsxPopulate)throw new Error('암호 파일 처리 모듈을 불러오지 못했습니다. 인터넷 연결을 확인해 주세요.');
+ const wb=await XlsxPopulate.fromDataAsync(buffer,{password});
+ return paymentRowsFromPopulate(wb);
+}
+function readPaymentWorkbook(file){
+ const status=$('paymentUploadStatus');if(status)status.textContent='입금명세 파일을 확인하는 중입니다...';
+ const fr=new FileReader();fr.onload=async e=>{const buffer=e.target.result;try{
+   let best=null;
+   try{best=paymentRowsFromSheetJs(buffer)}catch(normalErr){console.warn('일반 엑셀 읽기 실패, 암호 여부 확인',normalErr)}
+   if(!best||best.count===0){
+    const password=prompt('암호가 설정된 입금명세 파일이면 암호를 입력해 주세요.\n암호가 없는 파일이면 취소를 누르세요.');
+    if(password===null||password==='')throw new Error('파일이 암호화되어 있거나 거래일시·거래금액·내용 열을 찾지 못했습니다. 암호 파일은 암호를 입력해야 합니다.');
+    if(status)status.textContent='암호를 확인하고 입금내역을 복호화하는 중입니다...';
+    best=await readEncryptedPaymentWorkbook(buffer,password);
+   }
+   if(!best||best.count===0)throw new Error('암호는 확인됐지만 거래일시·거래금액·내용(입금자) 열 또는 입금 건수를 찾지 못했습니다.');
+   importPayments(best.rows,best.hi,best.sheet);if(status)status.textContent=`${best.sheet} 시트에서 입금 ${best.count}건을 등록하고 정산서와 대조했습니다.`;
+ }catch(err){if(status)status.textContent='불러오기 실패: '+err.message;alert('입금명세 파일을 읽지 못했습니다: '+err.message)}finally{$('paymentFile').value=''}};fr.readAsArrayBuffer(file);
+}
+$('paymentFile').onchange=e=>{const f=e.target.files&&e.target.files[0];if(f)readPaymentWorkbook(f)};
 function renderPayments(){
  const rs=getReceipts();
  if(!state.payments.length){$('paymentsTable').innerHTML='<div class="empty">은행 거래내역 엑셀을 올려주세요.</div>';return}
@@ -865,6 +943,7 @@ function openCustomerForReceipt(i){
  $('customerModal').dataset.receiptKey=r.key||'';
 }
 
+function editCustomerById(id){const i=state.customers.findIndex(c=>String(c.id)===String(id));if(i<0)return alert('고객정보를 찾을 수 없습니다.');editCustomer(i)}
 function editCustomer(i){const c=state.customers[i];$('cEditIndex').value=i;$('cName').value=c.name||'';$('cNick').value=c.nick||c.nickname||'';$('cPhone').value=c.phone||'';$('cPostalCode').value=c.postalCode||'';$('cAddress').value=c.address||'';$('cDetailAddress').value=c.detailAddress||'';$('cMemo').value=c.memo||'';$('cAddressStatus').textContent='';$('customerModal').classList.add('show')}
 async function saveCustomer(){
  const oldIndex=$('cEditIndex').value;
@@ -960,14 +1039,14 @@ async function syncServerCustomers(showMessage=false){
    const serverCustomers=list.map(c=>({
     ...c,
     id:c.id||crypto.randomUUID(),
-    name:String(c.name||'').trim(),
-    nickname:String(c.nickname||c.nick||'').trim(),
-    nick:String(c.nickname||c.nick||'').trim(),
-    phone:String(c.phone||'').trim(),
-    postalCode:String(c.postalCode||'').trim(),
-    address:String(c.address||'').trim(),
-    detailAddress:String(c.detailAddress||'').trim(),
-    memo:String(c.memo||'').trim()
+    name:cleanBrokenText(c.name||''),
+    nickname:cleanBrokenText(c.nickname||c.nick||''),
+    nick:cleanBrokenText(c.nickname||c.nick||''),
+    phone:cleanBrokenText(c.phone||''),
+    postalCode:cleanBrokenText(c.postalCode||''),
+    address:cleanBrokenText(c.address||''),
+    detailAddress:cleanBrokenText(c.detailAddress||''),
+    memo:cleanBrokenText(c.memo||'')
    })).filter(c=>c.name||c.nick);
    state.customers=serverCustomers; dedupeCustomers(); autoMatchAll(); saveSilently(); renderAll();
    if(showMessage)alert(`고객폼에서 등록된 고객 ${state.customers.length}명을 불러왔습니다.`);
@@ -977,10 +1056,10 @@ async function syncServerCustomers(showMessage=false){
 function applyServerCustomers(list){
  if(!Array.isArray(list))return;
  const serverCustomers=list.map(c=>({
-  ...c,id:c.id||crypto.randomUUID(),name:String(c.name||'').trim(),
-  nickname:String(c.nickname||c.nick||'').trim(),nick:String(c.nickname||c.nick||'').trim(),
-  phone:String(c.phone||'').trim(),postalCode:String(c.postalCode||'').trim(),
-  address:String(c.address||'').trim(),detailAddress:String(c.detailAddress||'').trim(),memo:String(c.memo||'').trim()
+  ...c,id:c.id||crypto.randomUUID(),name:cleanBrokenText(c.name||''),
+  nickname:cleanBrokenText(c.nickname||c.nick||''),nick:cleanBrokenText(c.nickname||c.nick||''),
+  phone:cleanBrokenText(c.phone||''),postalCode:cleanBrokenText(c.postalCode||''),
+  address:cleanBrokenText(c.address||''),detailAddress:cleanBrokenText(c.detailAddress||''),memo:cleanBrokenText(c.memo||'')
  })).filter(c=>c.name||c.nick);
  state.customers=serverCustomers;dedupeCustomers();autoMatchAll();saveSilently();renderAll();
 }
