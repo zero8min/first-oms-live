@@ -145,11 +145,27 @@ function saveAccounts(list){
  for(const account of list)ensureTenantStorage(account);
  return true
 }
+const DEFAULT_ADMIN_ID='firstadmin',DEFAULT_ADMIN_PASSWORD='12345678';
 function ensureOwnerAccount(){
- let list=readAccounts();if(list.some(a=>a.role==='superadmin')){for(const a of list)ensureTenantStorage(a);return;}
- const username=process.env.FIRST_ADMIN_ID||'firstadmin',password=process.env.FIRST_ADMIN_PASSWORD||'12345678';
- list.push({id:crypto.randomUUID(),code:'FIRST-MASTER',username,passwordHash:passwordHash(password),company:'FIRST OMS',ownerName:'최고관리자',phone:'',role:'superadmin',status:'active',mustChangePassword:true,createdAt:new Date().toISOString()});saveAccounts(list);
- console.log(`[LOGIN] 최고관리자 아이디: ${username}${process.env.FIRST_ADMIN_PASSWORD?'':' / 초기 비밀번호: 12345678 (첫 로그인 후 변경 필요)'}`)
+ let list=readAccounts(),changed=false;
+ let owner=list.find(a=>a.role==='superadmin'||a.code==='FIRST-MASTER');
+ if(!owner){
+  owner={id:crypto.randomUUID(),code:'FIRST-MASTER',username:DEFAULT_ADMIN_ID,passwordHash:passwordHash(DEFAULT_ADMIN_PASSWORD),company:'FIRST OMS',ownerName:'최고관리자',phone:'',role:'superadmin',status:'active',mustChangePassword:true,createdAt:new Date().toISOString(),bootstrapVersion:'7.3'};
+  list.push(owner);changed=true;
+ }else{
+  // 아직 최초 비밀번호를 변경하지 않은 관리자 계정은 배포 후에도 기본 로그인값으로 확실히 복구한다.
+  // 사용자가 비밀번호를 변경해 passwordChangedAt이 생긴 뒤에는 절대 덮어쓰지 않는다.
+  if(!owner.passwordChangedAt){
+   if(owner.username!==DEFAULT_ADMIN_ID){owner.username=DEFAULT_ADMIN_ID;changed=true}
+   if(!verifyPassword(DEFAULT_ADMIN_PASSWORD,owner.passwordHash)){owner.passwordHash=passwordHash(DEFAULT_ADMIN_PASSWORD);changed=true}
+   if(owner.mustChangePassword!==true){owner.mustChangePassword=true;changed=true}
+  }
+  if(owner.role!=='superadmin'){owner.role='superadmin';changed=true}
+  if(owner.status!=='active'){owner.status='active';changed=true}
+  if(owner.code!=='FIRST-MASTER'){owner.code='FIRST-MASTER';changed=true}
+ }
+ if(changed)saveAccounts(list);else for(const a of list)ensureTenantStorage(a);
+ console.log('[LOGIN] 최고관리자 계정 준비 완료');
 }
 function cookies(req){return Object.fromEntries(String(req.headers.cookie||'').split(';').map(x=>x.trim()).filter(Boolean).map(x=>{const i=x.indexOf('=');return [decodeURIComponent(x.slice(0,i)),decodeURIComponent(x.slice(i+1))]}))}
 function currentUser(req){const sid=cookies(req).ddaeng_session,ss=sessions.get(sid);if(!ss||ss.expiresAt<Date.now()){if(sid)sessions.delete(sid);return null}return readAccounts().find(a=>a.id===ss.userId&&a.status==='active')||null}
