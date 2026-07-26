@@ -4,18 +4,20 @@ function broadcastCustomers(list){
  const payload=`event: customers\ndata: ${JSON.stringify(list)}\n\n`;
  for(const res of [...sseClients]){try{res.write(payload)}catch(e){sseClients.delete(res)}}
 }
-const ROOT=__dirname, DATA=path.join(ROOT,'data','customers.json'), CUSTOMER_BACKUP=path.join(ROOT,'data','customers-backup.json'), CUSTOMER_XLSX=path.join(ROOT,'data','customers.xlsx'), INTEGRATIONS=path.join(ROOT,'data','integrations.json'), BACKUP_DIR=path.join(ROOT,'data','backups'), SEND_HISTORY=path.join(ROOT,'data','send-history.json'), YT_AUTH=path.join(ROOT,'data','youtube-auth.json');
-const STATE_DATA=path.join(ROOT,'data','server-state.json'), STATE_BACKUP=path.join(ROOT,'data','server-state-backup.json'), STATE_XLSX=path.join(ROOT,'data','sales-list.xlsx'), SALES_ARCHIVE_DIR=path.join(ROOT,'data','sales-archives'), STATE_BACKUP_DIR=path.join(ROOT,'data','state-backups');
-const ACCOUNTS=path.join(ROOT,'data','accounts.json'), ACCOUNTS_BACKUP=path.join(ROOT,'data','accounts-backup.json'), ACCOUNTS_XLSX=path.join(ROOT,'data','accounts.xlsx'), ACCOUNT_BACKUP_DIR=path.join(ROOT,'data','account-backups');
+const ROOT=__dirname;
+// Render Persistent Disk mount path. DATA_DIR can be overridden for local tests.
+const DATA_ROOT=process.env.DATA_DIR||path.join(ROOT,'data');
+const DATA=path.join(DATA_ROOT,'customers.json'), CUSTOMER_BACKUP=path.join(DATA_ROOT,'customers-backup.json'), CUSTOMER_XLSX=path.join(DATA_ROOT,'customers.xlsx'), INTEGRATIONS=path.join(DATA_ROOT,'integrations.json'), BACKUP_DIR=path.join(DATA_ROOT,'backups'), SEND_HISTORY=path.join(DATA_ROOT,'send-history.json'), YT_AUTH=path.join(DATA_ROOT,'youtube-auth.json');
+const STATE_DATA=path.join(DATA_ROOT,'server-state.json'), STATE_BACKUP=path.join(DATA_ROOT,'server-state-backup.json'), STATE_XLSX=path.join(DATA_ROOT,'sales-list.xlsx'), SALES_ARCHIVE_DIR=path.join(DATA_ROOT,'sales-archives'), STATE_BACKUP_DIR=path.join(DATA_ROOT,'state-backups');
+const ACCOUNTS=path.join(DATA_ROOT,'accounts.json'), ACCOUNTS_BACKUP=path.join(DATA_ROOT,'accounts-backup.json'), ACCOUNTS_XLSX=path.join(DATA_ROOT,'accounts.xlsx'), ACCOUNT_BACKUP_DIR=path.join(DATA_ROOT,'account-backups'), TENANTS_DIR=path.join(DATA_ROOT,'tenants');
 const sessions=new Map();
-if(!fs.existsSync(path.dirname(DATA)))fs.mkdirSync(path.dirname(DATA),{recursive:true});
+if(!fs.existsSync(DATA_ROOT))fs.mkdirSync(DATA_ROOT,{recursive:true});
 if(!fs.existsSync(DATA))fs.writeFileSync(DATA,'[]','utf8');
 if(!fs.existsSync(YT_AUTH))fs.writeFileSync(YT_AUTH,'{}','utf8');
 if(!fs.existsSync(INTEGRATIONS))fs.writeFileSync(INTEGRATIONS,'{}','utf8');
 if(!fs.existsSync(SEND_HISTORY))fs.writeFileSync(SEND_HISTORY,'[]','utf8');
 if(!fs.existsSync(STATE_DATA))fs.writeFileSync(STATE_DATA,JSON.stringify({orders:[],customers:readCustomers(),payments:[],settings:{},csRecords:[],shippingRecords:[]},null,2),'utf8');
-for(const d of [SALES_ARCHIVE_DIR,STATE_BACKUP_DIR])if(!fs.existsSync(d))fs.mkdirSync(d,{recursive:true});
-if(!fs.existsSync(ACCOUNT_BACKUP_DIR))fs.mkdirSync(ACCOUNT_BACKUP_DIR,{recursive:true});
+for(const d of [SALES_ARCHIVE_DIR,STATE_BACKUP_DIR,ACCOUNT_BACKUP_DIR,TENANTS_DIR])if(!fs.existsSync(d))fs.mkdirSync(d,{recursive:true});
 const mime={'.html':'text/html; charset=utf-8','.js':'application/javascript; charset=utf-8','.css':'text/css; charset=utf-8','.json':'application/json; charset=utf-8','.png':'image/png','.jpg':'image/jpeg','.jpeg':'image/jpeg','.ico':'image/x-icon'};
 function readCustomers(){try{return JSON.parse(fs.readFileSync(DATA,'utf8'))}catch(e){return[]}}
 function readIntegrations(){try{return JSON.parse(fs.readFileSync(INTEGRATIONS,'utf8'))}catch(e){return{}}}
@@ -99,17 +101,52 @@ function passwordHash(password,salt=crypto.randomBytes(16).toString('hex')){
 function verifyPassword(password,stored){
  try{const [salt,hex]=String(stored||'').split(':');if(!salt||!hex)return false;const a=Buffer.from(hex,'hex'),b=crypto.scryptSync(String(password),salt,64);return a.length===b.length&&crypto.timingSafeEqual(a,b)}catch(e){return false}
 }
-function readAccounts(){try{const v=JSON.parse(fs.readFileSync(ACCOUNTS,'utf8'));return Array.isArray(v)?v:[]}catch(e){return[]}}
+function readJsonArraySafe(file){
+ try{const v=JSON.parse(fs.readFileSync(file,'utf8'));return Array.isArray(v)?v:null}catch(e){return null}
+}
+function atomicWrite(file,text){
+ const tmp=`${file}.tmp-${process.pid}-${Date.now()}`;fs.writeFileSync(tmp,text,'utf8');fs.renameSync(tmp,file)
+}
+function latestAccountBackup(){
+ try{return fs.readdirSync(ACCOUNT_BACKUP_DIR).filter(x=>/^accounts-.*\.json$/.test(x)).sort().reverse().map(x=>path.join(ACCOUNT_BACKUP_DIR,x))[0]||null}catch(e){return null}
+}
+function readAccounts(){
+ const primary=readJsonArraySafe(ACCOUNTS);if(primary)return primary;
+ const fallback=readJsonArraySafe(ACCOUNTS_BACKUP);if(fallback){try{atomicWrite(ACCOUNTS,JSON.stringify(fallback,null,2))}catch(e){};return fallback}
+ const latest=latestAccountBackup(), historical=latest&&readJsonArraySafe(latest);if(historical){try{atomicWrite(ACCOUNTS,JSON.stringify(historical,null,2));atomicWrite(ACCOUNTS_BACKUP,JSON.stringify(historical,null,2))}catch(e){};return historical}
+ return []
+}
+function tenantDir(code){return path.join(TENANTS_DIR,String(code||'UNKNOWN').replace(/[^A-Za-z0-9_-]/g,''))}
+function ensureTenantStorage(account){
+ if(!account||!account.code)return;
+ const dir=tenantDir(account.code);fs.mkdirSync(path.join(dir,'sales-archives'),{recursive:true});
+ const defaults={
+  'customers.json':'[]',
+  'server-state.json':JSON.stringify({orders:[],customers:[],payments:[],settings:{},csRecords:[],shippingRecords:[]},null,2),
+  'shipping.json':'[]',
+  'cs-history.json':'[]'
+ };
+ for(const [name,text] of Object.entries(defaults)){const f=path.join(dir,name);if(!fs.existsSync(f))atomicWrite(f,text)}
+}
 function writeAccountsExcel(list){
  try{const rows=(list||[]).map(a=>({'거래처코드':a.code||'','아이디':a.username||'','거래처명':a.company||'','대표자':a.ownerName||'','연락처':a.phone||'','권한':a.role||'tenant','상태':a.status||'pending','가입일':a.createdAt||'','최근로그인':a.lastLoginAt||''}));const wb=XLSX.utils.book_new(),ws=XLSX.utils.json_to_sheet(rows);XLSX.utils.book_append_sheet(wb,ws,'거래처계정');XLSX.writeFile(wb,ACCOUNTS_XLSX)}catch(e){console.error('계정 엑셀 실패',e)}
 }
 function saveAccounts(list){
- const old=readAccounts(),stamp=new Date().toISOString().replace(/[:.]/g,'-');
- try{fs.writeFileSync(ACCOUNTS_BACKUP,JSON.stringify(old,null,2));fs.writeFileSync(path.join(ACCOUNT_BACKUP_DIR,`accounts-${stamp}.json`),JSON.stringify(old,null,2));const fsx=fs.readdirSync(ACCOUNT_BACKUP_DIR).filter(x=>x.endsWith('.json')).sort();while(fsx.length>50){try{fs.unlinkSync(path.join(ACCOUNT_BACKUP_DIR,fsx.shift()))}catch(e){}}}catch(e){}
- fs.writeFileSync(ACCOUNTS,JSON.stringify(list,null,2));fs.writeFileSync(ACCOUNTS_BACKUP,JSON.stringify(list,null,2));writeAccountsExcel(list)
+ if(!Array.isArray(list))throw new Error('계정 데이터 형식 오류');
+ const old=readAccounts(),stamp=new Date().toISOString().replace(/[:.]/g,'-'),nextText=JSON.stringify(list,null,2),oldText=JSON.stringify(old,null,2);
+ // First preserve the last known-good copy. Never replace valid data with an empty accidental payload.
+ if(old.length>0&&list.length===0)throw new Error('거래처 계정 전체 초기화가 차단되었습니다.');
+ try{
+  atomicWrite(ACCOUNTS_BACKUP,oldText);
+  atomicWrite(path.join(ACCOUNT_BACKUP_DIR,`accounts-${stamp}.json`),oldText);
+  const fsx=fs.readdirSync(ACCOUNT_BACKUP_DIR).filter(x=>/^accounts-.*\.json$/.test(x)).sort();while(fsx.length>100){try{fs.unlinkSync(path.join(ACCOUNT_BACKUP_DIR,fsx.shift()))}catch(e){}}
+ }catch(e){console.error('계정 사전백업 실패',e);throw new Error('계정 백업에 실패하여 변경을 중단했습니다.')}
+ atomicWrite(ACCOUNTS,nextText);atomicWrite(ACCOUNTS_BACKUP,nextText);writeAccountsExcel(list);
+ for(const account of list)ensureTenantStorage(account);
+ return true
 }
 function ensureOwnerAccount(){
- let list=readAccounts();if(list.some(a=>a.role==='superadmin'))return;
+ let list=readAccounts();if(list.some(a=>a.role==='superadmin')){for(const a of list)ensureTenantStorage(a);return;}
  const username=process.env.FIRST_ADMIN_ID||'firstadmin',password=process.env.FIRST_ADMIN_PASSWORD||'FirstOms!2026';
  list.push({id:crypto.randomUUID(),code:'FIRST-MASTER',username,passwordHash:passwordHash(password),company:'FIRST OMS',ownerName:'최고관리자',phone:'',role:'superadmin',status:'active',createdAt:new Date().toISOString()});saveAccounts(list);
  console.log(`[LOGIN] 최고관리자 아이디: ${username}${process.env.FIRST_ADMIN_PASSWORD?'':' / 초기 비밀번호: FirstOms!2026 (로그인 후 환경변수로 변경 권장)'}`)
@@ -283,6 +320,8 @@ const server=http.createServer((req,res)=>{
  if(!publicPaths.has(u.pathname)&&!publicApi&&!user){if(u.pathname.startsWith('/api/'))return json(res,401,{ok:false,error:'로그인이 필요합니다.'});res.writeHead(302,{Location:'/login.html'});return res.end()}
  if(u.pathname==='/api/admin/accounts'&&req.method==='GET'){if(user.role!=='superadmin')return json(res,403,{ok:false,error:'최고관리자 권한이 필요합니다.'});return json(res,200,{ok:true,accounts:readAccounts().map(({passwordHash,...a})=>a)})}
  if(u.pathname==='/api/admin/accounts/status'&&req.method==='POST'){if(user.role!=='superadmin')return json(res,403,{ok:false,error:'최고관리자 권한이 필요합니다.'});return readBody(req).then(body=>{try{const d=JSON.parse(body||'{}'),list=readAccounts(),a=list.find(x=>x.id===d.id);if(!a)return json(res,404,{ok:false,error:'계정을 찾을 수 없습니다.'});if(!['active','pending','suspended'].includes(d.status))return json(res,400,{ok:false,error:'상태값 오류'});a.status=d.status;saveAccounts(list);return json(res,200,{ok:true})}catch(e){return json(res,400,{ok:false,error:e.message})}})}
+ if(u.pathname==='/api/admin/accounts/backup'&&req.method==='POST'){if(user.role!=='superadmin')return json(res,403,{ok:false,error:'최고관리자 권한이 필요합니다.'});try{const list=readAccounts(),stamp=new Date().toISOString().replace(/[:.]/g,'-'),file=path.join(ACCOUNT_BACKUP_DIR,`accounts-manual-${stamp}.json`);atomicWrite(file,JSON.stringify(list,null,2));return json(res,200,{ok:true,count:list.length,file:path.basename(file)})}catch(e){return json(res,500,{ok:false,error:e.message})}}
+ if(u.pathname==='/api/admin/accounts/backups'&&req.method==='GET'){if(user.role!=='superadmin')return json(res,403,{ok:false,error:'최고관리자 권한이 필요합니다.'});try{const files=fs.readdirSync(ACCOUNT_BACKUP_DIR).filter(x=>x.endsWith('.json')).sort().reverse();return json(res,200,{ok:true,files})}catch(e){return json(res,500,{ok:false,error:e.message})}}
 
 
  if(u.pathname==='/api/youtube/status'&&req.method==='GET'){
