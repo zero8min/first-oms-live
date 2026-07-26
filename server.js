@@ -151,7 +151,7 @@ function saveAccounts(list){
  for(const account of list)ensureTenantStorage(account);
  return true
 }
-const DEFAULT_ADMIN_ID='firstadmin',DEFAULT_ADMIN_PASSWORD='FirstOms!2026',ADMIN_RESET_VERSION='7.7';
+const DEFAULT_ADMIN_ID='firstadmin',DEFAULT_ADMIN_PASSWORD='12345678';
 function ensureOwnerAccount(){
  let list=readAccounts(),changed=false;
  let owner=list.find(a=>a.role==='superadmin'||a.code==='FIRST-MASTER');
@@ -159,18 +159,11 @@ function ensureOwnerAccount(){
   owner={id:crypto.randomUUID(),code:'FIRST-MASTER',username:DEFAULT_ADMIN_ID,passwordHash:passwordHash(DEFAULT_ADMIN_PASSWORD),company:'FIRST OMS',ownerName:'최고관리자',phone:'',role:'superadmin',status:'active',mustChangePassword:true,createdAt:new Date().toISOString(),bootstrapVersion:'7.3'};
   list.push(owner);changed=true;
  }else{
+  // 기존 최고관리자 계정의 아이디·비밀번호는 배포/재시작 시 절대 덮어쓰지 않는다.
+  // 기본 계정은 최고관리자가 아예 없을 때에만 최초 1회 생성된다.
   if(owner.role!=='superadmin'){owner.role='superadmin';changed=true}
   if(owner.status!=='active'){owner.status='active';changed=true}
   if(owner.code!=='FIRST-MASTER'){owner.code='FIRST-MASTER';changed=true}
-  // v7.7 배포 시 최고관리자만 최초 1회 확정 초기화. 거래처/고객/정산 데이터는 건드리지 않는다.
-  if(owner.adminResetVersion!==ADMIN_RESET_VERSION){
-   owner.username=DEFAULT_ADMIN_ID;
-   owner.passwordHash=passwordHash(DEFAULT_ADMIN_PASSWORD);
-   owner.mustChangePassword=true;
-   owner.adminResetVersion=ADMIN_RESET_VERSION;
-   owner.passwordResetAt=new Date().toISOString();
-   changed=true;
-  }
  }
  if(changed)saveAccounts(list);else for(const a of list)ensureTenantStorage(a);
  console.log('[LOGIN] 최고관리자 계정 준비 완료');
@@ -369,18 +362,10 @@ const server=http.createServer((req,res)=>{
  if(u.pathname==='/api/health')return json(res,200,{ok:true,time:new Date().toISOString()});
  if(u.pathname==='/api/auth/login'&&req.method==='POST')return readBody(req).then(body=>{try{const d=JSON.parse(body||'{}'),list=readAccounts(),a=list.find(x=>x.username===String(d.username||'').trim());if(!a||!verifyPassword(d.password,a.passwordHash))return json(res,401,{ok:false,error:'아이디 또는 비밀번호가 맞지 않습니다.'});if(a.status!=='active')return json(res,403,{ok:false,error:a.status==='pending'?'최고관리자 승인 대기 중입니다.':'사용이 정지된 계정입니다.'});a.lastLoginAt=new Date().toISOString();saveAccounts(list);issueSession(req,res,a);return json(res,200,{ok:true,user:{id:a.id,username:a.username,company:a.company,code:a.code,role:a.role,mustChangePassword:!!a.mustChangePassword}})}catch(e){return json(res,400,{ok:false,error:e.message})}});
  if(u.pathname==='/api/auth/signup'&&req.method==='POST')return readBody(req).then(body=>{try{const d=JSON.parse(body||'{}'),list=readAccounts(),username=String(d.username||'').trim();if(!username||String(d.password||'').length<8||!d.company||!d.ownerName||!d.phone)return json(res,400,{ok:false,error:'거래처명·대표자·연락처·아이디와 8자 이상 비밀번호를 입력해 주세요.'});if(list.some(x=>x.username===username))return json(res,409,{ok:false,error:'이미 사용 중인 아이디입니다.'});const a={id:crypto.randomUUID(),code:newTenantCode(list),username,passwordHash:passwordHash(d.password),company:String(d.company).trim(),ownerName:String(d.ownerName).trim(),phone:onlyDigits(d.phone),role:'tenant',status:'pending',createdAt:new Date().toISOString()};list.push(a);saveAccounts(list);return json(res,200,{ok:true,code:a.code,status:a.status})}catch(e){return json(res,400,{ok:false,error:e.message})}});
- if(u.pathname==='/api/auth/forgot-password'&&req.method==='POST')return readBody(req).then(body=>{try{
-  const d=JSON.parse(body||'{}'),username=String(d.username||'').trim(),company=String(d.company||'').trim(),phone=onlyDigits(d.phone),next=String(d.newPassword||'');
-  if(!username||!company||!phone||next.length<8)return json(res,400,{ok:false,error:'아이디·거래처명·등록 연락처와 8자 이상 새 비밀번호를 입력해 주세요.'});
-  const list=readAccounts(),a=list.find(x=>x.role==='tenant'&&x.username===username&&String(x.company||'').trim()===company&&onlyDigits(x.phone)===phone);
-  if(!a)return json(res,404,{ok:false,error:'등록된 거래처 정보와 일치하지 않습니다. 최고관리자에게 확인해 주세요.'});
-  a.passwordHash=passwordHash(next);a.mustChangePassword=false;a.passwordChangedAt=new Date().toISOString();a.passwordResetMethod='registered-info';saveAccounts(list);
-  return json(res,200,{ok:true,message:'비밀번호가 변경되었습니다. 새 비밀번호로 로그인해 주세요.'});
- }catch(e){return json(res,400,{ok:false,error:e.message})}});
  if(u.pathname==='/api/auth/logout'&&req.method==='POST'){clearSession(req,res);return json(res,200,{ok:true})}
  if(u.pathname==='/api/auth/me'&&req.method==='GET'){const a=currentUser(req);return a?json(res,200,{ok:true,user:{id:a.id,username:a.username,company:a.company,code:a.code,role:a.role,mustChangePassword:!!a.mustChangePassword,activeTenantCode:selectedTenantCode(req)}}):json(res,401,{ok:false})}
  if(u.pathname==='/api/auth/change-password'&&req.method==='POST'){const a=currentUser(req);if(!a)return json(res,401,{ok:false,error:'로그인이 필요합니다.'});return readBody(req).then(body=>{try{const d=JSON.parse(body||'{}'),current=String(d.currentPassword||''),next=String(d.newPassword||'');if(!verifyPassword(current,a.passwordHash))return json(res,400,{ok:false,error:'현재 비밀번호가 맞지 않습니다.'});if(next.length<8)return json(res,400,{ok:false,error:'새 비밀번호는 8자 이상 입력해 주세요.'});if(current===next)return json(res,400,{ok:false,error:'현재 비밀번호와 다른 비밀번호를 입력해 주세요.'});const list=readAccounts(),target=list.find(x=>x.id===a.id);if(!target)return json(res,404,{ok:false,error:'계정을 찾을 수 없습니다.'});target.passwordHash=passwordHash(next);target.mustChangePassword=false;target.passwordChangedAt=new Date().toISOString();saveAccounts(list);return json(res,200,{ok:true})}catch(e){return json(res,400,{ok:false,error:e.message})}})}
- const publicPaths=new Set(['/login.html','/signup.html','/join.html','/packing.html','/forgot-password.html','/favicon.ico']);
+ const publicPaths=new Set(['/login.html','/signup.html','/join.html','/packing.html','/favicon.ico']);
  const publicApi=(u.pathname==='/api/health'||u.pathname.startsWith('/api/auth/')||u.pathname.startsWith('/api/public/packing')||(u.pathname==='/api/customers'&&req.method==='POST'&&!!u.query.tenant));
  const user=currentUser(req);
  if(!publicPaths.has(u.pathname)&&!publicApi&&!user){if(u.pathname.startsWith('/api/'))return json(res,401,{ok:false,error:'로그인이 필요합니다.'});res.writeHead(302,{Location:'/login.html'});return res.end()}
