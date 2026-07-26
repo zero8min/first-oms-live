@@ -889,9 +889,7 @@ main{padding-top:18px}
  <div class="actions"><button class="btn" onclick="saveSolapiSettings()">API 입력값 저장·연결</button><button class="btn secondary" onclick="loadSolapiSettings()">연결상태 확인</button></div>
  <p class="note">API Secret은 관리자 서버에만 저장되며 화면에는 다시 표시하지 않습니다. Render 재배포에도 절대 잃지 않으려면 Render Environment에도 같은 값을 등록하거나 Persistent Disk를 연결하세요.</p>
 </div></div>
-<script>
-(async()=>{try{const r=await fetch('/api/admin/current-tenant',{credentials:'same-origin',cache:'no-store'});if(!r.ok)return;const d=await r.json(),b=document.getElementById('tenantGuard');if(d.actingAs){b.style.display='block';b.textContent=`최고관리자 대리접속 중 · 현재 거래처: ${d.tenant.company} (${d.tenant.code}) · 저장 내용은 이 거래처에만 반영됩니다.`}}catch(e){}})();
-<\/script></body></html>`);w.document.close();w.print();
+</body></html>`);w.document.close();w.print();
 }
 const paymentAliases={payer:['입금자','입금자명','보낸분','거래내용','내용','적요','성명'],amount:['입금액','금액','거래금액','입금'],date:['거래일시','거래일','날짜','시간']};
 function importPayments(rows,headerIndex=null,sheetName=''){
@@ -1023,9 +1021,7 @@ function printShipping(){
  renderShipping();const arr=window.currentShipping||[];if(!arr.length)return alert('출력할 택배 대상이 없습니다.');
  const rows=arr.map((g,i)=>`<tr><td>${i+1}</td><td><div id="qr-${i}" class="qr"></div><svg id="bc-${i}"></svg><div class="code">${esc(g.code)}</div></td><td>${esc(g.name)}</td><td>${esc(g.nick)}</td><td>${esc(g.phone)}</td><td>${esc(g.address)}</td><td>${g.items.map(x=>esc(x.item)+' '+x.qty+'개').join('<br>')}</td><td>${money(g.total)}</td><td>${state.shippingScans?.[g.code]?'포장완료':'대기'}</td></tr>`).join('');
  const data=JSON.stringify(arr.map(g=>g.code));const w=window.open('','_blank');
- w.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>FIRST OMS 택배리스트</title><script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"><\/script><script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"><\/script><style>body{font-family:Arial,sans-serif;padding:14px;color:#111}h1{font-size:22px;margin:0 0 12px}table{width:100%;border-collapse:collapse;table-layout:fixed}th,td{border:1px solid #555;padding:6px;font-size:10px;vertical-align:middle;word-break:break-word}th{background:#eee}.qr img,.qr canvas{width:58px!important;height:58px!important}.code{font-family:monospace;font-size:9px;margin-top:2px}svg{width:120px;height:38px}@page{size:A4 landscape;margin:8mm}</style></head><body><h1>FIRST OMS 택배리스트</h1><table><thead><tr><th>번호</th><th>QR/바코드</th><th>고객명</th><th>닉네임</th><th>연락처</th><th>주소</th><th>상품/수량</th><th>금액</th><th>포장</th></tr></thead><tbody>${rows}</tbody></table><script>const codes=${data};window.onload=()=>{codes.forEach((c,i)=>{new QRCode(document.getElementById('qr-'+i),{text:c,width:150,height:150})});setTimeout(()=>window.print(),500)};<\/script><script>
-(async()=>{try{const r=await fetch('/api/admin/current-tenant',{credentials:'same-origin',cache:'no-store'});if(!r.ok)return;const d=await r.json(),b=document.getElementById('tenantGuard');if(d.actingAs){b.style.display='block';b.textContent=`최고관리자 대리접속 중 · 현재 거래처: ${d.tenant.company} (${d.tenant.code}) · 저장 내용은 이 거래처에만 반영됩니다.`}}catch(e){}})();
-<\/script></body></html>`);w.document.close();
+ w.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>FIRST OMS 택배리스트</title><script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"><\/script><script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"><\/script><style>body{font-family:Arial,sans-serif;padding:14px;color:#111}h1{font-size:22px;margin:0 0 12px}table{width:100%;border-collapse:collapse;table-layout:fixed}th,td{border:1px solid #555;padding:6px;font-size:10px;vertical-align:middle;word-break:break-word}th{background:#eee}.qr img,.qr canvas{width:58px!important;height:58px!important}.code{font-family:monospace;font-size:9px;margin-top:2px}svg{width:120px;height:38px}@page{size:A4 landscape;margin:8mm}</style></head><body><h1>FIRST OMS 택배리스트</h1><table><thead><tr><th>번호</th><th>QR/바코드</th><th>고객명</th><th>닉네임</th><th>연락처</th><th>주소</th><th>상품/수량</th><th>금액</th><th>포장</th></tr></thead><tbody>${rows}</tbody></table><script>const codes=${data};window.onload=()=>{codes.forEach((c,i)=>{new QRCode(document.getElementById('qr-'+i),{text:c,width:150,height:150})});setTimeout(()=>window.print(),500)};<\/script></body></html>`);w.document.close();
 }
 function downloadReceiptList(){
  const rows=getReceipts().map((r,i)=>({'정산번호':r.date.replaceAll('-','')+'-'+String(i+1).padStart(3,'0'),'방송일':r.date,'실명':r.customer?.name||'','닉네임':r.nick,'전화번호':r.customer?.phone||'','주소':[r.customer?.postalCode,r.customer?.address,r.customer?.detailAddress].filter(Boolean).join(' '),'상품내역':r.items.map(x=>x.item+' '+x.qty+'개').join(' / '),'상품합계':r.subtotal,'배송비':r.fee,'결제금액':r.total,'고객매칭':r.customer?'완료':'확인필요','입금상태':r.payment.status==='paid'?'입금완료':'미입금/확인필요'}));
@@ -1232,6 +1228,18 @@ async function runFunctionCheck(){
  <p class="note">API Secret은 관리자 서버에만 저장되며 화면에는 다시 표시하지 않습니다. Render 재배포에도 절대 잃지 않으려면 Render Environment에도 같은 값을 등록하거나 Persistent Disk를 연결하세요.</p>
 </div></div>
 <script>
-(async()=>{try{const r=await fetch('/api/admin/current-tenant',{credentials:'same-origin',cache:'no-store'});if(!r.ok)return;const d=await r.json(),b=document.getElementById('tenantGuard');if(d.actingAs){b.style.display='block';b.textContent=`최고관리자 대리접속 중 · 현재 거래처: ${d.tenant.company} (${d.tenant.code}) · 저장 내용은 이 거래처에만 반영됩니다.`}}catch(e){}})();
+(async()=>{
+ try{
+  const r=await fetch('/api/admin/current-tenant',{credentials:'same-origin',cache:'no-store'});
+  if(!r.ok)return;
+  const d=await r.json(),b=document.getElementById('tenantGuard');
+  if(d.actingAs&&b){
+   b.style.display='flex';b.style.alignItems='center';b.style.justifyContent='center';b.style.gap='12px';b.style.flexWrap='wrap';
+   const text=document.createElement('span');text.textContent=`현재 거래처: ${d.tenant.company} (${d.tenant.code}) · 이 화면의 저장 내용은 해당 거래처에만 반영됩니다.`;
+   const back=document.createElement('button');back.type='button';back.textContent='거래처 관리로 돌아가기';back.style.cssText='border:0;border-radius:8px;padding:7px 11px;font-weight:900;cursor:pointer;background:#fff;color:#7b2d2d';back.onclick=()=>location.href='/superadmin.html';
+   b.replaceChildren(text,back);
+  }
+ }catch(e){console.warn('거래처 표시를 불러오지 못했습니다.',e)}
+})();
 </script></body>
 </html>
