@@ -124,7 +124,13 @@ function ensureTenantStorage(account){
   'customers.json':'[]',
   'server-state.json':JSON.stringify({orders:[],customers:[],payments:[],settings:{},csRecords:[],shippingRecords:[]},null,2),
   'shipping.json':'[]',
-  'cs-history.json':'[]'
+  'payments.json':'[]',
+  'settlements.json':'[]',
+  'cs-history.json':'[]',
+  'message-history.json':'[]',
+  'solapi-settings.json':'{}',
+  'youtube-auth.json':'{}',
+  'tenant-settings.json':JSON.stringify({tenantCode:account.code,company:account.company||'',createdAt:new Date().toISOString()},null,2)
  };
  for(const [name,text] of Object.entries(defaults)){const f=path.join(dir,name);if(!fs.existsSync(f))atomicWrite(f,text)}
 }
@@ -169,10 +175,42 @@ function ensureOwnerAccount(){
 }
 function cookies(req){return Object.fromEntries(String(req.headers.cookie||'').split(';').map(x=>x.trim()).filter(Boolean).map(x=>{const i=x.indexOf('=');return [decodeURIComponent(x.slice(0,i)),decodeURIComponent(x.slice(i+1))]}))}
 function currentUser(req){const sid=cookies(req).ddaeng_session,ss=sessions.get(sid);if(!ss||ss.expiresAt<Date.now()){if(sid)sessions.delete(sid);return null}return readAccounts().find(a=>a.id===ss.userId&&a.status==='active')||null}
-function issueSession(req,res,user){const sid=crypto.randomBytes(32).toString('hex');sessions.set(sid,{userId:user.id,expiresAt:Date.now()+1000*60*60*24*7});const secure=String(req.headers['x-forwarded-proto']||'').includes('https')?'; Secure':'';res.setHeader('Set-Cookie',`ddaeng_session=${sid}; Path=/; HttpOnly; SameSite=Lax; Max-Age=604800${secure}`)}
+function issueSession(req,res,user){const sid=crypto.randomBytes(32).toString('hex');sessions.set(sid,{userId:user.id,activeTenantCode:user.role==='superadmin'?DDAENG_TENANT_CODE:user.code,expiresAt:Date.now()+1000*60*60*24*7});const secure=String(req.headers['x-forwarded-proto']||'').includes('https')?'; Secure':'';res.setHeader('Set-Cookie',`ddaeng_session=${sid}; Path=/; HttpOnly; SameSite=Lax; Max-Age=604800${secure}`)}
 function clearSession(req,res){const sid=cookies(req).ddaeng_session;if(sid)sessions.delete(sid);res.setHeader('Set-Cookie','ddaeng_session=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0')}
 function newTenantCode(list){let n=1;const used=new Set(list.map(a=>a.code));while(used.has(`FIRST-${String(n).padStart(4,'0')}`))n++;return `FIRST-${String(n).padStart(4,'0')}`}
 ensureOwnerAccount();
+
+
+// ===== v7.5 strict multi-tenant isolation =====
+const DDAENG_TENANT_CODE=process.env.DDAENG_TENANT_CODE||'FIRST-0001';
+function tenantFile(code,name){ensureTenantStorage({code});return path.join(tenantDir(code),name)}
+function tenantBackupDir(code,name){const d=path.join(tenantDir(code),name);fs.mkdirSync(d,{recursive:true});return d}
+function readJsonObject(file,fallback){try{const v=JSON.parse(fs.readFileSync(file,'utf8'));return v&&typeof v==='object'?v:fallback}catch(e){return fallback}}
+function selectedTenantCode(req){
+ const user=currentUser(req);if(!user)return null;
+ if(user.role!=='superadmin')return user.code;
+ const sid=cookies(req).ddaeng_session,ss=sessions.get(sid);
+ return (ss&&ss.activeTenantCode)||DDAENG_TENANT_CODE;
+}
+function assertTenantAccess(req,requested){const user=currentUser(req);if(!user)throw new Error('로그인이 필요합니다.');const code=String(requested||selectedTenantCode(req)||'');if(user.role!=='superadmin'&&code!==user.code)throw new Error('다른 거래처 데이터에는 접근할 수 없습니다.');return code}
+function tenantReadCustomers(code){return readJsonObject(tenantFile(code,'customers.json'),[])}
+function tenantReadState(code){return readJsonObject(tenantFile(code,'server-state.json'),{orders:[],customers:tenantReadCustomers(code),payments:[],settings:{},csRecords:[],shippingRecords:[]})}
+function tenantWriteCustomers(code,list){if(!Array.isArray(list))throw new Error('고객 데이터 형식 오류');const file=tenantFile(code,'customers.json'),backup=tenantFile(code,'customers-backup.json'),dir=tenantBackupDir(code,'backups');const old=tenantReadCustomers(code),stamp=new Date().toISOString().replace(/[:.]/g,'-');atomicWrite(backup,JSON.stringify(old,null,2));atomicWrite(path.join(dir,`customers-${stamp}.json`),JSON.stringify(old,null,2));atomicWrite(file,JSON.stringify(list,null,2));}
+function tenantWriteState(code,patch){const old=tenantReadState(code),next={...old,...patch,customers:Array.isArray(patch.customers)?patch.customers:tenantReadCustomers(code),updatedAt:new Date().toISOString()};const backup=tenantFile(code,'server-state-backup.json'),dir=tenantBackupDir(code,'state-backups');atomicWrite(backup,JSON.stringify(old,null,2));atomicWrite(path.join(dir,`state-${new Date().toISOString().replace(/[:.]/g,'-')}.json`),JSON.stringify(old,null,2));atomicWrite(tenantFile(code,'server-state.json'),JSON.stringify(next,null,2));if(Array.isArray(next.customers))tenantWriteCustomers(code,next.customers);return next}
+function tenantReadIntegrations(code){return readJsonObject(tenantFile(code,'solapi-settings.json'),{})}
+function tenantSaveIntegrations(code,v){atomicWrite(tenantFile(code,'solapi-settings.json'),JSON.stringify(v,null,2))}
+function tenantReadSendHistory(code){return readJsonObject(tenantFile(code,'message-history.json'),[])}
+function tenantAppendSendHistory(code,v){const a=tenantReadSendHistory(code);a.unshift(v);atomicWrite(tenantFile(code,'message-history.json'),JSON.stringify(a.slice(0,5000),null,2))}
+function tenantSalesArchiveDir(code){return tenantBackupDir(code,'sales-archives')}
+function tenantListSalesArchives(code){try{return fs.readdirSync(tenantSalesArchiveDir(code)).filter(x=>x.endsWith('.json')).sort().reverse().map(x=>{const d=readJsonObject(path.join(tenantSalesArchiveDir(code),x),{});return {date:d.date,count:d.count,file:x}})}catch(e){return[]}}
+function migrateDdaengDataOnce(){
+ const marker=path.join(DATA_ROOT,'.v75-ddaeng-migrated');if(fs.existsSync(marker))return;
+ const account=readAccounts().find(a=>a.code===DDAENG_TENANT_CODE)||readAccounts().find(a=>a.role==='tenant');if(!account)return;
+ ensureTenantStorage(account);const pairs=[[DATA,'customers.json'],[CUSTOMER_BACKUP,'customers-backup.json'],[STATE_DATA,'server-state.json'],[STATE_BACKUP,'server-state-backup.json'],[INTEGRATIONS,'solapi-settings.json'],[SEND_HISTORY,'message-history.json'],[YT_AUTH,'youtube-auth.json']];
+ for(const [src,name] of pairs){const dst=tenantFile(account.code,name);try{if(fs.existsSync(src)){let copy=!fs.existsSync(dst)||fs.statSync(dst).size<5;if(!copy&&name==='server-state.json'){const a=readJsonObject(src,{}),b=readJsonObject(dst,{});copy=((b.orders||[]).length===0&&(b.customers||[]).length===0)&&((a.orders||[]).length>0||(a.customers||[]).length>0)}if(copy)fs.copyFileSync(src,dst)}}catch(e){console.error('땡라이브 이전 실패',name,e.message)}}
+ atomicWrite(path.join(tenantDir(account.code),'tenant-settings.json'),JSON.stringify({company:account.company||'땡라이브',tenantCode:account.code,migratedAt:new Date().toISOString(),source:'legacy-root'},null,2));atomicWrite(marker,JSON.stringify({tenantCode:account.code,at:new Date().toISOString()},null,2));
+}
+migrateDdaengDataOnce();
 
 function readBody(req,max=1024*1024){
  return new Promise((resolve,reject)=>{
@@ -186,8 +224,8 @@ function solapiAuth(apiKey,apiSecret){
  const signature=crypto.createHmac('sha256',apiSecret).update(date+salt).digest('hex');
  return `HMAC-SHA256 apiKey=${apiKey}, date=${date}, salt=${salt}, signature=${signature}`
 }
-async function sendSolapiSms(to,text){
- const cfg=solapiConfig(),apiKey=cfg.apiKey,apiSecret=cfg.apiSecret,sender=cfg.sender;
+async function sendSolapiSms(to,text,tenantCode){
+ const cfg=solapiConfig(tenantCode),apiKey=cfg.apiKey,apiSecret=cfg.apiSecret,sender=cfg.sender;
  if(!apiKey||!apiSecret||!sender)throw new Error('Render 환경변수 SOLAPI_API_KEY, SOLAPI_API_SECRET, SOLAPI_SENDER를 확인해 주세요.');
  const receiver=onlyDigits(to);
  if(receiver.length<10)throw new Error('수신번호가 올바르지 않습니다.');
@@ -204,8 +242,9 @@ async function sendSolapiSms(to,text){
 }
 
 
-function solapiConfig(){
- const f=readIntegrations();
+function solapiConfig(tenantCode){
+ const f=tenantCode?tenantReadIntegrations(tenantCode):readIntegrations();
+ if(tenantCode)return {apiKey:f.apiKey||'',apiSecret:f.apiSecret||'',sender:onlyDigits(f.sender),pfId:f.pfId||'',templateId:f.templateId||''};
  return {
   apiKey:f.apiKey||process.env.SOLAPI_API_KEY||'',
   apiSecret:f.apiSecret||process.env.SOLAPI_API_SECRET||'',
@@ -214,8 +253,8 @@ function solapiConfig(){
   templateId:f.templateId||process.env.SOLAPI_KAKAO_TEMPLATE_ID||process.env.SOLAPI_TEMPLATE_ID||''
  }
 }
-async function sendSolapiKakao(to,variables,text){
- const cfg=solapiConfig();
+async function sendSolapiKakao(to,variables,text,tenantCode){
+ const cfg=solapiConfig(tenantCode);
  if(!cfg.apiKey||!cfg.apiSecret||!cfg.sender)throw new Error('SOLAPI API Key·Secret·발신번호 환경변수를 확인해 주세요.');
  if(!cfg.pfId||!cfg.templateId)throw new Error('SOLAPI_KAKAO_PF_ID와 SOLAPI_KAKAO_TEMPLATE_ID를 Render 환경변수에 등록해 주세요.');
  const receiver=onlyDigits(to);
@@ -242,8 +281,8 @@ async function sendSolapiKakao(to,variables,text){
 
 function readSendHistory(){try{return JSON.parse(fs.readFileSync(SEND_HISTORY,'utf8'))}catch(e){return[]}}
 function appendSendHistory(v){const a=readSendHistory();a.unshift(v);fs.writeFileSync(SEND_HISTORY,JSON.stringify(a.slice(0,5000),null,2),'utf8')}
-async function sendSolapiMms(to,imageBase64,subject,text){
- const cfg=solapiConfig();if(!cfg.apiKey||!cfg.apiSecret||!cfg.sender)throw new Error('SOLAPI API Key·Secret·승인 발신번호를 확인해 주세요.');
+async function sendSolapiMms(to,imageBase64,subject,text,tenantCode){
+ const cfg=solapiConfig(tenantCode);if(!cfg.apiKey||!cfg.apiSecret||!cfg.sender)throw new Error('SOLAPI API Key·Secret·승인 발신번호를 확인해 주세요.');
  const receiver=onlyDigits(to);if(receiver.length<10)throw new Error('수신번호가 올바르지 않습니다.');
  const clean=String(imageBase64||'').replace(/^data:image\/jpeg;base64,/,'');if(!clean)throw new Error('정산서 이미지가 없습니다.');
  const bytes=Buffer.from(clean,'base64');if(bytes.length>200*1024)throw new Error(`이미지 용량이 200KB를 넘습니다 (${Math.ceil(bytes.length/1024)}KB).`);
@@ -265,7 +304,7 @@ function youtubeConfig(){
  }
 }
 async function youtubeToken(){
- const cfg=youtubeConfig(),auth=readYoutubeAuth();
+ const cfg=youtubeConfig(),auth=readJsonObject(tenantFile(tenantCode,'youtube-auth.json'),{});
  if(auth.access_token&&auth.expires_at>Date.now()+60000)return auth.access_token;
  if(auth.refresh_token&&cfg.clientId&&cfg.clientSecret){
   const body=new URLSearchParams({client_id:cfg.clientId,client_secret:cfg.clientSecret,refresh_token:auth.refresh_token,grant_type:'refresh_token'});
@@ -329,27 +368,30 @@ const server=http.createServer((req,res)=>{
  if(u.pathname==='/api/auth/login'&&req.method==='POST')return readBody(req).then(body=>{try{const d=JSON.parse(body||'{}'),list=readAccounts(),a=list.find(x=>x.username===String(d.username||'').trim());if(!a||!verifyPassword(d.password,a.passwordHash))return json(res,401,{ok:false,error:'아이디 또는 비밀번호가 맞지 않습니다.'});if(a.status!=='active')return json(res,403,{ok:false,error:a.status==='pending'?'최고관리자 승인 대기 중입니다.':'사용이 정지된 계정입니다.'});a.lastLoginAt=new Date().toISOString();saveAccounts(list);issueSession(req,res,a);return json(res,200,{ok:true,user:{id:a.id,username:a.username,company:a.company,code:a.code,role:a.role,mustChangePassword:!!a.mustChangePassword}})}catch(e){return json(res,400,{ok:false,error:e.message})}});
  if(u.pathname==='/api/auth/signup'&&req.method==='POST')return readBody(req).then(body=>{try{const d=JSON.parse(body||'{}'),list=readAccounts(),username=String(d.username||'').trim();if(!username||String(d.password||'').length<8||!d.company||!d.ownerName||!d.phone)return json(res,400,{ok:false,error:'거래처명·대표자·연락처·아이디와 8자 이상 비밀번호를 입력해 주세요.'});if(list.some(x=>x.username===username))return json(res,409,{ok:false,error:'이미 사용 중인 아이디입니다.'});const a={id:crypto.randomUUID(),code:newTenantCode(list),username,passwordHash:passwordHash(d.password),company:String(d.company).trim(),ownerName:String(d.ownerName).trim(),phone:onlyDigits(d.phone),role:'tenant',status:'pending',createdAt:new Date().toISOString()};list.push(a);saveAccounts(list);return json(res,200,{ok:true,code:a.code,status:a.status})}catch(e){return json(res,400,{ok:false,error:e.message})}});
  if(u.pathname==='/api/auth/logout'&&req.method==='POST'){clearSession(req,res);return json(res,200,{ok:true})}
- if(u.pathname==='/api/auth/me'&&req.method==='GET'){const a=currentUser(req);return a?json(res,200,{ok:true,user:{id:a.id,username:a.username,company:a.company,code:a.code,role:a.role,mustChangePassword:!!a.mustChangePassword}}):json(res,401,{ok:false})}
+ if(u.pathname==='/api/auth/me'&&req.method==='GET'){const a=currentUser(req);return a?json(res,200,{ok:true,user:{id:a.id,username:a.username,company:a.company,code:a.code,role:a.role,mustChangePassword:!!a.mustChangePassword,activeTenantCode:selectedTenantCode(req)}}):json(res,401,{ok:false})}
  if(u.pathname==='/api/auth/change-password'&&req.method==='POST'){const a=currentUser(req);if(!a)return json(res,401,{ok:false,error:'로그인이 필요합니다.'});return readBody(req).then(body=>{try{const d=JSON.parse(body||'{}'),current=String(d.currentPassword||''),next=String(d.newPassword||'');if(!verifyPassword(current,a.passwordHash))return json(res,400,{ok:false,error:'현재 비밀번호가 맞지 않습니다.'});if(next.length<8)return json(res,400,{ok:false,error:'새 비밀번호는 8자 이상 입력해 주세요.'});if(current===next)return json(res,400,{ok:false,error:'현재 비밀번호와 다른 비밀번호를 입력해 주세요.'});const list=readAccounts(),target=list.find(x=>x.id===a.id);if(!target)return json(res,404,{ok:false,error:'계정을 찾을 수 없습니다.'});target.passwordHash=passwordHash(next);target.mustChangePassword=false;target.passwordChangedAt=new Date().toISOString();saveAccounts(list);return json(res,200,{ok:true})}catch(e){return json(res,400,{ok:false,error:e.message})}})}
- const publicPaths=new Set(['/login.html','/signup.html','/join.html','/favicon.ico']);
- const publicApi=(u.pathname==='/api/health'||u.pathname.startsWith('/api/auth/')||(u.pathname==='/api/customers'&&req.method==='POST'));
+ const publicPaths=new Set(['/login.html','/signup.html','/join.html','/packing.html','/favicon.ico']);
+ const publicApi=(u.pathname==='/api/health'||u.pathname.startsWith('/api/auth/')||u.pathname.startsWith('/api/public/packing')||(u.pathname==='/api/customers'&&req.method==='POST'&&!!u.query.tenant));
  const user=currentUser(req);
  if(!publicPaths.has(u.pathname)&&!publicApi&&!user){if(u.pathname.startsWith('/api/'))return json(res,401,{ok:false,error:'로그인이 필요합니다.'});res.writeHead(302,{Location:'/login.html'});return res.end()}
  if(u.pathname==='/api/admin/accounts'&&req.method==='GET'){if(user.role!=='superadmin')return json(res,403,{ok:false,error:'최고관리자 권한이 필요합니다.'});return json(res,200,{ok:true,accounts:readAccounts().map(({passwordHash,...a})=>a)})}
+ if(u.pathname==='/api/admin/select-tenant'&&req.method==='POST'){if(user.role!=='superadmin')return json(res,403,{ok:false,error:'최고관리자 권한이 필요합니다.'});return readBody(req).then(body=>{try{const d=JSON.parse(body||'{}'),a=readAccounts().find(x=>x.code===d.code&&x.role==='tenant');if(!a)return json(res,404,{ok:false,error:'거래처를 찾을 수 없습니다.'});const sid=cookies(req).ddaeng_session,ss=sessions.get(sid);if(!ss)return json(res,401,{ok:false,error:'세션이 만료되었습니다.'});ss.activeTenantCode=a.code;ss.activeTenantAt=Date.now();sessions.set(sid,ss);return json(res,200,{ok:true,tenant:{code:a.code,company:a.company,ownerName:a.ownerName}})}catch(e){return json(res,400,{ok:false,error:e.message})}})}
+ if(u.pathname==='/api/admin/current-tenant'&&req.method==='GET'){const code=selectedTenantCode(req),a=readAccounts().find(x=>x.code===code);return json(res,200,{ok:true,tenant:a?{code:a.code,company:a.company,ownerName:a.ownerName}:{code,company:'거래처'},actingAs:user.role==='superadmin'})}
  if(u.pathname==='/api/admin/accounts/status'&&req.method==='POST'){if(user.role!=='superadmin')return json(res,403,{ok:false,error:'최고관리자 권한이 필요합니다.'});return readBody(req).then(body=>{try{const d=JSON.parse(body||'{}'),list=readAccounts(),a=list.find(x=>x.id===d.id);if(!a)return json(res,404,{ok:false,error:'계정을 찾을 수 없습니다.'});if(!['active','pending','suspended'].includes(d.status))return json(res,400,{ok:false,error:'상태값 오류'});a.status=d.status;saveAccounts(list);return json(res,200,{ok:true})}catch(e){return json(res,400,{ok:false,error:e.message})}})}
  if(u.pathname==='/api/admin/accounts/backup'&&req.method==='POST'){if(user.role!=='superadmin')return json(res,403,{ok:false,error:'최고관리자 권한이 필요합니다.'});try{const list=readAccounts(),stamp=new Date().toISOString().replace(/[:.]/g,'-'),file=path.join(ACCOUNT_BACKUP_DIR,`accounts-manual-${stamp}.json`);atomicWrite(file,JSON.stringify(list,null,2));return json(res,200,{ok:true,count:list.length,file:path.basename(file)})}catch(e){return json(res,500,{ok:false,error:e.message})}}
  if(u.pathname==='/api/admin/accounts/backups'&&req.method==='GET'){if(user.role!=='superadmin')return json(res,403,{ok:false,error:'최고관리자 권한이 필요합니다.'});try{const files=fs.readdirSync(ACCOUNT_BACKUP_DIR).filter(x=>x.endsWith('.json')).sort().reverse();return json(res,200,{ok:true,files})}catch(e){return json(res,500,{ok:false,error:e.message})}}
 
+ const tenantCode=user?selectedTenantCode(req):String(u.query.tenant||'');
 
  if(u.pathname==='/api/youtube/status'&&req.method==='GET'){
-  const cfg=youtubeConfig(),auth=readYoutubeAuth();
+  const cfg=youtubeConfig(),auth=readJsonObject(tenantFile(tenantCode,'youtube-auth.json'),{});
   return json(res,200,{ok:true,connected:!!(auth.refresh_token||auth.access_token||cfg.apiKey),oauth:!!(auth.refresh_token||auth.access_token),apiKey:!!cfg.apiKey})
  }
  if(u.pathname==='/api/youtube/oauth/start'&&req.method==='GET'){
   const cfg=youtubeConfig();
   if(!cfg.clientId||!cfg.redirectUri){res.writeHead(500,{'Content-Type':'text/plain; charset=utf-8'});return res.end('Render 환경변수 YOUTUBE_CLIENT_ID, YOUTUBE_REDIRECT_URI를 확인해 주세요.')}
   const state=crypto.randomBytes(20).toString('hex');
-  saveYoutubeAuth({...readYoutubeAuth(),oauth_state:state});
+  atomicWrite(tenantFile(tenantCode,'youtube-auth.json'),JSON.stringify({...readJsonObject(tenantFile(tenantCode,'youtube-auth.json'),{}),oauth_state:state},null,2));
   const q=new URLSearchParams({
    client_id:cfg.clientId,redirect_uri:cfg.redirectUri,response_type:'code',
    scope:'https://www.googleapis.com/auth/youtube.force-ssl',
@@ -366,7 +408,7 @@ const server=http.createServer((req,res)=>{
     const body=new URLSearchParams({code:String(u.query.code),client_id:cfg.clientId,client_secret:cfg.clientSecret,redirect_uri:cfg.redirectUri,grant_type:'authorization_code'});
     const r=await fetch('https://oauth2.googleapis.com/token',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body});
     const j=await r.json();if(!r.ok)throw new Error(j.error_description||j.error||'토큰 발급 실패');
-    saveYoutubeAuth({...j,refresh_token:j.refresh_token||auth.refresh_token||'',expires_at:Date.now()+(j.expires_in||3600)*1000});
+    atomicWrite(tenantFile(tenantCode,'youtube-auth.json'),JSON.stringify({...j,refresh_token:j.refresh_token||auth.refresh_token||'',expires_at:Date.now()+(j.expires_in||3600)*1000},null,2));
     res.writeHead(200,{'Content-Type':'text/html; charset=utf-8'});
     return res.end('<!doctype html><meta charset="utf-8"><title>연결 완료</title><body style="font-family:sans-serif;padding:30px"><h2>유튜브 계정 연결 완료</h2><p>이 창은 자동으로 닫힙니다.</p><script>if(window.opener)window.opener.postMessage("youtube-connected","*");setTimeout(()=>window.close(),1000)</script></body>')
    }catch(e){res.writeHead(400,{'Content-Type':'text/html; charset=utf-8'});return res.end('<meta charset="utf-8"><h2>유튜브 연결 실패</h2><pre>'+String(e.message).replace(/[&<>]/g,s=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[s]))+'</pre>')}
@@ -422,24 +464,24 @@ const server=http.createServer((req,res)=>{
  }
 
  if(u.pathname==='/api/solapi/config'&&req.method==='GET'){
-  const cfg=solapiConfig();
+  const cfg=solapiConfig(tenantCode);
   return json(res,200,{ok:true,configured:!!(cfg.apiKey&&cfg.apiSecret&&cfg.sender),apiKey:cfg.apiKey?cfg.apiKey.slice(0,4)+'••••••':'',sender:cfg.sender||'',pfId:cfg.pfId||'',templateId:cfg.templateId||'',hasSecret:!!cfg.apiSecret});
  }
  if(u.pathname==='/api/solapi/config'&&req.method==='POST'){
   return readBody(req).then(body=>{try{
-   const d=JSON.parse(body||'{}'), old=readIntegrations();
+   const d=JSON.parse(body||'{}'), old=tenantReadIntegrations(tenantCode);
    const next={apiKey:String(d.apiKey||old.apiKey||'').trim(),apiSecret:String(d.apiSecret||old.apiSecret||'').trim(),sender:onlyDigits(d.sender||old.sender),pfId:String(d.pfId||old.pfId||'').trim(),templateId:String(d.templateId||old.templateId||'').trim()};
    if(!next.apiKey||!next.apiSecret||!next.sender)return json(res,400,{ok:false,error:'API Key, API Secret, 승인 발신번호를 모두 입력해 주세요.'});
-   saveIntegrations(next);return json(res,200,{ok:true,configured:true,sender:next.sender});
+   tenantSaveIntegrations(tenantCode,next);return json(res,200,{ok:true,configured:true,sender:next.sender});
   }catch(e){return json(res,400,{ok:false,error:e.message})}});
  }
  if(u.pathname==='/api/customers/export.xlsx'&&req.method==='GET'){
-  writeCustomerExcel(readCustomers());
-  if(!fs.existsSync(CUSTOMER_XLSX))return json(res,500,{ok:false,error:'고객 엑셀 생성 실패'});
-  res.writeHead(200,{'Content-Type':'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet','Content-Disposition':'attachment; filename="FIRST_OMS_customers.xlsx"','Cache-Control':'no-store'});return fs.createReadStream(CUSTOMER_XLSX).pipe(res);
+  const list=tenantReadCustomers(tenantCode);const tf=tenantFile(tenantCode,'customers.xlsx');try{const wb=XLSX.utils.book_new(),ws=XLSX.utils.json_to_sheet(list);XLSX.utils.book_append_sheet(wb,ws,'고객DB');XLSX.writeFile(wb,tf)}catch(e){}
+  if(!fs.existsSync(tf))return json(res,500,{ok:false,error:'고객 엑셀 생성 실패'});
+  res.writeHead(200,{'Content-Type':'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet','Content-Disposition':'attachment; filename="FIRST_OMS_customers.xlsx"','Cache-Control':'no-store'});return fs.createReadStream(tf).pipe(res);
  }
  if(u.pathname==='/api/kakao/status'&&req.method==='GET'){
-  const cfg=solapiConfig();
+  const cfg=solapiConfig(tenantCode);
   return json(res,200,{ok:true,ready:!!(cfg.apiKey&&cfg.apiSecret&&cfg.sender&&cfg.pfId&&cfg.templateId),sender:cfg.sender?cfg.sender.slice(0,3)+'****'+cfg.sender.slice(-4):'',pfId:cfg.pfId?cfg.pfId.slice(0,6)+'…':'',templateId:cfg.templateId?cfg.templateId.slice(0,6)+'…':'',missing:[!cfg.apiKey&&'SOLAPI_API_KEY',!cfg.apiSecret&&'SOLAPI_API_SECRET',!cfg.sender&&'SOLAPI_SENDER',!cfg.pfId&&'SOLAPI_KAKAO_PF_ID',!cfg.templateId&&'SOLAPI_KAKAO_TEMPLATE_ID'].filter(Boolean)})
  }
  if(u.pathname==='/api/kakao/send'&&req.method==='POST'){
@@ -447,55 +489,63 @@ const server=http.createServer((req,res)=>{
    try{
     const data=JSON.parse(body||'{}');
     if(!data.to)return json(res,400,{ok:false,error:'수신번호가 없습니다.'});
-    const result=await sendSolapiKakao(data.to,data.variables||{},data.text||'');
+    const result=await sendSolapiKakao(data.to,data.variables||{},data.text||'',tenantCode);
     json(res,200,{ok:true,result})
    }catch(e){json(res,500,{ok:false,error:e.message})}
   }).catch(e=>json(res,400,{ok:false,error:e.message}))
  }
 
- if(u.pathname==='/api/state'&&req.method==='GET')return json(res,200,{ok:true,state:readState(),archives:listSalesArchives()});
+
+ if(u.pathname==='/api/public/packing'&&req.method==='GET'){
+  const code=String(u.query.code||'').trim().toUpperCase();let found=null;
+  const tenantCodes=readAccounts().filter(a=>a.role==='tenant').map(a=>a.code);
+  for(const tc of tenantCodes){const st=tenantReadState(tc),customers=Array.isArray(st.customers)?st.customers:tenantReadCustomers(tc),groups=new Map();for(const o of (st.orders||[])){const k=(o.customerId||o.nick)+'|'+(o.date||'');if(!groups.has(k))groups.set(k,{name:'',nick:o.nick||'',phone:'',address:'',dates:new Set(),items:[],total:0,code:'',tenantCode:tc});const g=groups.get(k),c=customers.find(x=>x.id===o.customerId)||{};g.name=c.name||'';g.phone=c.phone||'';g.address=[c.postalCode,c.address,c.detailAddress].filter(Boolean).join(' ');g.dates.add(o.date||'');g.items.push({item:o.item||'',qty:Number(o.qty)||0});g.total+=(Number(o.amount)||0)+(Number(o.fee)||0)}function sc(g){const raw=[tc,g.name,g.nick,g.phone,g.address].join('|');let h=2166136261;for(let i=0;i<raw.length;i++){h^=raw.charCodeAt(i);h=Math.imul(h,16777619)}return 'FIRST-'+(h>>>0).toString(36).toUpperCase().padStart(7,'0')}found=[...groups.values()].map(g=>({...g,dates:[...g.dates],code:sc(g)})).find(g=>g.code===code);if(found){found.completedAt=st.shippingScans?.[code]?.at||null;break}}
+  if(!found)return json(res,404,{ok:false,error:'포장리스트를 찾을 수 없습니다.'});return json(res,200,{ok:true,job:found})
+ }
+ if(u.pathname==='/api/public/packing/complete'&&req.method==='POST')return readBody(req).then(body=>{try{const d=JSON.parse(body||'{}'),code=String(d.code||'').trim().toUpperCase(),tc=String(d.tenantCode||'');if(!code||!tc)return json(res,400,{ok:false,error:'QR 코드 또는 거래처 코드가 없습니다.'});const st=tenantReadState(tc);st.shippingScans=st.shippingScans||{};const completedAt=new Date().toISOString();st.shippingScans[code]={at:completedAt,source:'mobile-public'};tenantWriteState(tc,st);return json(res,200,{ok:true,completedAt})}catch(e){return json(res,400,{ok:false,error:e.message})}})
+
+ if(u.pathname==='/api/state'&&req.method==='GET')return json(res,200,{ok:true,state:tenantReadState(tenantCode),archives:tenantListSalesArchives(tenantCode),tenantCode});
  if(u.pathname==='/api/state'&&req.method==='POST'){
-  return readBody(req,20*1024*1024).then(body=>{try{const st=JSON.parse(body||'{}');const saved=saveState(st);return json(res,200,{ok:true,updatedAt:saved.updatedAt,orders:(saved.orders||[]).length,customers:(saved.customers||[]).length})}catch(e){return json(res,400,{ok:false,error:e.message})}})
+  return readBody(req,20*1024*1024).then(body=>{try{const st=JSON.parse(body||'{}');const saved=tenantWriteState(tenantCode,st);return json(res,200,{ok:true,updatedAt:saved.updatedAt,orders:(saved.orders||[]).length,customers:(saved.customers||[]).length})}catch(e){return json(res,400,{ok:false,error:e.message})}})
  }
  if(u.pathname==='/api/state/backup'&&req.method==='GET'){
-  const st=readState();const payload={version:6,exportedAt:new Date().toISOString(),state:st};
+  const st=tenantReadState(tenantCode);const payload={version:7.5,tenantCode,exportedAt:new Date().toISOString(),state:st};
   res.writeHead(200,{'Content-Type':'application/json; charset=utf-8','Content-Disposition':`attachment; filename=ddaenglive_full_backup_${new Date().toISOString().slice(0,10)}.json`,'Cache-Control':'no-store'});return res.end(JSON.stringify(payload,null,2));
  }
- if(u.pathname==='/api/sales/archives'&&req.method==='GET')return json(res,200,{ok:true,archives:listSalesArchives()});
+ if(u.pathname==='/api/sales/archives'&&req.method==='GET')return json(res,200,{ok:true,archives:tenantListSalesArchives(tenantCode)});
  if(u.pathname.startsWith('/api/sales/archive/')&&req.method==='GET'){
-  const date=decodeURIComponent(u.pathname.split('/').pop()).replace(/[^0-9-]/g,'');const f=path.join(SALES_ARCHIVE_DIR,date+'.json');
+  const date=decodeURIComponent(u.pathname.split('/').pop()).replace(/[^0-9-]/g,'');const f=path.join(tenantSalesArchiveDir(tenantCode),date+'.json');
   if(!fs.existsSync(f))return json(res,404,{ok:false,error:'해당 날짜 판매리스트가 없습니다.'});return json(res,200,{ok:true,...JSON.parse(fs.readFileSync(f,'utf8'))});
  }
  if(u.pathname==='/api/send-history'&&req.method==='GET'){
-  const date=String(u.query.date||'');const history=readSendHistory().filter(x=>!date||x.date===date);return json(res,200,{ok:true,history});
+  const date=String(u.query.date||'');const history=tenantReadSendHistory(tenantCode).filter(x=>!date||x.date===date);return json(res,200,{ok:true,history});
  }
  if(u.pathname==='/api/mms/send'&&req.method==='POST'){
-  return readBody(req,1024*1024).then(async body=>{let meta={};try{const d=JSON.parse(body||'{}');meta={sentAt:new Date().toISOString(),date:String(d.date||''),nickname:String(d.nickname||''),name:String(d.name||''),toMasked:onlyDigits(d.to).replace(/^(\d{3})\d+(\d{4})$/,'$1****$2'),total:Number(d.total)||0};if(!d.to||!d.imageBase64)return json(res,400,{ok:false,error:'수신번호 또는 정산서 이미지가 없습니다.'});const result=await sendSolapiMms(d.to,d.imageBase64,d.subject,d.text);appendSendHistory({...meta,ok:true});return json(res,200,{ok:true,result})}catch(e){appendSendHistory({...meta,ok:false,error:e.message});return json(res,500,{ok:false,error:e.message})}}).catch(e=>json(res,400,{ok:false,error:e.message}))
+  return readBody(req,1024*1024).then(async body=>{let meta={};try{const d=JSON.parse(body||'{}');meta={sentAt:new Date().toISOString(),date:String(d.date||''),nickname:String(d.nickname||''),name:String(d.name||''),toMasked:onlyDigits(d.to).replace(/^(\d{3})\d+(\d{4})$/,'$1****$2'),total:Number(d.total)||0};if(!d.to||!d.imageBase64)return json(res,400,{ok:false,error:'수신번호 또는 정산서 이미지가 없습니다.'});const result=await sendSolapiMms(d.to,d.imageBase64,d.subject,d.text,tenantCode);tenantAppendSendHistory(tenantCode,{...meta,ok:true});return json(res,200,{ok:true,result})}catch(e){tenantAppendSendHistory(tenantCode,{...meta,ok:false,error:e.message});return json(res,500,{ok:false,error:e.message})}}).catch(e=>json(res,400,{ok:false,error:e.message}))
  }
  if(u.pathname==='/api/sms/send'&&req.method==='POST'){
   return readBody(req).then(async body=>{
    try{
     const data=JSON.parse(body||'{}');
     if(!data.to||!data.text)return json(res,400,{ok:false,error:'수신번호 또는 문자내용이 없습니다.'});
-    const result=await sendSolapiSms(data.to,data.text);
+    const result=await sendSolapiSms(data.to,data.text,tenantCode);
     json(res,200,{ok:true,result})
    }catch(e){json(res,500,{ok:false,error:e.message})}
   }).catch(e=>json(res,400,{ok:false,error:e.message}))
  }
 
  if(u.pathname==='/api/customers/backup'&&req.method==='GET'){
-  const info=backupCustomers();
-  const payload={version:1,exportedAt:new Date().toISOString(),count:readCustomers().length,customers:readCustomers()};
+  const list=tenantReadCustomers(tenantCode);const payload={version:2,tenantCode,exportedAt:new Date().toISOString(),count:list.length,customers:list};
   res.writeHead(200,{
    'Content-Type':'application/json; charset=utf-8',
    'Content-Disposition':`attachment; filename=FIRST_OMS_customers_backup_${new Date().toISOString().slice(0,10)}.json`,
    'Cache-Control':'no-store',
-   'X-Backup-Count':String(info.count||0)
+   'X-Backup-Count':String(list.length)
   });
   return res.end(JSON.stringify(payload,null,2));
  }
  if(u.pathname==='/api/customers/backup/status'&&req.method==='GET'){
-  return json(res,200,{ok:true,count:readCustomers().length,backupExists:fs.existsSync(CUSTOMER_BACKUP)});
+  return json(res,200,{ok:true,count:tenantReadCustomers(tenantCode).length,backupExists:fs.existsSync(tenantFile(tenantCode,'customers-backup.json'))});
  }
 
  if(u.pathname==='/api/customers/stream'&&req.method==='GET'){
@@ -505,18 +555,18 @@ const server=http.createServer((req,res)=>{
    'Connection':'keep-alive',
    'X-Accel-Buffering':'no'
   });
-  res.write(`event: customers\ndata: ${JSON.stringify(readCustomers())}\n\n`);
+  res.write(`event: customers\ndata: ${JSON.stringify(tenantReadCustomers(tenantCode))}\n\n`);
   sseClients.add(res);
   const keep=setInterval(()=>{try{res.write(': keepalive\n\n')}catch(e){}},15000);
   req.on('close',()=>{clearInterval(keep);sseClients.delete(res)});
   return;
  }
- if(u.pathname==='/api/customers'&&req.method==='GET')return json(res,200,readCustomers());
+ if(u.pathname==='/api/customers'&&req.method==='GET')return json(res,200,tenantReadCustomers(tenantCode));
 
  if(u.pathname.startsWith('/api/customers/')&&req.method==='DELETE'){
   const nickname=decodeURIComponent(u.pathname.split('/').pop());
-  let list=readCustomers().map(x=>x.nickname===nickname?{...x,active:false,archivedAt:new Date().toISOString()}:x);
-  saveCustomers(list);const st=readState();st.customers=list;saveState(st);return json(res,200,{ok:true,softDeleted:true})
+  let list=tenantReadCustomers(tenantCode).map(x=>x.nickname===nickname?{...x,active:false,archivedAt:new Date().toISOString()}:x);
+  tenantWriteCustomers(tenantCode,list);const st=tenantReadState(tenantCode);st.customers=list;tenantWriteState(tenantCode,st);return json(res,200,{ok:true,softDeleted:true})
  }
 
  if(u.pathname==='/api/customers'&&req.method==='POST'){
@@ -524,10 +574,10 @@ const server=http.createServer((req,res)=>{
   return req.on('end',()=>{try{
    const c=JSON.parse(body||'{}');
    if(!c.name||!c.nickname||!c.phone)return json(res,400,{error:'필수값 누락'});
-   let list=readCustomers(),i=list.findIndex(x=>x.nickname===c.nickname||x.phone===c.phone);
+   let list=tenantReadCustomers(tenantCode),i=list.findIndex(x=>x.nickname===c.nickname||x.phone===c.phone);
    const next={id:c.id||Date.now().toString(36),joinedAt:c.joinedAt||new Date().toLocaleString('ko-KR'),source:c.source||'가입폼',...c};
    if(i>=0)list[i]={...list[i],...next};else list.push(next);
-   saveCustomers(list);json(res,200,next)
+   tenantWriteCustomers(tenantCode,list);const st=tenantReadState(tenantCode);st.customers=list;tenantWriteState(tenantCode,st);json(res,200,next)
   }catch(e){json(res,400,{error:'잘못된 요청'})}})
  }
  let p=u.pathname==='/'?'/index.html':u.pathname;
