@@ -151,7 +151,7 @@ function saveAccounts(list){
  for(const account of list)ensureTenantStorage(account);
  return true
 }
-const DEFAULT_ADMIN_ID='firstadmin',DEFAULT_ADMIN_PASSWORD='FirstOms!2026',ADMIN_RESET_VERSION='7.7';
+const DEFAULT_ADMIN_ID='firstadmin',DEFAULT_ADMIN_PASSWORD='FirstOms!2026';
 function ensureOwnerAccount(){
  let list=readAccounts(),changed=false;
  let owner=list.find(a=>a.role==='superadmin'||a.code==='FIRST-MASTER');
@@ -162,22 +162,16 @@ function ensureOwnerAccount(){
   if(owner.role!=='superadmin'){owner.role='superadmin';changed=true}
   if(owner.status!=='active'){owner.status='active';changed=true}
   if(owner.code!=='FIRST-MASTER'){owner.code='FIRST-MASTER';changed=true}
-  // v7.7 배포 시 최고관리자만 최초 1회 확정 초기화. 거래처/고객/정산 데이터는 건드리지 않는다.
-  if(owner.adminResetVersion!==ADMIN_RESET_VERSION){
-   owner.username=DEFAULT_ADMIN_ID;
-   owner.passwordHash=passwordHash(DEFAULT_ADMIN_PASSWORD);
-   owner.mustChangePassword=true;
-   owner.adminResetVersion=ADMIN_RESET_VERSION;
-   owner.passwordResetAt=new Date().toISOString();
-   changed=true;
-  }
+  // 기존 최고관리자 아이디·비밀번호는 재배포/재시작 때 절대 덮어쓰지 않는다.
+  if(!owner.username){owner.username=DEFAULT_ADMIN_ID;changed=true}
+  if(!owner.passwordHash){owner.passwordHash=passwordHash(DEFAULT_ADMIN_PASSWORD);owner.mustChangePassword=true;changed=true}
  }
  if(changed)saveAccounts(list);else for(const a of list)ensureTenantStorage(a);
  console.log('[LOGIN] 최고관리자 계정 준비 완료');
 }
 function cookies(req){return Object.fromEntries(String(req.headers.cookie||'').split(';').map(x=>x.trim()).filter(Boolean).map(x=>{const i=x.indexOf('=');return [decodeURIComponent(x.slice(0,i)),decodeURIComponent(x.slice(i+1))]}))}
 function currentUser(req){const sid=cookies(req).ddaeng_session,ss=sessions.get(sid);if(!ss||ss.expiresAt<Date.now()){if(sid)sessions.delete(sid);return null}return readAccounts().find(a=>a.id===ss.userId&&a.status==='active')||null}
-function issueSession(req,res,user){const sid=crypto.randomBytes(32).toString('hex');sessions.set(sid,{userId:user.id,activeTenantCode:user.role==='superadmin'?DDAENG_TENANT_CODE:user.code,expiresAt:Date.now()+1000*60*60*24*7});const secure=String(req.headers['x-forwarded-proto']||'').includes('https')?'; Secure':'';res.setHeader('Set-Cookie',`ddaeng_session=${sid}; Path=/; HttpOnly; SameSite=Lax; Max-Age=604800${secure}`)}
+function issueSession(req,res,user){const sid=crypto.randomBytes(32).toString('hex');sessions.set(sid,{userId:user.id,activeTenantCode:user.role==='superadmin'?'FIRST-MASTER':user.code,expiresAt:Date.now()+1000*60*60*24*7});const secure=String(req.headers['x-forwarded-proto']||'').includes('https')?'; Secure':'';res.setHeader('Set-Cookie',`ddaeng_session=${sid}; Path=/; HttpOnly; SameSite=Lax; Max-Age=604800${secure}`)}
 function clearSession(req,res){const sid=cookies(req).ddaeng_session;if(sid)sessions.delete(sid);res.setHeader('Set-Cookie','ddaeng_session=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0')}
 function newTenantCode(list){let n=1;const used=new Set(list.map(a=>a.code));while(used.has(`FIRST-${String(n).padStart(4,'0')}`))n++;return `FIRST-${String(n).padStart(4,'0')}`}
 ensureOwnerAccount();
@@ -190,10 +184,10 @@ function ensureDdaengTenantAccount(){
  let tenant=list.find(a=>a.code===DDAENG_TENANT_CODE);
  if(!tenant){
   tenant={
-   id:crypto.randomUUID(),code:DDAENG_TENANT_CODE,username:'ddaenglive-system',
-   passwordHash:passwordHash(crypto.randomBytes(24).toString('hex')),
+   id:crypto.randomUUID(),code:DDAENG_TENANT_CODE,username:'01021842344',
+   passwordHash:passwordHash('@21842344'),
    company:'땡라이브',ownerName:'땡라이브',phone:'',role:'tenant',status:'active',
-   systemManaged:true,createdAt:new Date().toISOString()
+   systemManaged:true,credentialSetupVersion:'7.8',createdAt:new Date().toISOString()
   };
   list.push(tenant);changed=true;
  }else{
@@ -201,8 +195,14 @@ function ensureDdaengTenantAccount(){
   if(tenant.status!=='active'){tenant.status='active';changed=true}
   if(!tenant.company||tenant.company==='FIRST OMS'){tenant.company='땡라이브';changed=true}
   if(!tenant.ownerName){tenant.ownerName='땡라이브';changed=true}
-  if(!tenant.username||list.some(a=>a!==tenant&&a.username===tenant.username)){
-   tenant.username='ddaenglive-system';changed=true
+  // 요청한 땡라이브 계정은 이번 버전에서 최초 1회 확정하고 이후 변경값은 보존한다.
+  if(tenant.credentialSetupVersion!=='7.8'){
+   tenant.username='01021842344';
+   tenant.passwordHash=passwordHash('@21842344');
+   tenant.mustChangePassword=false;
+   tenant.credentialSetupVersion='7.8';
+   tenant.passwordChangedAt=new Date().toISOString();
+   changed=true;
   }
   tenant.systemManaged=true;
  }
@@ -217,7 +217,7 @@ function selectedTenantCode(req){
  const user=currentUser(req);if(!user)return null;
  if(user.role!=='superadmin')return user.code;
  const sid=cookies(req).ddaeng_session,ss=sessions.get(sid);
- return (ss&&ss.activeTenantCode)||DDAENG_TENANT_CODE;
+ return (ss&&ss.activeTenantCode)||'FIRST-MASTER';
 }
 function assertTenantAccess(req,requested){const user=currentUser(req);if(!user)throw new Error('로그인이 필요합니다.');const code=String(requested||selectedTenantCode(req)||'');if(user.role!=='superadmin'&&code!==user.code)throw new Error('다른 거래처 데이터에는 접근할 수 없습니다.');return code}
 function tenantReadCustomers(code){return readJsonObject(tenantFile(code,'customers.json'),[])}
@@ -230,14 +230,46 @@ function tenantReadSendHistory(code){return readJsonObject(tenantFile(code,'mess
 function tenantAppendSendHistory(code,v){const a=tenantReadSendHistory(code);a.unshift(v);atomicWrite(tenantFile(code,'message-history.json'),JSON.stringify(a.slice(0,5000),null,2))}
 function tenantSalesArchiveDir(code){return tenantBackupDir(code,'sales-archives')}
 function tenantListSalesArchives(code){try{return fs.readdirSync(tenantSalesArchiveDir(code)).filter(x=>x.endsWith('.json')).sort().reverse().map(x=>{const d=readJsonObject(path.join(tenantSalesArchiveDir(code),x),{});return {date:d.date,count:d.count,file:x}})}catch(e){return[]}}
-function migrateDdaengDataOnce(){
- const marker=path.join(DATA_ROOT,'.v75-ddaeng-migrated');if(fs.existsSync(marker))return;
- const account=readAccounts().find(a=>a.code===DDAENG_TENANT_CODE)||readAccounts().find(a=>a.role==='tenant');if(!account)return;
- ensureTenantStorage(account);const pairs=[[DATA,'customers.json'],[CUSTOMER_BACKUP,'customers-backup.json'],[STATE_DATA,'server-state.json'],[STATE_BACKUP,'server-state-backup.json'],[INTEGRATIONS,'solapi-settings.json'],[SEND_HISTORY,'message-history.json'],[YT_AUTH,'youtube-auth.json']];
- for(const [src,name] of pairs){const dst=tenantFile(account.code,name);try{if(fs.existsSync(src)){let copy=!fs.existsSync(dst)||fs.statSync(dst).size<5;if(!copy&&name==='server-state.json'){const a=readJsonObject(src,{}),b=readJsonObject(dst,{});copy=((b.orders||[]).length===0&&(b.customers||[]).length===0)&&((a.orders||[]).length>0||(a.customers||[]).length>0)}if(copy)fs.copyFileSync(src,dst)}}catch(e){console.error('땡라이브 이전 실패',name,e.message)}}
- atomicWrite(path.join(tenantDir(account.code),'tenant-settings.json'),JSON.stringify({company:account.company||'땡라이브',tenantCode:account.code,migratedAt:new Date().toISOString(),source:'legacy-root'},null,2));atomicWrite(marker,JSON.stringify({tenantCode:account.code,at:new Date().toISOString()},null,2));
+function copyFileIfTargetEmpty(src,dst){
+ try{
+  if(!fs.existsSync(src))return false;
+  let copy=!fs.existsSync(dst)||fs.statSync(dst).size<5;
+  if(!copy){
+   const a=readJsonObject(src,null),b=readJsonObject(dst,null);
+   if(Array.isArray(a)&&Array.isArray(b))copy=b.length===0&&a.length>0;
+   else if(a&&b&&typeof a==='object'&&typeof b==='object')copy=Object.keys(b).length===0&&Object.keys(a).length>0;
+  }
+  if(copy){fs.copyFileSync(src,dst);return true}
+ }catch(e){console.error('자료 복원 실패',path.basename(dst),e.message)}
+ return false
 }
-migrateDdaengDataOnce();
+function migrateOwnerLegacyDataOnce(){
+ const marker=path.join(DATA_ROOT,'.v78-owner-legacy-preserved');
+ const owner=readAccounts().find(a=>a.role==='superadmin');if(!owner)return;
+ ensureTenantStorage(owner);
+ const pairs=[[DATA,'customers.json'],[CUSTOMER_BACKUP,'customers-backup.json'],[STATE_DATA,'server-state.json'],[STATE_BACKUP,'server-state-backup.json'],[INTEGRATIONS,'solapi-settings.json'],[SEND_HISTORY,'message-history.json'],[YT_AUTH,'youtube-auth.json']];
+ for(const [src,name] of pairs)copyFileIfTargetEmpty(src,tenantFile(owner.code,name));
+ if(!fs.existsSync(marker))atomicWrite(marker,JSON.stringify({tenantCode:owner.code,at:new Date().toISOString(),note:'기존 고객·정산·솔라피 보존'},null,2));
+}
+function restoreDdaengCustomersAndSeparateSolapiOnce(){
+ const marker=path.join(DATA_ROOT,'.v78-ddaeng-customer-restored-solapi-separated');if(fs.existsSync(marker))return;
+ const tenant=readAccounts().find(a=>a.code===DDAENG_TENANT_CODE),owner=readAccounts().find(a=>a.role==='superadmin');if(!tenant||!owner)return;
+ ensureTenantStorage(tenant);ensureTenantStorage(owner);
+ const sourceCustomers=tenantReadCustomers(owner.code).length?tenantReadCustomers(owner.code):readCustomers();
+ if(sourceCustomers.length){
+  const current=tenantReadCustomers(tenant.code);
+  if(current.length===0)tenantWriteCustomers(tenant.code,sourceCustomers);
+  const st=tenantReadState(tenant.code);if(!Array.isArray(st.customers)||st.customers.length===0){st.customers=sourceCustomers;tenantWriteState(tenant.code,st)}
+ }
+ // 과거 버전에서 주인님 솔라피가 땡라이브로 복사됐을 수 있으므로 1회 백업 후 빈 설정으로 분리한다.
+ const solapiFile=tenantFile(tenant.code,'solapi-settings.json');
+ const old=readJsonObject(solapiFile,{});if(Object.keys(old).length){atomicWrite(tenantFile(tenant.code,'solapi-settings-before-v78-backup.json'),JSON.stringify(old,null,2))}
+ atomicWrite(solapiFile,'{}');
+ atomicWrite(path.join(tenantDir(tenant.code),'tenant-settings.json'),JSON.stringify({company:'땡라이브',tenantCode:tenant.code,customersRestoredAt:new Date().toISOString(),solapiMode:'tenant-own-setting'},null,2));
+ atomicWrite(marker,JSON.stringify({tenantCode:tenant.code,customerCount:sourceCustomers.length,at:new Date().toISOString()},null,2));
+}
+migrateOwnerLegacyDataOnce();
+restoreDdaengCustomersAndSeparateSolapiOnce();
 
 function readBody(req,max=1024*1024){
  return new Promise((resolve,reject)=>{
@@ -410,7 +442,7 @@ const server=http.createServer((req,res)=>{
  const user=currentUser(req);
  if(!publicPaths.has(u.pathname)&&!publicApi&&!user){if(u.pathname.startsWith('/api/'))return json(res,401,{ok:false,error:'로그인이 필요합니다.'});res.writeHead(302,{Location:'/login.html'});return res.end()}
  if(u.pathname==='/api/admin/accounts'&&req.method==='GET'){if(user.role!=='superadmin')return json(res,403,{ok:false,error:'최고관리자 권한이 필요합니다.'});return json(res,200,{ok:true,accounts:readAccounts().map(({passwordHash,...a})=>a)})}
- if(u.pathname==='/api/admin/select-tenant'&&req.method==='POST'){if(user.role!=='superadmin')return json(res,403,{ok:false,error:'최고관리자 권한이 필요합니다.'});return readBody(req).then(body=>{try{const d=JSON.parse(body||'{}');if(String(d.code||'')===DDAENG_TENANT_CODE)ensureDdaengTenantAccount();const a=readAccounts().find(x=>x.code===d.code&&x.role==='tenant');if(!a)return json(res,404,{ok:false,error:'거래처를 찾을 수 없습니다.'});const sid=cookies(req).ddaeng_session,ss=sessions.get(sid);if(!ss)return json(res,401,{ok:false,error:'세션이 만료되었습니다.'});ss.activeTenantCode=a.code;ss.activeTenantAt=Date.now();sessions.set(sid,ss);return json(res,200,{ok:true,tenant:{code:a.code,company:a.company,ownerName:a.ownerName}})}catch(e){return json(res,400,{ok:false,error:e.message})}})}
+ if(u.pathname==='/api/admin/select-tenant'&&req.method==='POST'){if(user.role!=='superadmin')return json(res,403,{ok:false,error:'최고관리자 권한이 필요합니다.'});return readBody(req).then(body=>{try{const d=JSON.parse(body||'{}');if(String(d.code||'')===DDAENG_TENANT_CODE)ensureDdaengTenantAccount();const a=readAccounts().find(x=>x.code===d.code&&(x.role==='tenant'||x.role==='superadmin'));if(!a)return json(res,404,{ok:false,error:'관리페이지를 찾을 수 없습니다.'});const sid=cookies(req).ddaeng_session,ss=sessions.get(sid);if(!ss)return json(res,401,{ok:false,error:'세션이 만료되었습니다.'});ss.activeTenantCode=a.code;ss.activeTenantAt=Date.now();sessions.set(sid,ss);return json(res,200,{ok:true,tenant:{code:a.code,company:a.company,ownerName:a.ownerName}})}catch(e){return json(res,400,{ok:false,error:e.message})}})}
  if(u.pathname==='/api/admin/current-tenant'&&req.method==='GET'){const code=selectedTenantCode(req),a=readAccounts().find(x=>x.code===code);return json(res,200,{ok:true,tenant:a?{code:a.code,company:a.company,ownerName:a.ownerName}:{code,company:'거래처'},actingAs:user.role==='superadmin'})}
  if(u.pathname==='/api/admin/accounts/status'&&req.method==='POST'){if(user.role!=='superadmin')return json(res,403,{ok:false,error:'최고관리자 권한이 필요합니다.'});return readBody(req).then(body=>{try{const d=JSON.parse(body||'{}'),list=readAccounts(),a=list.find(x=>x.id===d.id);if(!a)return json(res,404,{ok:false,error:'계정을 찾을 수 없습니다.'});if(!['active','pending','suspended'].includes(d.status))return json(res,400,{ok:false,error:'상태값 오류'});a.status=d.status;saveAccounts(list);return json(res,200,{ok:true})}catch(e){return json(res,400,{ok:false,error:e.message})}})}
  if(u.pathname==='/api/admin/accounts/backup'&&req.method==='POST'){if(user.role!=='superadmin')return json(res,403,{ok:false,error:'최고관리자 권한이 필요합니다.'});try{const list=readAccounts(),stamp=new Date().toISOString().replace(/[:.]/g,'-'),file=path.join(ACCOUNT_BACKUP_DIR,`accounts-manual-${stamp}.json`);atomicWrite(file,JSON.stringify(list,null,2));return json(res,200,{ok:true,count:list.length,file:path.basename(file)})}catch(e){return json(res,500,{ok:false,error:e.message})}}
