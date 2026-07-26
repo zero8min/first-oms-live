@@ -185,6 +185,31 @@ ensureOwnerAccount();
 
 // ===== v7.5 strict multi-tenant isolation =====
 const DDAENG_TENANT_CODE=process.env.DDAENG_TENANT_CODE||'FIRST-0001';
+function ensureDdaengTenantAccount(){
+ let list=readAccounts(),changed=false;
+ let tenant=list.find(a=>a.code===DDAENG_TENANT_CODE);
+ if(!tenant){
+  tenant={
+   id:crypto.randomUUID(),code:DDAENG_TENANT_CODE,username:'ddaenglive-system',
+   passwordHash:passwordHash(crypto.randomBytes(24).toString('hex')),
+   company:'땡라이브',ownerName:'땡라이브',phone:'',role:'tenant',status:'active',
+   systemManaged:true,createdAt:new Date().toISOString()
+  };
+  list.push(tenant);changed=true;
+ }else{
+  if(tenant.role!=='tenant'){tenant.role='tenant';changed=true}
+  if(tenant.status!=='active'){tenant.status='active';changed=true}
+  if(!tenant.company||tenant.company==='FIRST OMS'){tenant.company='땡라이브';changed=true}
+  if(!tenant.ownerName){tenant.ownerName='땡라이브';changed=true}
+  if(!tenant.username||list.some(a=>a!==tenant&&a.username===tenant.username)){
+   tenant.username='ddaenglive-system';changed=true
+  }
+  tenant.systemManaged=true;
+ }
+ if(changed)saveAccounts(list);else ensureTenantStorage(tenant);
+ return tenant;
+}
+ensureDdaengTenantAccount();
 function tenantFile(code,name){ensureTenantStorage({code});return path.join(tenantDir(code),name)}
 function tenantBackupDir(code,name){const d=path.join(tenantDir(code),name);fs.mkdirSync(d,{recursive:true});return d}
 function readJsonObject(file,fallback){try{const v=JSON.parse(fs.readFileSync(file,'utf8'));return v&&typeof v==='object'?v:fallback}catch(e){return fallback}}
@@ -385,7 +410,7 @@ const server=http.createServer((req,res)=>{
  const user=currentUser(req);
  if(!publicPaths.has(u.pathname)&&!publicApi&&!user){if(u.pathname.startsWith('/api/'))return json(res,401,{ok:false,error:'로그인이 필요합니다.'});res.writeHead(302,{Location:'/login.html'});return res.end()}
  if(u.pathname==='/api/admin/accounts'&&req.method==='GET'){if(user.role!=='superadmin')return json(res,403,{ok:false,error:'최고관리자 권한이 필요합니다.'});return json(res,200,{ok:true,accounts:readAccounts().map(({passwordHash,...a})=>a)})}
- if(u.pathname==='/api/admin/select-tenant'&&req.method==='POST'){if(user.role!=='superadmin')return json(res,403,{ok:false,error:'최고관리자 권한이 필요합니다.'});return readBody(req).then(body=>{try{const d=JSON.parse(body||'{}'),a=readAccounts().find(x=>x.code===d.code&&x.role==='tenant');if(!a)return json(res,404,{ok:false,error:'거래처를 찾을 수 없습니다.'});const sid=cookies(req).ddaeng_session,ss=sessions.get(sid);if(!ss)return json(res,401,{ok:false,error:'세션이 만료되었습니다.'});ss.activeTenantCode=a.code;ss.activeTenantAt=Date.now();sessions.set(sid,ss);return json(res,200,{ok:true,tenant:{code:a.code,company:a.company,ownerName:a.ownerName}})}catch(e){return json(res,400,{ok:false,error:e.message})}})}
+ if(u.pathname==='/api/admin/select-tenant'&&req.method==='POST'){if(user.role!=='superadmin')return json(res,403,{ok:false,error:'최고관리자 권한이 필요합니다.'});return readBody(req).then(body=>{try{const d=JSON.parse(body||'{}');if(String(d.code||'')===DDAENG_TENANT_CODE)ensureDdaengTenantAccount();const a=readAccounts().find(x=>x.code===d.code&&x.role==='tenant');if(!a)return json(res,404,{ok:false,error:'거래처를 찾을 수 없습니다.'});const sid=cookies(req).ddaeng_session,ss=sessions.get(sid);if(!ss)return json(res,401,{ok:false,error:'세션이 만료되었습니다.'});ss.activeTenantCode=a.code;ss.activeTenantAt=Date.now();sessions.set(sid,ss);return json(res,200,{ok:true,tenant:{code:a.code,company:a.company,ownerName:a.ownerName}})}catch(e){return json(res,400,{ok:false,error:e.message})}})}
  if(u.pathname==='/api/admin/current-tenant'&&req.method==='GET'){const code=selectedTenantCode(req),a=readAccounts().find(x=>x.code===code);return json(res,200,{ok:true,tenant:a?{code:a.code,company:a.company,ownerName:a.ownerName}:{code,company:'거래처'},actingAs:user.role==='superadmin'})}
  if(u.pathname==='/api/admin/accounts/status'&&req.method==='POST'){if(user.role!=='superadmin')return json(res,403,{ok:false,error:'최고관리자 권한이 필요합니다.'});return readBody(req).then(body=>{try{const d=JSON.parse(body||'{}'),list=readAccounts(),a=list.find(x=>x.id===d.id);if(!a)return json(res,404,{ok:false,error:'계정을 찾을 수 없습니다.'});if(!['active','pending','suspended'].includes(d.status))return json(res,400,{ok:false,error:'상태값 오류'});a.status=d.status;saveAccounts(list);return json(res,200,{ok:true})}catch(e){return json(res,400,{ok:false,error:e.message})}})}
  if(u.pathname==='/api/admin/accounts/backup'&&req.method==='POST'){if(user.role!=='superadmin')return json(res,403,{ok:false,error:'최고관리자 권한이 필요합니다.'});try{const list=readAccounts(),stamp=new Date().toISOString().replace(/[:.]/g,'-'),file=path.join(ACCOUNT_BACKUP_DIR,`accounts-manual-${stamp}.json`);atomicWrite(file,JSON.stringify(list,null,2));return json(res,200,{ok:true,count:list.length,file:path.basename(file)})}catch(e){return json(res,500,{ok:false,error:e.message})}}
