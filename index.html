@@ -174,7 +174,7 @@ main{padding-top:18px}
 </head>
 <body><div id="tenantGuard" style="display:none;position:sticky;top:0;z-index:99999;background:#7b2d2d;color:#fff;padding:10px 16px;font-weight:900;text-align:center;box-shadow:0 2px 8px #0005"></div>
 <header>
-  <div><div class="brand"><b>FIRST OMS</b> 땡라이브 정산서버 v7.10</div><div class="sub">고객DB·판매리스트 3중 자동보존 · 정산 · 입금 · 택배</div></div>
+  <div><div class="brand"><b>FIRST OMS</b> 땡라이브 정산서버 v7.11</div><div class="sub">고객DB·판매리스트 3중 자동보존 · 정산 · 입금 · 택배</div></div>
   <div class="actions no-print">
     <span id="loginUser" class="sub">로그인 확인 중</span><button id="accountAdminBtn" class="btn secondary" style="display:none" onclick="location.href='/superadmin.html'">거래처 계정관리</button><button class="btn secondary" onclick="location.href='/change-password.html'">비밀번호 변경</button><button class="btn secondary" onclick="runFunctionCheck()">기능점검</button><button class="btn secondary" onclick="logoutNow()">로그아웃</button>
     <button class="btn secondary" onclick="recoverOldData()">이전 고객DB 복구</button>
@@ -663,7 +663,7 @@ async function openReceiptDetail(key){
  modal.classList.add('show');
  document.getElementById('detailEditBtn').onclick=()=>openReceiptEditByKey(key);
  document.getElementById('detailPrintBtn').onclick=()=>printByKey(key);
- try{const base64=await receiptImageBase64(r);document.getElementById('receiptDetailBody').innerHTML=`<img class="receipt-image-preview" alt="${esc(r.nick)} 정산서 이미지" src="${base64}">`;}catch(e){document.getElementById('receiptDetailBody').innerHTML=receiptHTML(r,indexOfReceiptKey(key));}
+ try{const base64=await receiptImageBase64(r);document.getElementById('receiptDetailBody').innerHTML=`<img class="receipt-image-preview" alt="${esc(r.nick)} 정산서 이미지" src="data:image/jpeg;base64,${base64}">`;}catch(e){document.getElementById('receiptDetailBody').innerHTML=receiptHTML(r,indexOfReceiptKey(key));}
 }
 function closeReceiptDetail(){document.getElementById('receiptDetailModal')?.classList.remove('show');}
 
@@ -998,17 +998,35 @@ function renderShipping(){
  const filter=$('shippingFilter').value, bundle=$('bundleMode').value; let rs=getReceipts();if(filter==='paid')rs=rs.filter(r=>r.payment.status==='paid');
  const groups=new Map();rs.forEach(r=>{const k=bundle==='customer'?(r.customer?.id||r.nick):r.key;if(!groups.has(k))groups.set(k,{name:r.customer?.name||'',nick:r.nick,phone:r.customer?.phone||'',address:[r.customer?.postalCode,r.customer?.address,r.customer?.detailAddress].filter(Boolean).join(' '),dates:new Set(),items:[],subtotal:0,fee:0,total:0,status:r.payment.status});const g=groups.get(k);g.dates.add(r.date);g.items.push(...r.items);g.subtotal+=r.subtotal;g.fee+=r.fee;g.total+=r.total});
  const arr=[...groups.values()].map(g=>({...g,code:shippingCodeFor(g)}));state.shippingScans=state.shippingScans||{};
- $('shippingTable').innerHTML=arr.length?'<div class="scroll"><table class="shipping-table"><thead><tr><th>포장</th><th>택배코드</th><th>고객명</th><th>닉네임</th><th>연락처</th><th>주소</th><th>방송일</th><th>#상품/수량/단가/금액</th><th>상품합계</th><th>배송비</th><th>토탈금액</th></tr></thead><tbody>'+arr.map(g=>{const packed=!!state.shippingScans[g.code];return `<tr class="${packed?'packed-row':''}"><td>${packed?'<span class="badge good">포장완료</span><br><small>'+new Date(state.shippingScans[g.code].at).toLocaleString('ko-KR')+'</small>':'<span class="badge warn">대기</span>'}<br><button class="btn secondary" style="padding:5px 8px;margin-top:5px" onclick="togglePackingStatus('${esc(g.code)}')">${packed?'미완료로 변경':'수기 완료'}</button></td><td class="shipping-code">${esc(g.code)}</td><td>${esc(g.name)}</td><td>${esc(g.nick)}</td><td>${esc(g.phone)}</td><td class="address-cell">${esc(g.address)}</td><td>${[...g.dates].join(', ')}</td><td>${g.items.map((x,i)=>`#${esc(x.number||i+1)} ${esc(x.item)} / ${x.qty}개 / ${money(x.unit)} / ${money(x.amount)}`).join('<br>')}</td><td>${money(g.subtotal)}</td><td>${money(g.fee)}</td><td><b>${money(g.total)}</b></td></tr>`}).join('')+'</tbody></table></div>':'<div class="empty">출력할 택배 대상이 없습니다.</div>';window.currentShipping=arr;
+ $('shippingTable').innerHTML=arr.length?'<div class="scroll"><table class="shipping-table"><thead><tr><th>포장</th><th>택배코드</th><th>고객명</th><th>닉네임</th><th>연락처</th><th>주소</th><th>방송일</th><th aria-label="상품내역"></th><th>상품합계</th><th>배송비</th><th>토탈금액</th></tr></thead><tbody>'+arr.map(g=>{const packed=!!state.shippingScans[g.code];return `<tr class="${packed?'packed-row':''}"><td>${packed?'<span class="badge good">포장완료</span><br><small>'+new Date(state.shippingScans[g.code].at).toLocaleString('ko-KR')+'</small>':'<span class="badge warn">대기</span>'}<br><button class="btn secondary" style="padding:5px 8px;margin-top:5px" onclick="togglePackingStatus('${esc(g.code)}')">${packed?'미완료로 변경':'수기 완료'}</button></td><td class="shipping-code">${esc(g.code)}</td><td>${esc(g.name)}</td><td>${esc(g.nick)}</td><td>${esc(g.phone)}</td><td class="address-cell">${esc(g.address)}</td><td>${[...g.dates].join(', ')}</td><td>${g.items.map((x,i)=>`#${esc(x.number||i+1)} ${esc(x.item)} / ${x.qty}개 / ${money(x.unit)} / ${money(x.amount)}`).join('<br>')}</td><td>${money(g.subtotal)}</td><td>${money(g.fee)}</td><td><b>${money(g.total)}</b></td></tr>`}).join('')+'</tbody></table></div>':'<div class="empty">출력할 택배 대상이 없습니다.</div>';window.currentShipping=arr;
 }
 
-function togglePackingStatus(code){state.shippingScans=state.shippingScans||{};if(state.shippingScans[code]){if(!confirm('포장완료를 미완료로 변경할까요?'))return;delete state.shippingScans[code]}else{const worker=prompt('작업자 이름을 입력해 주세요. (선택사항)','관리자')||'관리자';state.shippingScans[code]={at:new Date().toISOString(),source:'admin-manual',worker}}saveSilently();renderShipping()}
-function processShippingScan(value){
+async function togglePackingStatus(code){
+ state.shippingScans=state.shippingScans||{};
+ try{
+  if(state.shippingScans[code]){
+   if(!confirm('포장완료를 미완료로 변경할까요?'))return;
+   const r=await fetch('/api/packing/status?code='+encodeURIComponent(code),{method:'DELETE'}),d=await r.json();
+   if(!r.ok||!d.ok)throw new Error(d.error||'상태 변경 실패');
+  }else{
+   const worker=prompt('작업자 이름을 입력해 주세요. (선택사항)','관리자')||'관리자';
+   const r=await fetch('/api/packing/status',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({code,worker,source:'admin-manual'})}),d=await r.json();
+   if(!r.ok||!d.ok)throw new Error(d.error||'상태 변경 실패');
+  }
+  await syncShippingScans(true);
+ }catch(e){alert('포장상태 변경 실패: '+e.message)}
+}
+async function processShippingScan(value){
  const input=$('shippingScanInput'),code=String(value||input?.value||'').trim().toUpperCase();
  const status=$('shippingScanStatus');if(!code){status.textContent='스캔할 코드가 없습니다.';return}
  const found=(window.currentShipping||[]).find(g=>g.code.toUpperCase()===code||String(g.phone||'').replace(/\D/g,'')===code.replace(/\D/g,''));
  if(!found){status.textContent='목록에서 일치하는 택배코드를 찾지 못했습니다: '+code;return}
- state.shippingScans=state.shippingScans||{};state.shippingScans[found.code]={at:new Date().toISOString(),name:found.name,nick:found.nick};
- saveSilently();renderShipping();status.textContent=`포장완료 처리: ${found.name||found.nick} · ${found.code}`;if(input){input.value='';input.focus()}
+ try{
+  const rr=await fetch('/api/packing/status',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({code:found.code,worker:'관리자 스캔',source:'admin-scan'})}),dd=await rr.json();
+  if(!rr.ok||!dd.ok)throw new Error(dd.error||'포장완료 저장 실패');
+  await syncShippingScans(true);
+  status.textContent=`포장완료 처리: ${found.name||found.nick} · ${found.code}`;if(input){input.value='';input.focus()}
+ }catch(e){status.textContent='포장완료 저장 실패: '+e.message}
 }
 $('shippingScanInput')?.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();processShippingScan()}});
 let shippingScanStream=null,shippingScanTimer=null;
@@ -1022,6 +1040,16 @@ async function startCameraScanner(){
  }catch(e){status.textContent='카메라를 열지 못했습니다: '+e.message}
 }
 function stopCameraScanner(){if(shippingScanTimer)cancelAnimationFrame(shippingScanTimer);shippingScanTimer=null;if(shippingScanStream)shippingScanStream.getTracks().forEach(t=>t.stop());shippingScanStream=null;const v=$('shippingScanVideo');if(v){v.pause();v.srcObject=null;v.style.display='none'}}
+async function syncShippingScans(renderAfter=false){
+ try{
+  const r=await fetch('/api/packing/scans?ts='+Date.now(),{cache:'no-store'}),d=await r.json();
+  if(!r.ok||!d.ok)throw new Error(d.error||'포장상태 조회 실패');
+  state.shippingScans=d.shippingScans||{};
+  localStorage.setItem(KEY,JSON.stringify(state));
+  if(renderAfter)renderShipping();
+  return true;
+ }catch(e){console.warn('포장상태 동기화 실패',e);return false}
+}
 function downloadShippingList(){renderShipping();const rows=(window.currentShipping||[]).map((g,i)=>({'번호':i+1,'포장상태':state.shippingScans?.[g.code]?'포장완료':'대기','택배코드':g.code,'받는분':g.name,'닉네임':g.nick,'연락처':g.phone,'주소':g.address,'방송일':[...g.dates].join(', '),'상품내역':g.items.map((x,j)=>`#${x.number||j+1} ${x.item} ${x.qty}개 단가 ${x.unit} 금액 ${x.amount}`).join(' / '),'상품합계':g.subtotal,'배송비':g.fee,'토탈금액':g.total}));exportXlsx(rows,'FIRST_OMS_택배리스트.xlsx','택배리스트')}
 function printShipping(){renderShipping();const arr=window.currentShipping||[];if(!arr.length)return alert('출력할 택배 대상이 없습니다.');const data=JSON.stringify(arr.map(g=>({code:g.code,url:location.origin+'/packing.html?code='+encodeURIComponent(g.code)})));const pages=arr.map((g,i)=>`<section class="page"><header><div><h1>땡라이브 고객별 포장리스트</h1><b>${esc(g.name||g.nick)}</b> · ${esc(g.nick)}</div><div id="qr-${i}" class="qr"></div></header><div class="meta"><div><b>연락처</b> ${esc(g.phone)}</div><div><b>방송일</b> ${[...g.dates].join(', ')}</div><div class="address"><b>주소</b> ${esc(g.address)}</div><div><b>택배코드</b> ${esc(g.code)}</div></div><table><thead><tr><th>번호</th><th>상품명</th><th>수량</th><th>단가</th><th>금액</th><th>확인</th></tr></thead><tbody>${g.items.map((x,j)=>`<tr><td>#${esc(x.number||j+1)}</td><td>${esc(x.item)}</td><td>${x.qty}</td><td>${money(x.unit)}</td><td>${money(x.amount)}</td><td>□</td></tr>`).join('')}</tbody></table><div class="totals"><div>상품 합계 <b>${money(g.subtotal)}</b></div><div>택배비 <b>${money(g.fee)}</b></div><div class="grand">토탈 금액 <b>${money(g.total)}</b></div></div><footer>QR을 휴대폰 기본 카메라로 스캔하면 이 고객의 포장리스트가 열립니다.</footer></section>`).join('');const w=window.open('','_blank');w.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>고객별 택배리스트</title><script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"><\/script><style>*{box-sizing:border-box}body{margin:0;font-family:Arial,'Noto Sans KR',sans-serif;color:#111}.page{width:210mm;min-height:297mm;padding:14mm;page-break-after:always;position:relative}.page:last-child{page-break-after:auto}header{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:3px solid #111;padding-bottom:12px}h1{font-size:25px;margin:0 0 8px}.qr img,.qr canvas{width:110px!important;height:110px!important}.meta{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:18px 0;font-size:14px}.address{grid-column:1/-1;line-height:1.5}table{width:100%;border-collapse:collapse;table-layout:fixed}th,td{border:1px solid #555;padding:11px 8px;text-align:center;word-break:keep-all}th:nth-child(2),td:nth-child(2){text-align:left;width:42%}.totals{margin:18px 0 0 auto;width:330px;font-size:16px;line-height:2;text-align:right}.grand{font-size:23px;border-top:2px solid #111;margin-top:4px;padding-top:5px}footer{position:absolute;bottom:12mm;left:14mm;right:14mm;text-align:center;color:#555}@page{size:A4 portrait;margin:0}</style></head><body>${pages}<script>const d=${data};window.onload=()=>{d.forEach((x,i)=>new QRCode(document.getElementById('qr-'+i),{text:x.url,width:180,height:180}));setTimeout(()=>window.print(),700)};<\/script></body></html>`);w.document.close()}
 function downloadReceiptList(){
@@ -1202,6 +1230,8 @@ async function bootFirstOms(){
 }
 bootFirstOms();
 setInterval(()=>{if(!document.hidden)syncServerCustomers(false)},10000);
+setInterval(()=>{if(!document.hidden&&document.querySelector('[data-page=shipping]')?.classList.contains('active'))syncShippingScans(true)},3000);
+syncShippingScans(true);
 
 async function loadLoginUser(){try{const r=await fetch('/api/auth/me');if(!r.ok){location.href='/login.html';return}const d=await r.json();const u=d.user||{};if(u.mustChangePassword){location.href='/change-password.html';return}const el=document.getElementById('loginUser');if(el)el.textContent=`${u.company||u.username} · ${u.code||''}`;const b=document.getElementById('accountAdminBtn');if(b&&u.role==='superadmin')b.style.display='inline-block'}catch(e){location.href='/login.html'}}
 async function logoutNow(){try{await fetch('/api/auth/logout',{method:'POST'})}finally{location.href='/login.html'}}
