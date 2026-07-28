@@ -965,65 +965,6 @@ receiptImageBase64=async function(r){
  x.textAlign='center';x.font='16px sans-serif';x.fillText('감사합니다! 좋은 하루 되세요 :)',745,y+150);x.fillStyle='#777';x.fillText('FIRST OMS · 주문내역을 확인해 주세요.',W/2,H-28);
  let q=.82,data=c.toDataURL('image/jpeg',q);while(data.length>350000&&q>.45){q-=.06;data=c.toDataURL('image/jpeg',q)}return data.split(',')[1];
 };
-
-/* v7.14: 택배 파일접수 송장번호 일괄 업로드 */
-let trackingUploadPreview=[];
-function normalizeTrackingText(v){return String(v??'').trim().replace(/\s+/g,' ')}
-function normalizePhone(v){return String(v??'').replace(/\D/g,'').replace(/^82/,'0')}
-function normalizeAddress(v){return String(v??'').toLowerCase().replace(/[\s,().-]/g,'')}
-function normalizeHeader(v){return String(v??'').trim().toLowerCase().replace(/[\s_()\[\]\-]/g,'')}
-function pickTrackingField(row,names){
- const entries=Object.entries(row||{});for(const n of names){const nn=normalizeHeader(n);const hit=entries.find(([k])=>normalizeHeader(k)===nn||normalizeHeader(k).includes(nn));if(hit&&String(hit[1]??'').trim()!=='')return hit[1]}return '';
-}
-function downloadTrackingTemplate(){
- exportXlsx([{'주문번호(선택)':'','고객명':'홍길동','닉네임(선택)':'길동맘','연락처':'010-0000-0000','주소':'서울시 강남구 예시로 1','송장번호':'123456789012','택배사':'CJ대한통운'}],'FIRST_OMS_송장업로드_양식.xlsx','송장업로드');
-}
-async function prepareTrackingUpload(input){
- const file=input?.files?.[0];if(!file)return;
- try{
-  renderShipping();
-  const buf=await file.arrayBuffer(),wb=XLSX.read(buf,{type:'array',cellDates:true});let rows=[];
-  for(const sn of wb.SheetNames){const x=XLSX.utils.sheet_to_json(wb.Sheets[sn],{defval:'',raw:false});if(x.length>rows.length)rows=x}
-  if(!rows.length)throw new Error('업로드 파일에서 데이터 행을 찾지 못했습니다.');
-  const groups=window.currentShipping||[];
-  trackingUploadPreview=rows.map((row,index)=>{
-   const orderNo=normalizeTrackingText(pickTrackingField(row,['주문번호','주문번호(선택)','택배코드','코드']));
-   const name=normalizeTrackingText(pickTrackingField(row,['고객명','받는분','수하인명','수취인명','성명','이름']));
-   const nick=normalizeTrackingText(pickTrackingField(row,['닉네임','별명']));
-   const phone=normalizePhone(pickTrackingField(row,['연락처','전화번호','휴대폰','수하인전화번호','수취인전화번호']));
-   const address=normalizeTrackingText(pickTrackingField(row,['주소','배송지','수하인주소','수취인주소']));
-   const tracking=String(pickTrackingField(row,['송장번호','운송장번호','등기번호','trackingnumber','invoice'])).replace(/[^0-9A-Za-z-]/g,'').trim();
-   const courier=normalizeTrackingText(pickTrackingField(row,['택배사','배송사','운송사']))||'파일접수';
-   let candidates=[];
-   if(orderNo)candidates=groups.filter(g=>String(g.code||'').toUpperCase()===orderNo.toUpperCase());
-   if(!candidates.length&&phone)candidates=groups.filter(g=>normalizePhone(g.phone)===phone);
-   if(candidates.length>1&&name)candidates=candidates.filter(g=>normalizeTrackingText(g.name)===name);
-   if(!candidates.length&&name&&address){const na=normalizeAddress(address);candidates=groups.filter(g=>normalizeTrackingText(g.name)===name&&(normalizeAddress(g.address).includes(na)||na.includes(normalizeAddress(g.address))))}
-   if(!candidates.length&&name)candidates=groups.filter(g=>normalizeTrackingText(g.name)===name);
-   if(candidates.length>1&&nick)candidates=candidates.filter(g=>normalizeTrackingText(g.nick)===nick);
-   const g=candidates.length===1?candidates[0]:null,existing=g?String(state.shippingScans?.[g.code]?.trackingNumber||''):'';
-   let status='match';let reason='자동 연결';
-   if(!tracking){status='invalid';reason='송장번호 없음'}else if(!g){status=candidates.length>1?'review':'unmatched';reason=candidates.length>1?'동명이인/중복 후보':'고객을 찾지 못함'}else if(existing&&existing!==tracking){status='conflict';reason='기존 송장번호와 다름'}else if(existing===tracking){status='same';reason='이미 등록됨'}
-   return {index:index+2,name,phone,address,tracking,courier,g,existing,status,reason};
-  });
-  showTrackingUploadPreview(file.name);
- }catch(e){alert('송장 파일 확인 실패: '+e.message)}finally{input.value=''}
-}
-function showTrackingUploadPreview(fileName){
- const counts=trackingUploadPreview.reduce((a,x)=>(a[x.status]=(a[x.status]||0)+1,a),{}),safe=trackingUploadPreview.filter(x=>x.status==='match').length;
- let modal=document.getElementById('trackingUploadModal');if(!modal){modal=document.createElement('div');modal.id='trackingUploadModal';modal.className='modal';document.body.appendChild(modal)}
- modal.innerHTML=`<div class="modal-box" style="max-width:1100px"><div class="modal-title"><h3>송장 파일 업로드 미리보기</h3><button class="close" onclick="closeTrackingUploadPreview()">×</button></div><div class="note"><b>${esc(fileName)}</b> · 총 ${trackingUploadPreview.length}건 / 자동반영 ${safe}건 / 확인필요 ${(counts.review||0)+(counts.unmatched||0)+(counts.invalid||0)}건 / 충돌 ${counts.conflict||0}건 / 기존동일 ${counts.same||0}건<br>기존 송장번호는 자동으로 덮어쓰지 않습니다.</div><div class="scroll" style="max-height:55vh"><table><thead><tr><th>행</th><th>파일 고객</th><th>연결 고객</th><th>송장번호</th><th>기존번호</th><th>결과</th></tr></thead><tbody>${trackingUploadPreview.map(x=>`<tr><td>${x.index}</td><td>${esc(x.name||'-')}<br><small>${esc(x.phone||'-')}</small></td><td>${x.g?`${esc(x.g.nick)} (${esc(x.g.name)})`:'-'}</td><td>${esc(x.tracking||'-')}</td><td>${esc(x.existing||'-')}</td><td><span class="badge ${x.status==='match'||x.status==='same'?'good':'warn'}">${esc(x.reason)}</span></td></tr>`).join('')}</tbody></table></div><div class="actions" style="justify-content:flex-end;margin-top:14px"><button class="btn secondary" onclick="closeTrackingUploadPreview()">취소</button><button class="btn" onclick="applyTrackingUpload(this)" ${safe?'':'disabled'}>자동 연결 ${safe}건 적용</button></div></div>`;
- modal.classList.add('show');
-}
-function closeTrackingUploadPreview(){document.getElementById('trackingUploadModal')?.classList.remove('show')}
-async function applyTrackingUpload(button){
- const safe=trackingUploadPreview.filter(x=>x.status==='match');if(!safe.length)return alert('자동 반영할 안전한 일치 항목이 없습니다.');
- if(!confirm(`${safe.length}건의 송장번호를 고객 정산서와 택배리스트에 반영하시겠습니까?`))return;
- button.disabled=true;let ok=0,fail=[];const tenant=window.currentTenantCode||'FIRST-0001';
- for(const x of safe){try{const r=await fetch('/api/public/packing/tracking',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({code:x.g.code,tenantCode:tenant,trackingNumber:x.tracking,courier:x.courier,source:'file-upload'})}),d=await r.json();if(!r.ok||!d.ok)throw new Error(d.error||'저장 실패');state.shippingScans=state.shippingScans||{};state.shippingScans[x.g.code]={...(state.shippingScans[x.g.code]||{}),trackingNumber:x.tracking,courier:x.courier,trackingSource:'file-upload',trackingUpdatedAt:d.trackingUpdatedAt||new Date().toISOString()};ok++}catch(e){fail.push(`${x.name||x.g.code}: ${e.message}`)}}
- saveSilently();renderShipping();closeTrackingUploadPreview();alert(`송장 업로드 완료: 성공 ${ok}건${fail.length?` / 실패 ${fail.length}건\n${fail.slice(0,5).join('\n')}`:''}`);
-}
-
 </script>
 
 </body></html>`);w.document.close();w.print();
@@ -1531,6 +1472,66 @@ receiptImageBase64=async function(r){
  x.textAlign='center';x.font='16px sans-serif';x.fillText('감사합니다! 좋은 하루 되세요 :)',745,y+150);x.fillStyle='#777';x.fillText('FIRST OMS · 주문내역을 확인해 주세요.',W/2,H-28);
  let q=.82,data=c.toDataURL('image/jpeg',q);while(data.length>350000&&q>.45){q-=.06;data=c.toDataURL('image/jpeg',q)}return data.split(',')[1];
 };
+
+
+/* v7.15: 택배 파일접수 송장번호 일괄 업로드 - 정상 스크립트 영역 */
+let trackingUploadPreview=[];
+function normalizeTrackingText(v){return String(v??'').trim().replace(/\s+/g,' ')}
+function normalizePhone(v){return String(v??'').replace(/\D/g,'').replace(/^82/,'0')}
+function normalizeAddress(v){return String(v??'').toLowerCase().replace(/[\s,().-]/g,'')}
+function normalizeHeader(v){return String(v??'').trim().toLowerCase().replace(/[\s_()\[\]\-]/g,'')}
+function pickTrackingField(row,names){
+ const entries=Object.entries(row||{});for(const n of names){const nn=normalizeHeader(n);const hit=entries.find(([k])=>normalizeHeader(k)===nn||normalizeHeader(k).includes(nn));if(hit&&String(hit[1]??'').trim()!=='')return hit[1]}return '';
+}
+function downloadTrackingTemplate(){
+ exportXlsx([{'주문번호(선택)':'','고객명':'홍길동','닉네임(선택)':'길동맘','연락처':'010-0000-0000','주소':'서울시 강남구 예시로 1','송장번호':'123456789012','택배사':'CJ대한통운'}],'FIRST_OMS_송장업로드_양식.xlsx','송장업로드');
+}
+async function prepareTrackingUpload(input){
+ const file=input?.files?.[0];if(!file)return;
+ try{
+  renderShipping();
+  const buf=await file.arrayBuffer(),wb=XLSX.read(buf,{type:'array',cellDates:true});let rows=[];
+  for(const sn of wb.SheetNames){const x=XLSX.utils.sheet_to_json(wb.Sheets[sn],{defval:'',raw:false});if(x.length>rows.length)rows=x}
+  if(!rows.length)throw new Error('업로드 파일에서 데이터 행을 찾지 못했습니다.');
+  const groups=window.currentShipping||[];
+  trackingUploadPreview=rows.map((row,index)=>{
+   const orderNo=normalizeTrackingText(pickTrackingField(row,['주문번호','주문번호(선택)','택배코드','코드']));
+   const name=normalizeTrackingText(pickTrackingField(row,['고객명','받는분','수하인명','수취인명','성명','이름']));
+   const nick=normalizeTrackingText(pickTrackingField(row,['닉네임','별명']));
+   const phone=normalizePhone(pickTrackingField(row,['연락처','전화번호','휴대폰','수하인전화번호','수취인전화번호']));
+   const address=normalizeTrackingText(pickTrackingField(row,['주소','배송지','수하인주소','수취인주소']));
+   const tracking=String(pickTrackingField(row,['송장번호','운송장번호','등기번호','trackingnumber','invoice'])).replace(/[^0-9A-Za-z-]/g,'').trim();
+   const courier=normalizeTrackingText(pickTrackingField(row,['택배사','배송사','운송사']))||'파일접수';
+   let candidates=[];
+   if(orderNo)candidates=groups.filter(g=>String(g.code||'').toUpperCase()===orderNo.toUpperCase());
+   if(!candidates.length&&phone)candidates=groups.filter(g=>normalizePhone(g.phone)===phone);
+   if(candidates.length>1&&name)candidates=candidates.filter(g=>normalizeTrackingText(g.name)===name);
+   if(!candidates.length&&name&&address){const na=normalizeAddress(address);candidates=groups.filter(g=>normalizeTrackingText(g.name)===name&&(normalizeAddress(g.address).includes(na)||na.includes(normalizeAddress(g.address))))}
+   if(!candidates.length&&name)candidates=groups.filter(g=>normalizeTrackingText(g.name)===name);
+   if(candidates.length>1&&nick)candidates=candidates.filter(g=>normalizeTrackingText(g.nick)===nick);
+   const g=candidates.length===1?candidates[0]:null,existing=g?String(state.shippingScans?.[g.code]?.trackingNumber||''):'';
+   let status='match';let reason='자동 연결';
+   if(!tracking){status='invalid';reason='송장번호 없음'}else if(!g){status=candidates.length>1?'review':'unmatched';reason=candidates.length>1?'동명이인/중복 후보':'고객을 찾지 못함'}else if(existing&&existing!==tracking){status='conflict';reason='기존 송장번호와 다름'}else if(existing===tracking){status='same';reason='이미 등록됨'}
+   return {index:index+2,name,phone,address,tracking,courier,g,existing,status,reason};
+  });
+  showTrackingUploadPreview();
+ }catch(e){alert('송장 파일 확인 실패: '+e.message)}finally{input.value=''}
+}
+function showTrackingUploadPreview(){
+ const counts=trackingUploadPreview.reduce((a,x)=>(a[x.status]=(a[x.status]||0)+1,a),{}),safe=trackingUploadPreview.filter(x=>x.status==='match').length;
+ let modal=document.getElementById('trackingUploadModal');if(!modal){modal=document.createElement('div');modal.id='trackingUploadModal';modal.className='modal';document.body.appendChild(modal)}
+ modal.innerHTML=`<div class="modal-box" style="max-width:1100px"><div class="modal-title"><h3>송장 파일 업로드 미리보기</h3><button class="close" onclick="closeTrackingUploadPreview()">×</button></div><div class="note">총 ${trackingUploadPreview.length}건 / 자동반영 ${safe}건 / 확인필요 ${(counts.review||0)+(counts.unmatched||0)+(counts.invalid||0)}건 / 충돌 ${counts.conflict||0}건 / 기존동일 ${counts.same||0}건<br>기존 송장번호는 자동으로 덮어쓰지 않습니다.</div><div class="scroll" style="max-height:55vh"><table><thead><tr><th>행</th><th>파일 고객</th><th>연결 고객</th><th>송장번호</th><th>기존번호</th><th>결과</th></tr></thead><tbody>${trackingUploadPreview.map(x=>`<tr><td>${x.index}</td><td>${esc(x.name||'-')}<br><small>${esc(x.phone||'-')}</small></td><td>${x.g?`${esc(x.g.nick)} (${esc(x.g.name)})`:'-'}</td><td>${esc(x.tracking||'-')}</td><td>${esc(x.existing||'-')}</td><td><span class="badge ${x.status==='match'||x.status==='same'?'good':'warn'}">${esc(x.reason)}</span></td></tr>`).join('')}</tbody></table></div><div class="actions" style="justify-content:flex-end;margin-top:14px"><button class="btn secondary" onclick="closeTrackingUploadPreview()">취소</button><button class="btn" onclick="applyTrackingUpload(this)" ${safe?'':'disabled'}>자동 연결 ${safe}건 적용</button></div></div>`;
+ modal.classList.add('show');
+}
+function closeTrackingUploadPreview(){document.getElementById('trackingUploadModal')?.classList.remove('show')}
+async function applyTrackingUpload(button){
+ const safe=trackingUploadPreview.filter(x=>x.status==='match');if(!safe.length)return alert('자동 반영할 안전한 일치 항목이 없습니다.');
+ if(!confirm(`${safe.length}건의 송장번호를 고객 정산서와 택배리스트에 반영하시겠습니까?`))return;
+ button.disabled=true;let ok=0,fail=[];const tenant=window.currentTenantCode||'FIRST-0001';
+ for(const x of safe){try{const r=await fetch('/api/public/packing/tracking',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({code:x.g.code,tenantCode:tenant,trackingNumber:x.tracking,courier:x.courier,source:'file-upload'})}),d=await r.json();if(!r.ok||!d.ok)throw new Error(d.error||'저장 실패');state.shippingScans=state.shippingScans||{};state.shippingScans[x.g.code]={...(state.shippingScans[x.g.code]||{}),trackingNumber:x.tracking,courier:x.courier,trackingSource:'file-upload',trackingUpdatedAt:d.trackingUpdatedAt||new Date().toISOString()};ok++}catch(e){fail.push(`${x.name||x.g.code}: ${e.message}`)}}
+ saveSilently();renderShipping();closeTrackingUploadPreview();alert(`송장 업로드 완료: 성공 ${ok}건${fail.length?` / 실패 ${fail.length}건\n${fail.slice(0,5).join('\n')}`:''}`);
+}
+
 </script>
 
 </body>
