@@ -308,6 +308,8 @@ main{padding-top:18px}
       <div class="actions">
         <button class="btn" onclick="downloadShippingList()">택배리스트 엑셀 출력</button>
         <button class="btn secondary" onclick="printShipping()">택배리스트 인쇄</button>
+        <label class="btn upload">송장 파일 업로드<input id="trackingFile" type="file" accept=".xlsx,.xls,.csv" onchange="prepareTrackingUpload(this)"></label>
+        <button class="btn secondary" onclick="downloadTrackingTemplate()">송장 업로드 양식</button>
       </div>
     </div>
     <div class="form-grid card">
@@ -908,6 +910,122 @@ main{padding-top:18px}
  <div class="actions"><button class="btn" onclick="saveSolapiSettings()">API 입력값 저장·연결</button><button class="btn secondary" onclick="loadSolapiSettings()">연결상태 확인</button></div>
  <p class="note">API Secret은 관리자 서버에만 저장되며 화면에는 다시 표시하지 않습니다. Render 재배포에도 절대 잃지 않으려면 Render Environment에도 같은 값을 등록하거나 Persistent Disk를 연결하세요.</p>
 </div></div>
+
+<style>
+/* v7.13: 택배실 한 화면 정렬 + 출력본 고객명 강조 */
+#shippingTable .scroll{overflow:visible!important}
+.shipping-table.v713-shipping{width:100%!important;min-width:0!important;table-layout:fixed;border-collapse:separate;border-spacing:0 6px}
+.shipping-table.v713-shipping th{font-size:12px;padding:10px 6px;white-space:normal}
+.shipping-table.v713-shipping td{font-size:12px;padding:10px 7px;white-space:normal;word-break:keep-all;line-height:1.45;background:#fff}
+.shipping-table.v713-shipping .customer-main{font-size:18px;font-weight:800;line-height:1.25}
+.shipping-table.v713-shipping .customer-sub{font-size:14px;font-weight:500;margin-top:3px}
+.shipping-table.v713-shipping .customer-phone{font-size:12px;margin-top:5px}
+.shipping-table.v713-shipping .money-total{font-size:16px;font-weight:900}
+.shipping-table.v713-shipping .manage-buttons{display:grid;gap:5px}
+.shipping-table.v713-shipping .manage-buttons .btn{padding:6px 7px;font-size:11px;width:100%}
+.shipping-table.v713-shipping .address-compact{line-height:1.45}
+.shipping-table.v713-shipping .product-compact{line-height:1.5}
+.shipping-table.v713-shipping .tracking-compact input{width:100%;font-size:11px;padding:6px}
+.shipping-table.v713-shipping .tracking-compact .btn{margin-top:4px;width:100%;padding:5px}
+@media(max-width:1100px){
+ .shipping-table.v713-shipping th,.shipping-table.v713-shipping td{font-size:11px;padding:8px 5px}
+ .shipping-table.v713-shipping .customer-main{font-size:16px}
+}
+</style>
+<script>
+/* 최종 요구사항: 택배실 화면은 좌우 스크롤 없이, 출력본에서는 닉네임(이름)을 크게 굵게 */
+renderShipping=function(){
+ const filter=$('shippingFilter').value,bundle=$('bundleMode').value;let rs=getReceipts();if(filter==='paid')rs=rs.filter(r=>r.payment.status==='paid');
+ const groups=new Map();rs.forEach(r=>{const c=r.customer||{},key=bundle==='customer'?(c.id||r.nick):r.key;if(!groups.has(key))groups.set(key,{customerId:c.id||'',name:c.name||'',nick:r.nick,phone:c.phone||'',address:[c.postalCode,c.address,c.detailAddress].filter(Boolean).join(' '),dates:new Set(),items:[],subtotal:0,fee:0,total:0});const g=groups.get(key);g.dates.add(r.date);g.items.push(...r.items);g.subtotal+=r.subtotal;g.fee+=r.fee;g.total+=r.total});
+ const arr=[...groups.values()].map(g=>({...g,code:shippingCodeFor(g)}));state.shippingScans=state.shippingScans||{};window.currentShipping=arr;
+ if(!arr.length){$('shippingTable').innerHTML='<div class="empty">출력할 택배 대상이 없습니다.</div>';return}
+ $('shippingTable').innerHTML=`<table class="shipping-table v713-shipping"><colgroup><col style="width:3%"><col style="width:17%"><col style="width:15%"><col style="width:13%"><col style="width:20%"><col style="width:10%"><col style="width:10%"><col style="width:12%"></colgroup><thead><tr><th>선택</th><th>고객정보</th><th>상품/수량</th><th>결제정보</th><th>배송지/연락처</th><th>배송상태</th><th>송장번호</th><th>관리</th></tr></thead><tbody>${arr.map(g=>{const scan=state.shippingScans?.[g.code]||{},packed=!!scan.at,r=receiptForGroup(g),deposit=r?.payment?.payment?.amount,prod=g.items.slice(0,3).map(x=>`${esc(x.item)} × ${x.qty}`).join('<br>')+(g.items.length>3?`<br><small>외 ${g.items.length-3}건</small>`:'');return `<tr><td><input type="checkbox"></td><td><div class="customer-main">${esc(g.nick)}</div><div class="customer-sub">(${esc(g.name||'이름 미등록')})</div><div class="customer-phone">☎ ${esc(g.phone||'-')}</div></td><td class="product-compact">${prod||'-'}</td><td><div>상품 ${money(g.subtotal)}</div><div>배송비 ${money(g.fee)}</div><div class="money-total">총 ${money(g.total)}</div>${deposit!=null?`<small>입금 ${money(deposit)}</small>`:''}</td><td><div class="address-compact">${esc(g.address||'주소 미등록')}</div><div style="margin-top:6px">☎ ${esc(g.phone||'-')}</div></td><td>${scan.trackingNumber?'<span class="badge good">송장발부</span>':packed?'<span class="badge good">포장완료</span>':'<span class="badge warn">송장발행 대기</span>'}<div style="margin-top:6px"><button class="btn secondary" style="padding:5px 7px" onclick="togglePackingStatus('${esc(g.code)}')">${packed?'미완료 변경':'포장완료'}</button></div></td><td class="tracking-compact"><input id="track-${esc(g.code)}" value="${esc(scan.trackingNumber||'')}" placeholder="송장번호"><button class="btn secondary" onclick="saveTracking('${esc(g.code)}')">저장</button></td><td><div class="manage-buttons"><button class="btn secondary" onclick="openShippingReceipt('${esc(g.code)}')">정산서 보기</button><button class="btn secondary" onclick="openCsModal('${esc(g.code)}')">상세/CS</button><button class="btn secondary" onclick="printInvoiceCopies('${esc(g.code)}')">송장 출력${g.total>=100000?' ×2':''}</button><button class="btn" onclick="sendShipmentNotice('${esc(g.code)}',this)">출고 안내</button></div></td></tr>`}).join('')}</tbody></table>`;
+};
+
+printShipping=function(){
+ renderShipping();const arr=window.currentShipping||[];if(!arr.length)return alert('출력할 택배 대상이 없습니다.');
+ const data=JSON.stringify(arr.map(g=>({code:g.code,url:location.origin+'/packing.html?code='+encodeURIComponent(g.code)})));
+ const pages=arr.map((g,i)=>`<section class="page"><header><div><div class="brand">땡라이브 고객별 포장리스트</div><div class="customer"><strong>${esc(g.nick)}</strong><span>(${esc(g.name||'이름 미등록')})</span></div></div><div id="qr-${i}" class="qr"></div></header><div class="meta"><div><b>연락처</b> ${esc(g.phone||'-')}</div><div><b>방송일</b> ${[...g.dates].join(', ')}</div><div class="address"><b>배송지</b> ${esc(g.address||'주소 미등록')}</div><div><b>택배코드</b> ${esc(g.code)}</div></div><table><thead><tr><th>NO</th><th>상품명</th><th>수량</th><th>단가</th><th>금액</th><th>확인</th></tr></thead><tbody>${g.items.map((x,j)=>`<tr><td>${j+1}</td><td>${esc(x.item)}</td><td>${x.qty}</td><td>${money(x.unit)}</td><td>${money(x.amount)}</td><td>□</td></tr>`).join('')}</tbody></table><div class="totals"><div>상품금액 합계 <b>${money(g.subtotal)}</b></div><div>배송비 <b>${money(g.fee)}</b></div><div class="grand">총 결제금액 <b>${money(g.total)}</b></div></div><footer>QR을 휴대폰 기본 카메라로 스캔하면 이 고객의 포장리스트가 열립니다.</footer></section>`).join('');
+ const w=window.open('','_blank');w.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>고객별 택배리스트</title><script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"><\/script><style>*{box-sizing:border-box}body{margin:0;font-family:Arial,'Noto Sans KR',sans-serif;color:#111}.page{width:210mm;min-height:297mm;padding:14mm;page-break-after:always;position:relative}.page:last-child{page-break-after:auto}header{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:3px solid #111;padding-bottom:12px}.brand{font-size:24px;font-weight:900}.customer{margin-top:12px}.customer strong{display:block;font-size:38px;font-weight:900;line-height:1.05}.customer span{display:block;font-size:25px;font-weight:900;margin-top:5px}.qr img,.qr canvas{width:110px!important;height:110px!important}.meta{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:18px 0;font-size:15px}.address{grid-column:1/-1;line-height:1.5}table{width:100%;border-collapse:collapse;table-layout:fixed}th,td{border:1px solid #555;padding:11px 8px;text-align:center;word-break:keep-all}th{background:#111;color:#fff}th:nth-child(2),td:nth-child(2){text-align:left;width:42%}.totals{margin:18px 0 0 auto;width:360px;font-size:17px;line-height:2;text-align:right}.grand{font-size:25px;border-top:2px solid #111;margin-top:4px;padding-top:5px}footer{position:absolute;bottom:12mm;left:14mm;right:14mm;text-align:center;color:#555}@page{size:A4 portrait;margin:0}</style></head><body>${pages}<script>const d=${data};window.onload=()=>{d.forEach((x,i)=>new QRCode(document.getElementById('qr-'+i),{text:x.url,width:180,height:180}));setTimeout(()=>window.print(),700)};<\/script></body></html>`);w.document.close();
+};
+
+receiptImageBase64=async function(r){
+ const W=1000,H=1414,c=document.createElement('canvas');c.width=W;c.height=H;const x=c.getContext('2d');
+ const cst=r.customer||{},set=state.settings||{},pad=38; x.fillStyle='#fff';x.fillRect(0,0,W,H);x.fillStyle='#111';x.strokeStyle='#111';x.lineWidth=2;
+ x.textAlign='center';x.font='900 66px sans-serif';x.fillText('정 산 서',W/2,125);x.textAlign='left';x.font='900 24px sans-serif';x.fillText('🎁  땡라이브',390,52);
+ x.strokeRect(730,68,225,90);x.font='700 18px sans-serif';x.fillText('주문일',745,102);x.fillText(r.date,825,102);x.fillText('주문번호',745,137);x.fillText(r.date.replaceAll('-','')+'-'+String(indexOfReceiptKey(r.key)+1).padStart(3,'0'),825,137);
+ x.lineWidth=3;x.beginPath();x.moveTo(pad,185);x.lineTo(W-pad,185);x.stroke();
+ x.font='900 30px sans-serif';x.fillText(`${r.nick}님 정산서`,175,235);x.fillStyle='#111';x.fillRect(pad,202,125,44);x.fillStyle='#fff';x.font='900 22px sans-serif';x.fillText('정산서 1',58,232);x.fillStyle='#111';x.font='16px sans-serif';x.fillText('항상 저희 땡라이브를 이용해주셔서 감사합니다.',175,265);
+ x.strokeRect(pad,290,W-pad*2,145);x.font='700 19px sans-serif';x.fillText('고객명',65,335);x.font='900 27px sans-serif';x.fillText(cst.name||'미등록',175,335);x.font='700 19px sans-serif';x.fillText('연락처',65,390);x.font='18px sans-serif';x.fillText(cst.phone||'-',175,390);x.font='700 19px sans-serif';x.fillText('배송지',515,335);x.font='17px sans-serif';wrapText(x,[cst.address,cst.detailAddress].filter(Boolean).join(' ')||'주소 미등록',610,325,320,24,3);x.font='700 19px sans-serif';x.fillText('메모',515,390);x.font='17px sans-serif';x.fillText(cst.memo||'-',610,390);
+ let y=470;const cols=[pad,110,490,625,790,W-pad];x.fillStyle='#111';x.fillRect(pad,y,W-pad*2,44);x.fillStyle='#fff';x.textAlign='center';x.font='700 18px sans-serif';['NO','상품명','수량','단가','금액'].forEach((t,i)=>x.fillText(t,(cols[i]+cols[i+1])/2,y+29));x.fillStyle='#111';y+=44;x.font='17px sans-serif';
+ const maxRows=8;for(let i=0;i<maxRows;i++){x.strokeRect(pad,y,W-pad*2,52);for(let j=1;j<cols.length-1;j++){x.beginPath();x.moveTo(cols[j],y);x.lineTo(cols[j],y+52);x.stroke()}const it=r.items[i];if(it){x.fillText(String(i+1),(cols[0]+cols[1])/2,y+33);x.textAlign='left';x.fillText(it.item,cols[1]+12,y+33);x.textAlign='center';x.fillText(String(it.qty),(cols[2]+cols[3])/2,y+33);x.fillText(Number(it.unit||0).toLocaleString('ko-KR'),(cols[3]+cols[4])/2,y+33);x.fillText(Number(it.amount||0).toLocaleString('ko-KR'),(cols[4]+cols[5])/2,y+33)}y+=52}
+ x.strokeRect(pad,y,W-pad*2,110);x.textAlign='left';x.font='700 19px sans-serif';x.fillText(`상품금액 합계`,60,y+38);x.textAlign='right';x.fillText(money(r.subtotal),480,y+38);x.textAlign='left';x.fillText('배송비',60,y+78);x.textAlign='right';x.fillText(money(r.fee),480,y+78);x.textAlign='left';x.font='900 25px sans-serif';x.fillText('총 결제금액',545,y+62);x.textAlign='right';x.font='900 48px sans-serif';x.fillText(money(r.total),940,y+70);y+=135;
+ x.strokeRect(pad,y,W-pad*2,95);x.textAlign='left';x.fillStyle='#c00';x.font='900 27px sans-serif';x.fillText('일요일 12시까지',100,y+43);x.fillStyle='#111';x.font='700 22px sans-serif';x.fillText('입금 바랍니다.',335,y+43);x.font='17px sans-serif';x.fillText('입금자명은 주문자명과 동일하게 부탁드립니다.',100,y+73);y+=120;
+ x.fillStyle='#fff8d7';x.fillRect(pad,y,500,120);x.strokeRect(pad,y,500,120);x.fillStyle='#111';x.font='700 18px sans-serif';x.fillText('입금계좌',55,y-12);x.font='700 18px sans-serif';x.fillText(set.bank||'카카오뱅크',80,y+38);x.font='900 31px sans-serif';x.fillText(set.account||'계좌번호 미설정',80,y+78);x.font='700 18px sans-serif';x.fillText(`예금주 : ${set.holder||'김미숙'}`,80,y+108);x.font='700 17px sans-serif';x.fillText(set.contact||'고객센터 문의',55,y+160);
+ x.textAlign='center';x.font='16px sans-serif';x.fillText('감사합니다! 좋은 하루 되세요 :)',745,y+150);x.fillStyle='#777';x.fillText('FIRST OMS · 주문내역을 확인해 주세요.',W/2,H-28);
+ let q=.82,data=c.toDataURL('image/jpeg',q);while(data.length>350000&&q>.45){q-=.06;data=c.toDataURL('image/jpeg',q)}return data.split(',')[1];
+};
+
+/* v7.14: 택배 파일접수 송장번호 일괄 업로드 */
+let trackingUploadPreview=[];
+function normalizeTrackingText(v){return String(v??'').trim().replace(/\s+/g,' ')}
+function normalizePhone(v){return String(v??'').replace(/\D/g,'').replace(/^82/,'0')}
+function normalizeAddress(v){return String(v??'').toLowerCase().replace(/[\s,().-]/g,'')}
+function normalizeHeader(v){return String(v??'').trim().toLowerCase().replace(/[\s_()\[\]\-]/g,'')}
+function pickTrackingField(row,names){
+ const entries=Object.entries(row||{});for(const n of names){const nn=normalizeHeader(n);const hit=entries.find(([k])=>normalizeHeader(k)===nn||normalizeHeader(k).includes(nn));if(hit&&String(hit[1]??'').trim()!=='')return hit[1]}return '';
+}
+function downloadTrackingTemplate(){
+ exportXlsx([{'주문번호(선택)':'','고객명':'홍길동','닉네임(선택)':'길동맘','연락처':'010-0000-0000','주소':'서울시 강남구 예시로 1','송장번호':'123456789012','택배사':'CJ대한통운'}],'FIRST_OMS_송장업로드_양식.xlsx','송장업로드');
+}
+async function prepareTrackingUpload(input){
+ const file=input?.files?.[0];if(!file)return;
+ try{
+  renderShipping();
+  const buf=await file.arrayBuffer(),wb=XLSX.read(buf,{type:'array',cellDates:true});let rows=[];
+  for(const sn of wb.SheetNames){const x=XLSX.utils.sheet_to_json(wb.Sheets[sn],{defval:'',raw:false});if(x.length>rows.length)rows=x}
+  if(!rows.length)throw new Error('업로드 파일에서 데이터 행을 찾지 못했습니다.');
+  const groups=window.currentShipping||[];
+  trackingUploadPreview=rows.map((row,index)=>{
+   const orderNo=normalizeTrackingText(pickTrackingField(row,['주문번호','주문번호(선택)','택배코드','코드']));
+   const name=normalizeTrackingText(pickTrackingField(row,['고객명','받는분','수하인명','수취인명','성명','이름']));
+   const nick=normalizeTrackingText(pickTrackingField(row,['닉네임','별명']));
+   const phone=normalizePhone(pickTrackingField(row,['연락처','전화번호','휴대폰','수하인전화번호','수취인전화번호']));
+   const address=normalizeTrackingText(pickTrackingField(row,['주소','배송지','수하인주소','수취인주소']));
+   const tracking=String(pickTrackingField(row,['송장번호','운송장번호','등기번호','trackingnumber','invoice'])).replace(/[^0-9A-Za-z-]/g,'').trim();
+   const courier=normalizeTrackingText(pickTrackingField(row,['택배사','배송사','운송사']))||'파일접수';
+   let candidates=[];
+   if(orderNo)candidates=groups.filter(g=>String(g.code||'').toUpperCase()===orderNo.toUpperCase());
+   if(!candidates.length&&phone)candidates=groups.filter(g=>normalizePhone(g.phone)===phone);
+   if(candidates.length>1&&name)candidates=candidates.filter(g=>normalizeTrackingText(g.name)===name);
+   if(!candidates.length&&name&&address){const na=normalizeAddress(address);candidates=groups.filter(g=>normalizeTrackingText(g.name)===name&&(normalizeAddress(g.address).includes(na)||na.includes(normalizeAddress(g.address))))}
+   if(!candidates.length&&name)candidates=groups.filter(g=>normalizeTrackingText(g.name)===name);
+   if(candidates.length>1&&nick)candidates=candidates.filter(g=>normalizeTrackingText(g.nick)===nick);
+   const g=candidates.length===1?candidates[0]:null,existing=g?String(state.shippingScans?.[g.code]?.trackingNumber||''):'';
+   let status='match';let reason='자동 연결';
+   if(!tracking){status='invalid';reason='송장번호 없음'}else if(!g){status=candidates.length>1?'review':'unmatched';reason=candidates.length>1?'동명이인/중복 후보':'고객을 찾지 못함'}else if(existing&&existing!==tracking){status='conflict';reason='기존 송장번호와 다름'}else if(existing===tracking){status='same';reason='이미 등록됨'}
+   return {index:index+2,name,phone,address,tracking,courier,g,existing,status,reason};
+  });
+  showTrackingUploadPreview(file.name);
+ }catch(e){alert('송장 파일 확인 실패: '+e.message)}finally{input.value=''}
+}
+function showTrackingUploadPreview(fileName){
+ const counts=trackingUploadPreview.reduce((a,x)=>(a[x.status]=(a[x.status]||0)+1,a),{}),safe=trackingUploadPreview.filter(x=>x.status==='match').length;
+ let modal=document.getElementById('trackingUploadModal');if(!modal){modal=document.createElement('div');modal.id='trackingUploadModal';modal.className='modal';document.body.appendChild(modal)}
+ modal.innerHTML=`<div class="modal-box" style="max-width:1100px"><div class="modal-title"><h3>송장 파일 업로드 미리보기</h3><button class="close" onclick="closeTrackingUploadPreview()">×</button></div><div class="note"><b>${esc(fileName)}</b> · 총 ${trackingUploadPreview.length}건 / 자동반영 ${safe}건 / 확인필요 ${(counts.review||0)+(counts.unmatched||0)+(counts.invalid||0)}건 / 충돌 ${counts.conflict||0}건 / 기존동일 ${counts.same||0}건<br>기존 송장번호는 자동으로 덮어쓰지 않습니다.</div><div class="scroll" style="max-height:55vh"><table><thead><tr><th>행</th><th>파일 고객</th><th>연결 고객</th><th>송장번호</th><th>기존번호</th><th>결과</th></tr></thead><tbody>${trackingUploadPreview.map(x=>`<tr><td>${x.index}</td><td>${esc(x.name||'-')}<br><small>${esc(x.phone||'-')}</small></td><td>${x.g?`${esc(x.g.nick)} (${esc(x.g.name)})`:'-'}</td><td>${esc(x.tracking||'-')}</td><td>${esc(x.existing||'-')}</td><td><span class="badge ${x.status==='match'||x.status==='same'?'good':'warn'}">${esc(x.reason)}</span></td></tr>`).join('')}</tbody></table></div><div class="actions" style="justify-content:flex-end;margin-top:14px"><button class="btn secondary" onclick="closeTrackingUploadPreview()">취소</button><button class="btn" onclick="applyTrackingUpload(this)" ${safe?'':'disabled'}>자동 연결 ${safe}건 적용</button></div></div>`;
+ modal.classList.add('show');
+}
+function closeTrackingUploadPreview(){document.getElementById('trackingUploadModal')?.classList.remove('show')}
+async function applyTrackingUpload(button){
+ const safe=trackingUploadPreview.filter(x=>x.status==='match');if(!safe.length)return alert('자동 반영할 안전한 일치 항목이 없습니다.');
+ if(!confirm(`${safe.length}건의 송장번호를 고객 정산서와 택배리스트에 반영하시겠습니까?`))return;
+ button.disabled=true;let ok=0,fail=[];const tenant=window.currentTenantCode||'FIRST-0001';
+ for(const x of safe){try{const r=await fetch('/api/public/packing/tracking',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({code:x.g.code,tenantCode:tenant,trackingNumber:x.tracking,courier:x.courier,source:'file-upload'})}),d=await r.json();if(!r.ok||!d.ok)throw new Error(d.error||'저장 실패');state.shippingScans=state.shippingScans||{};state.shippingScans[x.g.code]={...(state.shippingScans[x.g.code]||{}),trackingNumber:x.tracking,courier:x.courier,trackingSource:'file-upload',trackingUpdatedAt:d.trackingUpdatedAt||new Date().toISOString()};ok++}catch(e){fail.push(`${x.name||x.g.code}: ${e.message}`)}}
+ saveSilently();renderShipping();closeTrackingUploadPreview();alert(`송장 업로드 완료: 성공 ${ok}건${fail.length?` / 실패 ${fail.length}건\n${fail.slice(0,5).join('\n')}`:''}`);
+}
+
+</script>
+
 </body></html>`);w.document.close();w.print();
 }
 const paymentAliases={payer:['입금자','입금자명','보낸분','거래내용','내용','적요','성명'],amount:['입금액','금액','거래금액','입금'],date:['거래일시','거래일','날짜','시간']};
@@ -1051,7 +1169,64 @@ async function syncShippingScans(renderAfter=false){
  }catch(e){console.warn('포장상태 동기화 실패',e);return false}
 }
 function downloadShippingList(){renderShipping();const rows=(window.currentShipping||[]).map((g,i)=>({'번호':i+1,'포장상태':state.shippingScans?.[g.code]?'포장완료':'대기','택배코드':g.code,'받는분':g.name,'닉네임':g.nick,'연락처':g.phone,'주소':g.address,'방송일':[...g.dates].join(', '),'상품내역':g.items.map((x,j)=>`#${x.number||j+1} ${x.item} ${x.qty}개 단가 ${x.unit} 금액 ${x.amount}`).join(' / '),'상품합계':g.subtotal,'배송비':g.fee,'토탈금액':g.total}));exportXlsx(rows,'FIRST_OMS_택배리스트.xlsx','택배리스트')}
-function printShipping(){renderShipping();const arr=window.currentShipping||[];if(!arr.length)return alert('출력할 택배 대상이 없습니다.');const data=JSON.stringify(arr.map(g=>({code:g.code,url:location.origin+'/packing.html?code='+encodeURIComponent(g.code)})));const pages=arr.map((g,i)=>`<section class="page"><header><div><h1>땡라이브 고객별 포장리스트</h1><b>${esc(g.name||g.nick)}</b> · ${esc(g.nick)}</div><div id="qr-${i}" class="qr"></div></header><div class="meta"><div><b>연락처</b> ${esc(g.phone)}</div><div><b>방송일</b> ${[...g.dates].join(', ')}</div><div class="address"><b>주소</b> ${esc(g.address)}</div><div><b>택배코드</b> ${esc(g.code)}</div></div><table><thead><tr><th>번호</th><th>상품명</th><th>수량</th><th>단가</th><th>금액</th><th>확인</th></tr></thead><tbody>${g.items.map((x,j)=>`<tr><td>#${esc(x.number||j+1)}</td><td>${esc(x.item)}</td><td>${x.qty}</td><td>${money(x.unit)}</td><td>${money(x.amount)}</td><td>□</td></tr>`).join('')}</tbody></table><div class="totals"><div>상품 합계 <b>${money(g.subtotal)}</b></div><div>택배비 <b>${money(g.fee)}</b></div><div class="grand">토탈 금액 <b>${money(g.total)}</b></div></div><footer>QR을 휴대폰 기본 카메라로 스캔하면 이 고객의 포장리스트가 열립니다.</footer></section>`).join('');const w=window.open('','_blank');w.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>고객별 택배리스트</title><script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"><\/script><style>*{box-sizing:border-box}body{margin:0;font-family:Arial,'Noto Sans KR',sans-serif;color:#111}.page{width:210mm;min-height:297mm;padding:14mm;page-break-after:always;position:relative}.page:last-child{page-break-after:auto}header{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:3px solid #111;padding-bottom:12px}h1{font-size:25px;margin:0 0 8px}.qr img,.qr canvas{width:110px!important;height:110px!important}.meta{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:18px 0;font-size:14px}.address{grid-column:1/-1;line-height:1.5}table{width:100%;border-collapse:collapse;table-layout:fixed}th,td{border:1px solid #555;padding:11px 8px;text-align:center;word-break:keep-all}th:nth-child(2),td:nth-child(2){text-align:left;width:42%}.totals{margin:18px 0 0 auto;width:330px;font-size:16px;line-height:2;text-align:right}.grand{font-size:23px;border-top:2px solid #111;margin-top:4px;padding-top:5px}footer{position:absolute;bottom:12mm;left:14mm;right:14mm;text-align:center;color:#555}@page{size:A4 portrait;margin:0}</style></head><body>${pages}<script>const d=${data};window.onload=()=>{d.forEach((x,i)=>new QRCode(document.getElementById('qr-'+i),{text:x.url,width:180,height:180}));setTimeout(()=>window.print(),700)};<\/script></body></html>`);w.document.close()}
+function printShipping(){renderShipping();const arr=window.currentShipping||[];if(!arr.length)return alert('출력할 택배 대상이 없습니다.');const data=JSON.stringify(arr.map(g=>({code:g.code,url:location.origin+'/packing.html?code='+encodeURIComponent(g.code)})));const pages=arr.map((g,i)=>`<section class="page"><header><div><h1>땡라이브 고객별 포장리스트</h1><b>${esc(g.name||g.nick)}</b> · ${esc(g.nick)}</div><div id="qr-${i}" class="qr"></div></header><div class="meta"><div><b>연락처</b> ${esc(g.phone)}</div><div><b>방송일</b> ${[...g.dates].join(', ')}</div><div class="address"><b>주소</b> ${esc(g.address)}</div><div><b>택배코드</b> ${esc(g.code)}</div></div><table><thead><tr><th>번호</th><th>상품명</th><th>수량</th><th>단가</th><th>금액</th><th>확인</th></tr></thead><tbody>${g.items.map((x,j)=>`<tr><td>#${esc(x.number||j+1)}</td><td>${esc(x.item)}</td><td>${x.qty}</td><td>${money(x.unit)}</td><td>${money(x.amount)}</td><td>□</td></tr>`).join('')}</tbody></table><div class="totals"><div>상품 합계 <b>${money(g.subtotal)}</b></div><div>택배비 <b>${money(g.fee)}</b></div><div class="grand">토탈 금액 <b>${money(g.total)}</b></div></div><footer>QR을 휴대폰 기본 카메라로 스캔하면 이 고객의 포장리스트가 열립니다.</footer></section>`).join('');const w=window.open('','_blank');w.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>고객별 택배리스트</title><script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"><\/script><style>*{box-sizing:border-box}body{margin:0;font-family:Arial,'Noto Sans KR',sans-serif;color:#111}.page{width:210mm;min-height:297mm;padding:14mm;page-break-after:always;position:relative}.page:last-child{page-break-after:auto}header{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:3px solid #111;padding-bottom:12px}h1{font-size:25px;margin:0 0 8px}.qr img,.qr canvas{width:110px!important;height:110px!important}.meta{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:18px 0;font-size:14px}.address{grid-column:1/-1;line-height:1.5}table{width:100%;border-collapse:collapse;table-layout:fixed}th,td{border:1px solid #555;padding:11px 8px;text-align:center;word-break:keep-all}th:nth-child(2),td:nth-child(2){text-align:left;width:42%}.totals{margin:18px 0 0 auto;width:330px;font-size:16px;line-height:2;text-align:right}.grand{font-size:23px;border-top:2px solid #111;margin-top:4px;padding-top:5px}footer{position:absolute;bottom:12mm;left:14mm;right:14mm;text-align:center;color:#555}@page{size:A4 portrait;margin:0}</style></head><body>${pages}<script>const d=${data};window.onload=()=>{d.forEach((x,i)=>new QRCode(document.getElementById('qr-'+i),{text:x.url,width:180,height:180}));setTimeout(()=>window.print(),700)};<\/script>
+<style>
+/* v7.13: 택배실 한 화면 정렬 + 출력본 고객명 강조 */
+#shippingTable .scroll{overflow:visible!important}
+.shipping-table.v713-shipping{width:100%!important;min-width:0!important;table-layout:fixed;border-collapse:separate;border-spacing:0 6px}
+.shipping-table.v713-shipping th{font-size:12px;padding:10px 6px;white-space:normal}
+.shipping-table.v713-shipping td{font-size:12px;padding:10px 7px;white-space:normal;word-break:keep-all;line-height:1.45;background:#fff}
+.shipping-table.v713-shipping .customer-main{font-size:18px;font-weight:800;line-height:1.25}
+.shipping-table.v713-shipping .customer-sub{font-size:14px;font-weight:500;margin-top:3px}
+.shipping-table.v713-shipping .customer-phone{font-size:12px;margin-top:5px}
+.shipping-table.v713-shipping .money-total{font-size:16px;font-weight:900}
+.shipping-table.v713-shipping .manage-buttons{display:grid;gap:5px}
+.shipping-table.v713-shipping .manage-buttons .btn{padding:6px 7px;font-size:11px;width:100%}
+.shipping-table.v713-shipping .address-compact{line-height:1.45}
+.shipping-table.v713-shipping .product-compact{line-height:1.5}
+.shipping-table.v713-shipping .tracking-compact input{width:100%;font-size:11px;padding:6px}
+.shipping-table.v713-shipping .tracking-compact .btn{margin-top:4px;width:100%;padding:5px}
+@media(max-width:1100px){
+ .shipping-table.v713-shipping th,.shipping-table.v713-shipping td{font-size:11px;padding:8px 5px}
+ .shipping-table.v713-shipping .customer-main{font-size:16px}
+}
+</style>
+<script>
+/* 최종 요구사항: 택배실 화면은 좌우 스크롤 없이, 출력본에서는 닉네임(이름)을 크게 굵게 */
+renderShipping=function(){
+ const filter=$('shippingFilter').value,bundle=$('bundleMode').value;let rs=getReceipts();if(filter==='paid')rs=rs.filter(r=>r.payment.status==='paid');
+ const groups=new Map();rs.forEach(r=>{const c=r.customer||{},key=bundle==='customer'?(c.id||r.nick):r.key;if(!groups.has(key))groups.set(key,{customerId:c.id||'',name:c.name||'',nick:r.nick,phone:c.phone||'',address:[c.postalCode,c.address,c.detailAddress].filter(Boolean).join(' '),dates:new Set(),items:[],subtotal:0,fee:0,total:0});const g=groups.get(key);g.dates.add(r.date);g.items.push(...r.items);g.subtotal+=r.subtotal;g.fee+=r.fee;g.total+=r.total});
+ const arr=[...groups.values()].map(g=>({...g,code:shippingCodeFor(g)}));state.shippingScans=state.shippingScans||{};window.currentShipping=arr;
+ if(!arr.length){$('shippingTable').innerHTML='<div class="empty">출력할 택배 대상이 없습니다.</div>';return}
+ $('shippingTable').innerHTML=`<table class="shipping-table v713-shipping"><colgroup><col style="width:3%"><col style="width:17%"><col style="width:15%"><col style="width:13%"><col style="width:20%"><col style="width:10%"><col style="width:10%"><col style="width:12%"></colgroup><thead><tr><th>선택</th><th>고객정보</th><th>상품/수량</th><th>결제정보</th><th>배송지/연락처</th><th>배송상태</th><th>송장번호</th><th>관리</th></tr></thead><tbody>${arr.map(g=>{const scan=state.shippingScans?.[g.code]||{},packed=!!scan.at,r=receiptForGroup(g),deposit=r?.payment?.payment?.amount,prod=g.items.slice(0,3).map(x=>`${esc(x.item)} × ${x.qty}`).join('<br>')+(g.items.length>3?`<br><small>외 ${g.items.length-3}건</small>`:'');return `<tr><td><input type="checkbox"></td><td><div class="customer-main">${esc(g.nick)}</div><div class="customer-sub">(${esc(g.name||'이름 미등록')})</div><div class="customer-phone">☎ ${esc(g.phone||'-')}</div></td><td class="product-compact">${prod||'-'}</td><td><div>상품 ${money(g.subtotal)}</div><div>배송비 ${money(g.fee)}</div><div class="money-total">총 ${money(g.total)}</div>${deposit!=null?`<small>입금 ${money(deposit)}</small>`:''}</td><td><div class="address-compact">${esc(g.address||'주소 미등록')}</div><div style="margin-top:6px">☎ ${esc(g.phone||'-')}</div></td><td>${scan.trackingNumber?'<span class="badge good">송장발부</span>':packed?'<span class="badge good">포장완료</span>':'<span class="badge warn">송장발행 대기</span>'}<div style="margin-top:6px"><button class="btn secondary" style="padding:5px 7px" onclick="togglePackingStatus('${esc(g.code)}')">${packed?'미완료 변경':'포장완료'}</button></div></td><td class="tracking-compact"><input id="track-${esc(g.code)}" value="${esc(scan.trackingNumber||'')}" placeholder="송장번호"><button class="btn secondary" onclick="saveTracking('${esc(g.code)}')">저장</button></td><td><div class="manage-buttons"><button class="btn secondary" onclick="openShippingReceipt('${esc(g.code)}')">정산서 보기</button><button class="btn secondary" onclick="openCsModal('${esc(g.code)}')">상세/CS</button><button class="btn secondary" onclick="printInvoiceCopies('${esc(g.code)}')">송장 출력${g.total>=100000?' ×2':''}</button><button class="btn" onclick="sendShipmentNotice('${esc(g.code)}',this)">출고 안내</button></div></td></tr>`}).join('')}</tbody></table>`;
+};
+
+printShipping=function(){
+ renderShipping();const arr=window.currentShipping||[];if(!arr.length)return alert('출력할 택배 대상이 없습니다.');
+ const data=JSON.stringify(arr.map(g=>({code:g.code,url:location.origin+'/packing.html?code='+encodeURIComponent(g.code)})));
+ const pages=arr.map((g,i)=>`<section class="page"><header><div><div class="brand">땡라이브 고객별 포장리스트</div><div class="customer"><strong>${esc(g.nick)}</strong><span>(${esc(g.name||'이름 미등록')})</span></div></div><div id="qr-${i}" class="qr"></div></header><div class="meta"><div><b>연락처</b> ${esc(g.phone||'-')}</div><div><b>방송일</b> ${[...g.dates].join(', ')}</div><div class="address"><b>배송지</b> ${esc(g.address||'주소 미등록')}</div><div><b>택배코드</b> ${esc(g.code)}</div></div><table><thead><tr><th>NO</th><th>상품명</th><th>수량</th><th>단가</th><th>금액</th><th>확인</th></tr></thead><tbody>${g.items.map((x,j)=>`<tr><td>${j+1}</td><td>${esc(x.item)}</td><td>${x.qty}</td><td>${money(x.unit)}</td><td>${money(x.amount)}</td><td>□</td></tr>`).join('')}</tbody></table><div class="totals"><div>상품금액 합계 <b>${money(g.subtotal)}</b></div><div>배송비 <b>${money(g.fee)}</b></div><div class="grand">총 결제금액 <b>${money(g.total)}</b></div></div><footer>QR을 휴대폰 기본 카메라로 스캔하면 이 고객의 포장리스트가 열립니다.</footer></section>`).join('');
+ const w=window.open('','_blank');w.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>고객별 택배리스트</title><script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"><\/script><style>*{box-sizing:border-box}body{margin:0;font-family:Arial,'Noto Sans KR',sans-serif;color:#111}.page{width:210mm;min-height:297mm;padding:14mm;page-break-after:always;position:relative}.page:last-child{page-break-after:auto}header{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:3px solid #111;padding-bottom:12px}.brand{font-size:24px;font-weight:900}.customer{margin-top:12px}.customer strong{display:block;font-size:38px;font-weight:900;line-height:1.05}.customer span{display:block;font-size:25px;font-weight:900;margin-top:5px}.qr img,.qr canvas{width:110px!important;height:110px!important}.meta{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:18px 0;font-size:15px}.address{grid-column:1/-1;line-height:1.5}table{width:100%;border-collapse:collapse;table-layout:fixed}th,td{border:1px solid #555;padding:11px 8px;text-align:center;word-break:keep-all}th{background:#111;color:#fff}th:nth-child(2),td:nth-child(2){text-align:left;width:42%}.totals{margin:18px 0 0 auto;width:360px;font-size:17px;line-height:2;text-align:right}.grand{font-size:25px;border-top:2px solid #111;margin-top:4px;padding-top:5px}footer{position:absolute;bottom:12mm;left:14mm;right:14mm;text-align:center;color:#555}@page{size:A4 portrait;margin:0}</style></head><body>${pages}<script>const d=${data};window.onload=()=>{d.forEach((x,i)=>new QRCode(document.getElementById('qr-'+i),{text:x.url,width:180,height:180}));setTimeout(()=>window.print(),700)};<\/script></body></html>`);w.document.close();
+};
+
+receiptImageBase64=async function(r){
+ const W=1000,H=1414,c=document.createElement('canvas');c.width=W;c.height=H;const x=c.getContext('2d');
+ const cst=r.customer||{},set=state.settings||{},pad=38; x.fillStyle='#fff';x.fillRect(0,0,W,H);x.fillStyle='#111';x.strokeStyle='#111';x.lineWidth=2;
+ x.textAlign='center';x.font='900 66px sans-serif';x.fillText('정 산 서',W/2,125);x.textAlign='left';x.font='900 24px sans-serif';x.fillText('🎁  땡라이브',390,52);
+ x.strokeRect(730,68,225,90);x.font='700 18px sans-serif';x.fillText('주문일',745,102);x.fillText(r.date,825,102);x.fillText('주문번호',745,137);x.fillText(r.date.replaceAll('-','')+'-'+String(indexOfReceiptKey(r.key)+1).padStart(3,'0'),825,137);
+ x.lineWidth=3;x.beginPath();x.moveTo(pad,185);x.lineTo(W-pad,185);x.stroke();
+ x.font='900 30px sans-serif';x.fillText(`${r.nick}님 정산서`,175,235);x.fillStyle='#111';x.fillRect(pad,202,125,44);x.fillStyle='#fff';x.font='900 22px sans-serif';x.fillText('정산서 1',58,232);x.fillStyle='#111';x.font='16px sans-serif';x.fillText('항상 저희 땡라이브를 이용해주셔서 감사합니다.',175,265);
+ x.strokeRect(pad,290,W-pad*2,145);x.font='700 19px sans-serif';x.fillText('고객명',65,335);x.font='900 27px sans-serif';x.fillText(cst.name||'미등록',175,335);x.font='700 19px sans-serif';x.fillText('연락처',65,390);x.font='18px sans-serif';x.fillText(cst.phone||'-',175,390);x.font='700 19px sans-serif';x.fillText('배송지',515,335);x.font='17px sans-serif';wrapText(x,[cst.address,cst.detailAddress].filter(Boolean).join(' ')||'주소 미등록',610,325,320,24,3);x.font='700 19px sans-serif';x.fillText('메모',515,390);x.font='17px sans-serif';x.fillText(cst.memo||'-',610,390);
+ let y=470;const cols=[pad,110,490,625,790,W-pad];x.fillStyle='#111';x.fillRect(pad,y,W-pad*2,44);x.fillStyle='#fff';x.textAlign='center';x.font='700 18px sans-serif';['NO','상품명','수량','단가','금액'].forEach((t,i)=>x.fillText(t,(cols[i]+cols[i+1])/2,y+29));x.fillStyle='#111';y+=44;x.font='17px sans-serif';
+ const maxRows=8;for(let i=0;i<maxRows;i++){x.strokeRect(pad,y,W-pad*2,52);for(let j=1;j<cols.length-1;j++){x.beginPath();x.moveTo(cols[j],y);x.lineTo(cols[j],y+52);x.stroke()}const it=r.items[i];if(it){x.fillText(String(i+1),(cols[0]+cols[1])/2,y+33);x.textAlign='left';x.fillText(it.item,cols[1]+12,y+33);x.textAlign='center';x.fillText(String(it.qty),(cols[2]+cols[3])/2,y+33);x.fillText(Number(it.unit||0).toLocaleString('ko-KR'),(cols[3]+cols[4])/2,y+33);x.fillText(Number(it.amount||0).toLocaleString('ko-KR'),(cols[4]+cols[5])/2,y+33)}y+=52}
+ x.strokeRect(pad,y,W-pad*2,110);x.textAlign='left';x.font='700 19px sans-serif';x.fillText(`상품금액 합계`,60,y+38);x.textAlign='right';x.fillText(money(r.subtotal),480,y+38);x.textAlign='left';x.fillText('배송비',60,y+78);x.textAlign='right';x.fillText(money(r.fee),480,y+78);x.textAlign='left';x.font='900 25px sans-serif';x.fillText('총 결제금액',545,y+62);x.textAlign='right';x.font='900 48px sans-serif';x.fillText(money(r.total),940,y+70);y+=135;
+ x.strokeRect(pad,y,W-pad*2,95);x.textAlign='left';x.fillStyle='#c00';x.font='900 27px sans-serif';x.fillText('일요일 12시까지',100,y+43);x.fillStyle='#111';x.font='700 22px sans-serif';x.fillText('입금 바랍니다.',335,y+43);x.font='17px sans-serif';x.fillText('입금자명은 주문자명과 동일하게 부탁드립니다.',100,y+73);y+=120;
+ x.fillStyle='#fff8d7';x.fillRect(pad,y,500,120);x.strokeRect(pad,y,500,120);x.fillStyle='#111';x.font='700 18px sans-serif';x.fillText('입금계좌',55,y-12);x.font='700 18px sans-serif';x.fillText(set.bank||'카카오뱅크',80,y+38);x.font='900 31px sans-serif';x.fillText(set.account||'계좌번호 미설정',80,y+78);x.font='700 18px sans-serif';x.fillText(`예금주 : ${set.holder||'김미숙'}`,80,y+108);x.font='700 17px sans-serif';x.fillText(set.contact||'고객센터 문의',55,y+160);
+ x.textAlign='center';x.font='16px sans-serif';x.fillText('감사합니다! 좋은 하루 되세요 :)',745,y+150);x.fillStyle='#777';x.fillText('FIRST OMS · 주문내역을 확인해 주세요.',W/2,H-28);
+ let q=.82,data=c.toDataURL('image/jpeg',q);while(data.length>350000&&q>.45){q-=.06;data=c.toDataURL('image/jpeg',q)}return data.split(',')[1];
+};
+</script>
+
+</body></html>`);w.document.close()}
 function downloadReceiptList(){
  const rows=getReceipts().map((r,i)=>({'정산번호':r.date.replaceAll('-','')+'-'+String(i+1).padStart(3,'0'),'방송일':r.date,'실명':r.customer?.name||'','닉네임':r.nick,'전화번호':r.customer?.phone||'','주소':[r.customer?.postalCode,r.customer?.address,r.customer?.detailAddress].filter(Boolean).join(' '),'상품내역':r.items.map(x=>x.item+' '+x.qty+'개').join(' / '),'상품합계':r.subtotal,'배송비':r.fee,'결제금액':r.total,'고객매칭':r.customer?'완료':'확인필요','입금상태':r.payment.status==='paid'?'입금완료':'미입금/확인필요'}));
  exportXlsx(rows,'FIRST_OMS_정산서목록.xlsx','정산서');
@@ -1301,5 +1476,62 @@ function printInvoiceCopies(code){const g=(window.currentShipping||[]).find(x=>x
 const renderShippingV711=renderShipping;
 renderShipping=function(){renderShippingV711();const table=document.querySelector('#shippingTable table');if(!table)return;const hr=table.querySelector('thead tr');['송장번호','배송상태','추가작업'].forEach(t=>{const th=document.createElement('th');th.textContent=t;hr.appendChild(th)});const arr=window.currentShipping||[];table.querySelectorAll('tbody tr').forEach((tr,i)=>{const g=arr[i];if(!g)return;const cells=tr.children;if(cells[2]&&cells[3]){cells[3].innerHTML=`<div class="v712-name" onclick="openShippingReceipt('${esc(g.code)}')">${esc(g.nick)} (${esc(g.name)})</div>`;cells[2].style.display='none';hr.children[2].style.display='none'}const scan=state.shippingScans?.[g.code]||{},r=receiptForGroup(g),deposit=r?.payment?.payment?.amount;const td1=document.createElement('td');td1.innerHTML=`<input class="v712-track" id="track-${esc(g.code)}" value="${esc(scan.trackingNumber||'')}" placeholder="송장번호"><button class="btn secondary" onclick="saveTracking('${esc(g.code)}')">저장</button>`;const td2=document.createElement('td');td2.innerHTML=scan.trackingNumber?'<span class="badge good">송장발부</span>':'<span class="badge warn">미발부</span>';const td3=document.createElement('td');td3.innerHTML=`<div class="v712-actions"><button class="btn secondary" onclick="openShippingReceipt('${esc(g.code)}')">정산서 보기</button><button class="btn secondary" onclick="openCsModal('${esc(g.code)}')">CS</button><button class="btn secondary" onclick="printInvoiceCopies('${esc(g.code)}')">송장 출력${g.total>=100000?'×2':''}</button><button class="btn" onclick="sendShipmentNotice('${esc(g.code)}',this)">출고안내</button></div><div class="v712-note">청구 ${money(g.total)} / 입금 ${deposit!=null?money(deposit):(r?.payment?.status==='paid'?money(g.total):'-')}</div>`;tr.append(td1,td2,td3)})}
 </script>
+
+<style>
+/* v7.13: 택배실 한 화면 정렬 + 출력본 고객명 강조 */
+#shippingTable .scroll{overflow:visible!important}
+.shipping-table.v713-shipping{width:100%!important;min-width:0!important;table-layout:fixed;border-collapse:separate;border-spacing:0 6px}
+.shipping-table.v713-shipping th{font-size:12px;padding:10px 6px;white-space:normal}
+.shipping-table.v713-shipping td{font-size:12px;padding:10px 7px;white-space:normal;word-break:keep-all;line-height:1.45;background:#fff}
+.shipping-table.v713-shipping .customer-main{font-size:18px;font-weight:800;line-height:1.25}
+.shipping-table.v713-shipping .customer-sub{font-size:14px;font-weight:500;margin-top:3px}
+.shipping-table.v713-shipping .customer-phone{font-size:12px;margin-top:5px}
+.shipping-table.v713-shipping .money-total{font-size:16px;font-weight:900}
+.shipping-table.v713-shipping .manage-buttons{display:grid;gap:5px}
+.shipping-table.v713-shipping .manage-buttons .btn{padding:6px 7px;font-size:11px;width:100%}
+.shipping-table.v713-shipping .address-compact{line-height:1.45}
+.shipping-table.v713-shipping .product-compact{line-height:1.5}
+.shipping-table.v713-shipping .tracking-compact input{width:100%;font-size:11px;padding:6px}
+.shipping-table.v713-shipping .tracking-compact .btn{margin-top:4px;width:100%;padding:5px}
+@media(max-width:1100px){
+ .shipping-table.v713-shipping th,.shipping-table.v713-shipping td{font-size:11px;padding:8px 5px}
+ .shipping-table.v713-shipping .customer-main{font-size:16px}
+}
+</style>
+<script>
+/* 최종 요구사항: 택배실 화면은 좌우 스크롤 없이, 출력본에서는 닉네임(이름)을 크게 굵게 */
+renderShipping=function(){
+ const filter=$('shippingFilter').value,bundle=$('bundleMode').value;let rs=getReceipts();if(filter==='paid')rs=rs.filter(r=>r.payment.status==='paid');
+ const groups=new Map();rs.forEach(r=>{const c=r.customer||{},key=bundle==='customer'?(c.id||r.nick):r.key;if(!groups.has(key))groups.set(key,{customerId:c.id||'',name:c.name||'',nick:r.nick,phone:c.phone||'',address:[c.postalCode,c.address,c.detailAddress].filter(Boolean).join(' '),dates:new Set(),items:[],subtotal:0,fee:0,total:0});const g=groups.get(key);g.dates.add(r.date);g.items.push(...r.items);g.subtotal+=r.subtotal;g.fee+=r.fee;g.total+=r.total});
+ const arr=[...groups.values()].map(g=>({...g,code:shippingCodeFor(g)}));state.shippingScans=state.shippingScans||{};window.currentShipping=arr;
+ if(!arr.length){$('shippingTable').innerHTML='<div class="empty">출력할 택배 대상이 없습니다.</div>';return}
+ $('shippingTable').innerHTML=`<table class="shipping-table v713-shipping"><colgroup><col style="width:3%"><col style="width:17%"><col style="width:15%"><col style="width:13%"><col style="width:20%"><col style="width:10%"><col style="width:10%"><col style="width:12%"></colgroup><thead><tr><th>선택</th><th>고객정보</th><th>상품/수량</th><th>결제정보</th><th>배송지/연락처</th><th>배송상태</th><th>송장번호</th><th>관리</th></tr></thead><tbody>${arr.map(g=>{const scan=state.shippingScans?.[g.code]||{},packed=!!scan.at,r=receiptForGroup(g),deposit=r?.payment?.payment?.amount,prod=g.items.slice(0,3).map(x=>`${esc(x.item)} × ${x.qty}`).join('<br>')+(g.items.length>3?`<br><small>외 ${g.items.length-3}건</small>`:'');return `<tr><td><input type="checkbox"></td><td><div class="customer-main">${esc(g.nick)}</div><div class="customer-sub">(${esc(g.name||'이름 미등록')})</div><div class="customer-phone">☎ ${esc(g.phone||'-')}</div></td><td class="product-compact">${prod||'-'}</td><td><div>상품 ${money(g.subtotal)}</div><div>배송비 ${money(g.fee)}</div><div class="money-total">총 ${money(g.total)}</div>${deposit!=null?`<small>입금 ${money(deposit)}</small>`:''}</td><td><div class="address-compact">${esc(g.address||'주소 미등록')}</div><div style="margin-top:6px">☎ ${esc(g.phone||'-')}</div></td><td>${scan.trackingNumber?'<span class="badge good">송장발부</span>':packed?'<span class="badge good">포장완료</span>':'<span class="badge warn">송장발행 대기</span>'}<div style="margin-top:6px"><button class="btn secondary" style="padding:5px 7px" onclick="togglePackingStatus('${esc(g.code)}')">${packed?'미완료 변경':'포장완료'}</button></div></td><td class="tracking-compact"><input id="track-${esc(g.code)}" value="${esc(scan.trackingNumber||'')}" placeholder="송장번호"><button class="btn secondary" onclick="saveTracking('${esc(g.code)}')">저장</button></td><td><div class="manage-buttons"><button class="btn secondary" onclick="openShippingReceipt('${esc(g.code)}')">정산서 보기</button><button class="btn secondary" onclick="openCsModal('${esc(g.code)}')">상세/CS</button><button class="btn secondary" onclick="printInvoiceCopies('${esc(g.code)}')">송장 출력${g.total>=100000?' ×2':''}</button><button class="btn" onclick="sendShipmentNotice('${esc(g.code)}',this)">출고 안내</button></div></td></tr>`}).join('')}</tbody></table>`;
+};
+
+printShipping=function(){
+ renderShipping();const arr=window.currentShipping||[];if(!arr.length)return alert('출력할 택배 대상이 없습니다.');
+ const data=JSON.stringify(arr.map(g=>({code:g.code,url:location.origin+'/packing.html?code='+encodeURIComponent(g.code)})));
+ const pages=arr.map((g,i)=>`<section class="page"><header><div><div class="brand">땡라이브 고객별 포장리스트</div><div class="customer"><strong>${esc(g.nick)}</strong><span>(${esc(g.name||'이름 미등록')})</span></div></div><div id="qr-${i}" class="qr"></div></header><div class="meta"><div><b>연락처</b> ${esc(g.phone||'-')}</div><div><b>방송일</b> ${[...g.dates].join(', ')}</div><div class="address"><b>배송지</b> ${esc(g.address||'주소 미등록')}</div><div><b>택배코드</b> ${esc(g.code)}</div></div><table><thead><tr><th>NO</th><th>상품명</th><th>수량</th><th>단가</th><th>금액</th><th>확인</th></tr></thead><tbody>${g.items.map((x,j)=>`<tr><td>${j+1}</td><td>${esc(x.item)}</td><td>${x.qty}</td><td>${money(x.unit)}</td><td>${money(x.amount)}</td><td>□</td></tr>`).join('')}</tbody></table><div class="totals"><div>상품금액 합계 <b>${money(g.subtotal)}</b></div><div>배송비 <b>${money(g.fee)}</b></div><div class="grand">총 결제금액 <b>${money(g.total)}</b></div></div><footer>QR을 휴대폰 기본 카메라로 스캔하면 이 고객의 포장리스트가 열립니다.</footer></section>`).join('');
+ const w=window.open('','_blank');w.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>고객별 택배리스트</title><script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"><\/script><style>*{box-sizing:border-box}body{margin:0;font-family:Arial,'Noto Sans KR',sans-serif;color:#111}.page{width:210mm;min-height:297mm;padding:14mm;page-break-after:always;position:relative}.page:last-child{page-break-after:auto}header{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:3px solid #111;padding-bottom:12px}.brand{font-size:24px;font-weight:900}.customer{margin-top:12px}.customer strong{display:block;font-size:38px;font-weight:900;line-height:1.05}.customer span{display:block;font-size:25px;font-weight:900;margin-top:5px}.qr img,.qr canvas{width:110px!important;height:110px!important}.meta{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:18px 0;font-size:15px}.address{grid-column:1/-1;line-height:1.5}table{width:100%;border-collapse:collapse;table-layout:fixed}th,td{border:1px solid #555;padding:11px 8px;text-align:center;word-break:keep-all}th{background:#111;color:#fff}th:nth-child(2),td:nth-child(2){text-align:left;width:42%}.totals{margin:18px 0 0 auto;width:360px;font-size:17px;line-height:2;text-align:right}.grand{font-size:25px;border-top:2px solid #111;margin-top:4px;padding-top:5px}footer{position:absolute;bottom:12mm;left:14mm;right:14mm;text-align:center;color:#555}@page{size:A4 portrait;margin:0}</style></head><body>${pages}<script>const d=${data};window.onload=()=>{d.forEach((x,i)=>new QRCode(document.getElementById('qr-'+i),{text:x.url,width:180,height:180}));setTimeout(()=>window.print(),700)};<\/script></body></html>`);w.document.close();
+};
+
+receiptImageBase64=async function(r){
+ const W=1000,H=1414,c=document.createElement('canvas');c.width=W;c.height=H;const x=c.getContext('2d');
+ const cst=r.customer||{},set=state.settings||{},pad=38; x.fillStyle='#fff';x.fillRect(0,0,W,H);x.fillStyle='#111';x.strokeStyle='#111';x.lineWidth=2;
+ x.textAlign='center';x.font='900 66px sans-serif';x.fillText('정 산 서',W/2,125);x.textAlign='left';x.font='900 24px sans-serif';x.fillText('🎁  땡라이브',390,52);
+ x.strokeRect(730,68,225,90);x.font='700 18px sans-serif';x.fillText('주문일',745,102);x.fillText(r.date,825,102);x.fillText('주문번호',745,137);x.fillText(r.date.replaceAll('-','')+'-'+String(indexOfReceiptKey(r.key)+1).padStart(3,'0'),825,137);
+ x.lineWidth=3;x.beginPath();x.moveTo(pad,185);x.lineTo(W-pad,185);x.stroke();
+ x.font='900 30px sans-serif';x.fillText(`${r.nick}님 정산서`,175,235);x.fillStyle='#111';x.fillRect(pad,202,125,44);x.fillStyle='#fff';x.font='900 22px sans-serif';x.fillText('정산서 1',58,232);x.fillStyle='#111';x.font='16px sans-serif';x.fillText('항상 저희 땡라이브를 이용해주셔서 감사합니다.',175,265);
+ x.strokeRect(pad,290,W-pad*2,145);x.font='700 19px sans-serif';x.fillText('고객명',65,335);x.font='900 27px sans-serif';x.fillText(cst.name||'미등록',175,335);x.font='700 19px sans-serif';x.fillText('연락처',65,390);x.font='18px sans-serif';x.fillText(cst.phone||'-',175,390);x.font='700 19px sans-serif';x.fillText('배송지',515,335);x.font='17px sans-serif';wrapText(x,[cst.address,cst.detailAddress].filter(Boolean).join(' ')||'주소 미등록',610,325,320,24,3);x.font='700 19px sans-serif';x.fillText('메모',515,390);x.font='17px sans-serif';x.fillText(cst.memo||'-',610,390);
+ let y=470;const cols=[pad,110,490,625,790,W-pad];x.fillStyle='#111';x.fillRect(pad,y,W-pad*2,44);x.fillStyle='#fff';x.textAlign='center';x.font='700 18px sans-serif';['NO','상품명','수량','단가','금액'].forEach((t,i)=>x.fillText(t,(cols[i]+cols[i+1])/2,y+29));x.fillStyle='#111';y+=44;x.font='17px sans-serif';
+ const maxRows=8;for(let i=0;i<maxRows;i++){x.strokeRect(pad,y,W-pad*2,52);for(let j=1;j<cols.length-1;j++){x.beginPath();x.moveTo(cols[j],y);x.lineTo(cols[j],y+52);x.stroke()}const it=r.items[i];if(it){x.fillText(String(i+1),(cols[0]+cols[1])/2,y+33);x.textAlign='left';x.fillText(it.item,cols[1]+12,y+33);x.textAlign='center';x.fillText(String(it.qty),(cols[2]+cols[3])/2,y+33);x.fillText(Number(it.unit||0).toLocaleString('ko-KR'),(cols[3]+cols[4])/2,y+33);x.fillText(Number(it.amount||0).toLocaleString('ko-KR'),(cols[4]+cols[5])/2,y+33)}y+=52}
+ x.strokeRect(pad,y,W-pad*2,110);x.textAlign='left';x.font='700 19px sans-serif';x.fillText(`상품금액 합계`,60,y+38);x.textAlign='right';x.fillText(money(r.subtotal),480,y+38);x.textAlign='left';x.fillText('배송비',60,y+78);x.textAlign='right';x.fillText(money(r.fee),480,y+78);x.textAlign='left';x.font='900 25px sans-serif';x.fillText('총 결제금액',545,y+62);x.textAlign='right';x.font='900 48px sans-serif';x.fillText(money(r.total),940,y+70);y+=135;
+ x.strokeRect(pad,y,W-pad*2,95);x.textAlign='left';x.fillStyle='#c00';x.font='900 27px sans-serif';x.fillText('일요일 12시까지',100,y+43);x.fillStyle='#111';x.font='700 22px sans-serif';x.fillText('입금 바랍니다.',335,y+43);x.font='17px sans-serif';x.fillText('입금자명은 주문자명과 동일하게 부탁드립니다.',100,y+73);y+=120;
+ x.fillStyle='#fff8d7';x.fillRect(pad,y,500,120);x.strokeRect(pad,y,500,120);x.fillStyle='#111';x.font='700 18px sans-serif';x.fillText('입금계좌',55,y-12);x.font='700 18px sans-serif';x.fillText(set.bank||'카카오뱅크',80,y+38);x.font='900 31px sans-serif';x.fillText(set.account||'계좌번호 미설정',80,y+78);x.font='700 18px sans-serif';x.fillText(`예금주 : ${set.holder||'김미숙'}`,80,y+108);x.font='700 17px sans-serif';x.fillText(set.contact||'고객센터 문의',55,y+160);
+ x.textAlign='center';x.font='16px sans-serif';x.fillText('감사합니다! 좋은 하루 되세요 :)',745,y+150);x.fillStyle='#777';x.fillText('FIRST OMS · 주문내역을 확인해 주세요.',W/2,H-28);
+ let q=.82,data=c.toDataURL('image/jpeg',q);while(data.length>350000&&q>.45){q-=.06;data=c.toDataURL('image/jpeg',q)}return data.split(',')[1];
+};
+</script>
+
 </body>
 </html>
