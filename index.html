@@ -176,7 +176,7 @@ main{padding-top:18px}
 <header>
   <div><div class="brand"><b>FIRST OMS</b> 땡라이브 정산서버 v7.11</div><div class="sub">고객DB·판매리스트 3중 자동보존 · 정산 · 입금 · 택배</div></div>
   <div class="actions no-print">
-    <span id="loginUser" class="sub">로그인 확인 중</span><button id="accountAdminBtn" class="btn secondary" style="display:none" onclick="location.href='/superadmin.html'">거래처 계정관리</button><button class="btn secondary" onclick="location.href='/change-password.html'">비밀번호 변경</button><button class="btn secondary" onclick="runFunctionCheck()">기능점검</button><button id="alwaysSettingsBtn" class="btn" type="button" onclick="go('settings')">⚙ 설정</button><button class="btn secondary" onclick="logoutNow()">로그아웃</button>
+    <span id="loginUser" class="sub">로그인 확인 중</span><button id="accountAdminBtn" class="btn secondary" style="display:none" onclick="location.href='/superadmin.html'">거래처 계정관리</button><button class="btn secondary" onclick="location.href='/change-password.html'">비밀번호 변경</button><button class="btn secondary" onclick="runFunctionCheck()">기능점검</button><button class="btn secondary" onclick="logoutNow()">로그아웃</button>
     <button class="btn secondary" onclick="recoverOldData()">이전 고객DB 복구</button>
     <a class="btn secondary" href="/api/customers/export.xlsx">고객DB 엑셀 받기</a><button class="btn secondary" onclick="downloadCustomerBackup()">고객정보 백업</button>
     <button class="btn secondary" onclick="downloadBackup()">전체 백업</button>
@@ -213,7 +213,6 @@ main{padding-top:18px}
       <button class="btn secondary" onclick="go('payments')">입금 대조</button>
       <button class="btn secondary" onclick="go('shipping')">택배리스트</button>
       <button class="btn" onclick="openSolapiSettings()">솔라피 API 입력·연결</button>
-      <button class="btn" type="button" onclick="go('settings')">⚙ 전체 설정 열기</button>
     </div>
   </section>
 
@@ -965,44 +964,6 @@ main{padding-top:18px}
  .receipt-detail-modal .er-items th{background:#f1f2f4!important;color:#111!important;-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}
 }
 </style>
-
-<style id="v728-settings-visible-fix">
-.tabs{overflow-x:auto!important;flex-wrap:nowrap!important;scrollbar-width:thin!important}
-.tabs .tab[data-page="settings"]{position:sticky!important;right:0!important;z-index:12!important;background:#f6c453!important;color:#111!important;border:2px solid #d29a13!important;box-shadow:-8px 0 12px rgba(12,18,28,.45)!important;flex:0 0 auto!important}
-#alwaysSettingsBtn{background:#f6c453!important;color:#111!important;border-color:#d29a13!important;font-weight:900!important}
-#settings.page.active{display:block!important}
-#settings .settings-box,#settings .v723-courier-panel{display:block!important;visibility:visible!important;opacity:1!important}
-#settingsMessageMount:empty::before,#settingsCourierMount:empty::before{content:'설정 불러오는 중…';display:block;padding:22px;background:#fff;color:#111;border-radius:12px}
-</style>
-<script id="v728-settings-visible-script">
-(function(){
- function ensureSettings(){
-   var page=document.getElementById('settings');
-   var mm=document.getElementById('settingsMessageMount');
-   var cm=document.getElementById('settingsCourierMount');
-   var message=document.querySelector('#receipts .settings-box') || document.querySelector('#settings .settings-box');
-   var courier=document.querySelector('#shipping .v723-courier-panel') || document.querySelector('#settings .v723-courier-panel');
-   if(message&&mm&&message.parentElement!==mm) mm.appendChild(message);
-   if(courier&&cm&&courier.parentElement!==cm) cm.appendChild(courier);
-   if(page){ page.style.visibility='visible'; page.style.opacity='1'; }
-   try{ if(typeof renderMessageSettings==='function') renderMessageSettings(true); }catch(e){console.warn(e)}
-   try{ if(typeof loadCourierSettingsUI==='function') loadCourierSettingsUI(); }catch(e){console.warn(e)}
- }
- document.addEventListener('DOMContentLoaded',ensureSettings);
- window.addEventListener('load',ensureSettings);
- var previousGo=window.go;
- window.go=function(id){
-   if(typeof previousGo==='function') previousGo.apply(this,arguments);
-   if(id==='settings'){
-     ensureSettings();
-     var tab=document.querySelector('.tab[data-page="settings"]');
-     if(tab) tab.scrollIntoView({behavior:'auto',block:'nearest',inline:'end'});
-   }
- };
- setTimeout(ensureSettings,100);
-})();
-</script>
-
 </body></html>`);w.document.close();w.print();
 }
 const paymentAliases={payer:['입금자','입금자명','보낸분','거래내용','내용','적요','성명'],amount:['입금액','금액','거래금액','입금'],date:['거래일시','거래일','날짜','시간']};
@@ -1173,44 +1134,6 @@ function printShipping(){renderShipping();const arr=window.currentShipping||[];i
  .receipt-detail-modal .er-items th{background:#f1f2f4!important;color:#111!important;-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}
 }
 </style>
-
-<style id="v728-settings-visible-fix">
-.tabs{overflow-x:auto!important;flex-wrap:nowrap!important;scrollbar-width:thin!important}
-.tabs .tab[data-page="settings"]{position:sticky!important;right:0!important;z-index:12!important;background:#f6c453!important;color:#111!important;border:2px solid #d29a13!important;box-shadow:-8px 0 12px rgba(12,18,28,.45)!important;flex:0 0 auto!important}
-#alwaysSettingsBtn{background:#f6c453!important;color:#111!important;border-color:#d29a13!important;font-weight:900!important}
-#settings.page.active{display:block!important}
-#settings .settings-box,#settings .v723-courier-panel{display:block!important;visibility:visible!important;opacity:1!important}
-#settingsMessageMount:empty::before,#settingsCourierMount:empty::before{content:'설정 불러오는 중…';display:block;padding:22px;background:#fff;color:#111;border-radius:12px}
-</style>
-<script id="v728-settings-visible-script">
-(function(){
- function ensureSettings(){
-   var page=document.getElementById('settings');
-   var mm=document.getElementById('settingsMessageMount');
-   var cm=document.getElementById('settingsCourierMount');
-   var message=document.querySelector('#receipts .settings-box') || document.querySelector('#settings .settings-box');
-   var courier=document.querySelector('#shipping .v723-courier-panel') || document.querySelector('#settings .v723-courier-panel');
-   if(message&&mm&&message.parentElement!==mm) mm.appendChild(message);
-   if(courier&&cm&&courier.parentElement!==cm) cm.appendChild(courier);
-   if(page){ page.style.visibility='visible'; page.style.opacity='1'; }
-   try{ if(typeof renderMessageSettings==='function') renderMessageSettings(true); }catch(e){console.warn(e)}
-   try{ if(typeof loadCourierSettingsUI==='function') loadCourierSettingsUI(); }catch(e){console.warn(e)}
- }
- document.addEventListener('DOMContentLoaded',ensureSettings);
- window.addEventListener('load',ensureSettings);
- var previousGo=window.go;
- window.go=function(id){
-   if(typeof previousGo==='function') previousGo.apply(this,arguments);
-   if(id==='settings'){
-     ensureSettings();
-     var tab=document.querySelector('.tab[data-page="settings"]');
-     if(tab) tab.scrollIntoView({behavior:'auto',block:'nearest',inline:'end'});
-   }
- };
- setTimeout(ensureSettings,100);
-})();
-</script>
-
 </body></html>`);w.document.close()}
 function downloadReceiptList(){
  const rows=getReceipts().map((r,i)=>({'정산번호':r.date.replaceAll('-','')+'-'+String(i+1).padStart(3,'0'),'방송일':r.date,'실명':r.customer?.name||'','닉네임':r.nick,'전화번호':r.customer?.phone||'','주소':[r.customer?.postalCode,r.customer?.address,r.customer?.detailAddress].filter(Boolean).join(' '),'상품내역':r.items.map(x=>x.item+' '+x.qty+'개').join(' / '),'상품합계':r.subtotal,'배송비':r.fee,'결제금액':r.total,'고객매칭':r.customer?'완료':'확인필요','입금상태':r.payment.status==='paid'?'입금완료':'미입금/확인필요'}));
@@ -1581,44 +1504,6 @@ tr:hover td{background:#f6f7f9!important;color:inherit!important}.exact-receipt 
  .receipt-detail-modal .er-items th{background:#f1f2f4!important;color:#111!important;-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}
 }
 </style>
-
-<style id="v728-settings-visible-fix">
-.tabs{overflow-x:auto!important;flex-wrap:nowrap!important;scrollbar-width:thin!important}
-.tabs .tab[data-page="settings"]{position:sticky!important;right:0!important;z-index:12!important;background:#f6c453!important;color:#111!important;border:2px solid #d29a13!important;box-shadow:-8px 0 12px rgba(12,18,28,.45)!important;flex:0 0 auto!important}
-#alwaysSettingsBtn{background:#f6c453!important;color:#111!important;border-color:#d29a13!important;font-weight:900!important}
-#settings.page.active{display:block!important}
-#settings .settings-box,#settings .v723-courier-panel{display:block!important;visibility:visible!important;opacity:1!important}
-#settingsMessageMount:empty::before,#settingsCourierMount:empty::before{content:'설정 불러오는 중…';display:block;padding:22px;background:#fff;color:#111;border-radius:12px}
-</style>
-<script id="v728-settings-visible-script">
-(function(){
- function ensureSettings(){
-   var page=document.getElementById('settings');
-   var mm=document.getElementById('settingsMessageMount');
-   var cm=document.getElementById('settingsCourierMount');
-   var message=document.querySelector('#receipts .settings-box') || document.querySelector('#settings .settings-box');
-   var courier=document.querySelector('#shipping .v723-courier-panel') || document.querySelector('#settings .v723-courier-panel');
-   if(message&&mm&&message.parentElement!==mm) mm.appendChild(message);
-   if(courier&&cm&&courier.parentElement!==cm) cm.appendChild(courier);
-   if(page){ page.style.visibility='visible'; page.style.opacity='1'; }
-   try{ if(typeof renderMessageSettings==='function') renderMessageSettings(true); }catch(e){console.warn(e)}
-   try{ if(typeof loadCourierSettingsUI==='function') loadCourierSettingsUI(); }catch(e){console.warn(e)}
- }
- document.addEventListener('DOMContentLoaded',ensureSettings);
- window.addEventListener('load',ensureSettings);
- var previousGo=window.go;
- window.go=function(id){
-   if(typeof previousGo==='function') previousGo.apply(this,arguments);
-   if(id==='settings'){
-     ensureSettings();
-     var tab=document.querySelector('.tab[data-page="settings"]');
-     if(tab) tab.scrollIntoView({behavior:'auto',block:'nearest',inline:'end'});
-   }
- };
- setTimeout(ensureSettings,100);
-})();
-</script>
-
 </body></html>`);w.document.close();
  };
 })();
@@ -1758,43 +1643,5 @@ window.receiptImageBase64 = async function(r){
   } finally { host.remove(); }
 };
 </script>
-
-<style id="v728-settings-visible-fix">
-.tabs{overflow-x:auto!important;flex-wrap:nowrap!important;scrollbar-width:thin!important}
-.tabs .tab[data-page="settings"]{position:sticky!important;right:0!important;z-index:12!important;background:#f6c453!important;color:#111!important;border:2px solid #d29a13!important;box-shadow:-8px 0 12px rgba(12,18,28,.45)!important;flex:0 0 auto!important}
-#alwaysSettingsBtn{background:#f6c453!important;color:#111!important;border-color:#d29a13!important;font-weight:900!important}
-#settings.page.active{display:block!important}
-#settings .settings-box,#settings .v723-courier-panel{display:block!important;visibility:visible!important;opacity:1!important}
-#settingsMessageMount:empty::before,#settingsCourierMount:empty::before{content:'설정 불러오는 중…';display:block;padding:22px;background:#fff;color:#111;border-radius:12px}
-</style>
-<script id="v728-settings-visible-script">
-(function(){
- function ensureSettings(){
-   var page=document.getElementById('settings');
-   var mm=document.getElementById('settingsMessageMount');
-   var cm=document.getElementById('settingsCourierMount');
-   var message=document.querySelector('#receipts .settings-box') || document.querySelector('#settings .settings-box');
-   var courier=document.querySelector('#shipping .v723-courier-panel') || document.querySelector('#settings .v723-courier-panel');
-   if(message&&mm&&message.parentElement!==mm) mm.appendChild(message);
-   if(courier&&cm&&courier.parentElement!==cm) cm.appendChild(courier);
-   if(page){ page.style.visibility='visible'; page.style.opacity='1'; }
-   try{ if(typeof renderMessageSettings==='function') renderMessageSettings(true); }catch(e){console.warn(e)}
-   try{ if(typeof loadCourierSettingsUI==='function') loadCourierSettingsUI(); }catch(e){console.warn(e)}
- }
- document.addEventListener('DOMContentLoaded',ensureSettings);
- window.addEventListener('load',ensureSettings);
- var previousGo=window.go;
- window.go=function(id){
-   if(typeof previousGo==='function') previousGo.apply(this,arguments);
-   if(id==='settings'){
-     ensureSettings();
-     var tab=document.querySelector('.tab[data-page="settings"]');
-     if(tab) tab.scrollIntoView({behavior:'auto',block:'nearest',inline:'end'});
-   }
- };
- setTimeout(ensureSettings,100);
-})();
-</script>
-
 </body>
 </html>
