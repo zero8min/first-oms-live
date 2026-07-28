@@ -130,7 +130,8 @@ function ensureTenantStorage(account){
   'message-history.json':'[]',
   'solapi-settings.json':'{}',
   'youtube-auth.json':'{}',
-  'tenant-settings.json':JSON.stringify({tenantCode:account.code,company:account.company||'',createdAt:new Date().toISOString()},null,2)
+  'tenant-settings.json':JSON.stringify({tenantCode:account.code,company:account.company||'',createdAt:new Date().toISOString()},null,2),
+  'courier-settings.json':'{}'
  };
  for(const [name,text] of Object.entries(defaults)){const f=path.join(dir,name);if(!fs.existsSync(f))atomicWrite(f,text)}
 }
@@ -586,8 +587,26 @@ const server=http.createServer((req,res)=>{
  if(u.pathname==='/api/packing/status'&&req.method==='POST')return readBody(req).then(body=>{try{const d=JSON.parse(body||'{}'),code=String(d.code||'').trim().toUpperCase();if(!code)return json(res,400,{ok:false,error:'택배코드가 없습니다.'});const st=tenantReadState(tenantCode);st.shippingScans=st.shippingScans||{};const prev=st.shippingScans[code]||{};st.shippingScans[code]={...prev,at:new Date().toISOString(),source:String(d.source||'admin-manual'),worker:String(d.worker||'관리자')};tenantWriteState(tenantCode,st);return json(res,200,{ok:true,scan:st.shippingScans[code]})}catch(e){return json(res,400,{ok:false,error:e.message})}})
  if(u.pathname==='/api/packing/status'&&req.method==='DELETE'){const code=String(u.query.code||'').trim().toUpperCase();if(!code)return json(res,400,{ok:false,error:'택배코드가 없습니다.'});const st=tenantReadState(tenantCode);st.shippingScans=st.shippingScans||{};delete st.shippingScans[code];tenantWriteState(tenantCode,st);return json(res,200,{ok:true})}
  if(u.pathname==='/api/state'&&req.method==='GET')return json(res,200,{ok:true,state:tenantReadState(tenantCode),archives:tenantListSalesArchives(tenantCode),tenantCode});
+ if(u.pathname==='/api/courier/config'&&req.method==='GET'){
+  const cfg=readJsonObject(tenantFile(tenantCode,'courier-settings.json'),{});
+  return json(res,200,{ok:true,config:{...cfg,apiSecret:cfg.apiSecret?'••••••••':'',hasSecret:!!cfg.apiSecret}})
+ }
+ if(u.pathname==='/api/courier/config'&&req.method==='POST'){
+  return readBody(req).then(body=>{try{const d=JSON.parse(body||'{}'),old=readJsonObject(tenantFile(tenantCode,'courier-settings.json'),{});const next={courier:String(d.courier||old.courier||'').trim(),customerCode:String(d.customerCode||old.customerCode||'').trim(),apiKey:String(d.apiKey||old.apiKey||'').trim(),apiSecret:String((d.apiSecret&&d.apiSecret!=='••••••••')?d.apiSecret:old.apiSecret||'').trim(),contractCode:String(d.contractCode||old.contractCode||'').trim(),trackingBaseUrl:String(d.trackingBaseUrl||old.trackingBaseUrl||'').trim(),updatedAt:new Date().toISOString()};if(!next.courier)return json(res,400,{ok:false,error:'택배사를 선택해 주세요.'});atomicWrite(tenantFile(tenantCode,'courier-settings.json'),JSON.stringify(next,null,2));return json(res,200,{ok:true,configured:true,courier:next.courier})}catch(e){return json(res,400,{ok:false,error:e.message})}})
+ }
  if(u.pathname==='/api/state'&&req.method==='POST'){
-  return readBody(req,20*1024*1024).then(body=>{try{const st=JSON.parse(body||'{}'),current=tenantReadState(tenantCode);st.shippingScans=current.shippingScans||{};const saved=tenantWriteState(tenantCode,st);return json(res,200,{ok:true,updatedAt:saved.updatedAt,orders:(saved.orders||[]).length,customers:(saved.customers||[]).length})}catch(e){return json(res,400,{ok:false,error:e.message})}})
+  return readBody(req,20*1024*1024).then(body=>{try{
+   const incoming=JSON.parse(body||'{}'),current=tenantReadState(tenantCode);
+   const mergeById=(oldList,newList,keyFn)=>{if(!Array.isArray(newList))return oldList||[];const m=new Map((oldList||[]).map(x=>[keyFn(x),x]));for(const x of newList){const k=keyFn(x);m.set(k,m.has(k)?{...m.get(k),...x}:x)}return [...m.values()]};
+   const st={...current,...incoming};
+   st.orders=mergeById(current.orders,incoming.orders,x=>x.id||[x.date,x.nick,x.number,x.item,x.qty,x.amount].join('|'));
+   st.customers=mergeById(current.customers,incoming.customers,x=>x.id||x.phone||x.nickname||x.nick||x.name);
+   st.payments=mergeById(current.payments,incoming.payments,x=>x.id||[x.payer,x.amount,x.date].join('|'));
+   st.csRecords=mergeById(current.csRecords,incoming.csRecords,x=>x.id||[x.customerId,x.createdAt,x.text].join('|'));
+   st.shippingRecords=mergeById(current.shippingRecords,incoming.shippingRecords,x=>x.id||x.code||x.trackingNumber);
+   st.shippingScans={...(current.shippingScans||{}),...(incoming.shippingScans||{})};
+   const saved=tenantWriteState(tenantCode,st);return json(res,200,{ok:true,protectedMerge:true,updatedAt:saved.updatedAt,orders:(saved.orders||[]).length,customers:(saved.customers||[]).length})
+  }catch(e){return json(res,400,{ok:false,error:e.message})}})
  }
  if(u.pathname==='/api/state/backup'&&req.method==='GET'){
   const st=tenantReadState(tenantCode);const payload={version:7.5,tenantCode,exportedAt:new Date().toISOString(),state:st};
