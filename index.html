@@ -930,6 +930,33 @@ main{padding-top:18px}
  <div class="actions"><button class="btn" onclick="saveSolapiSettings()">API 입력값 저장·연결</button><button class="btn secondary" onclick="loadSolapiSettings()">연결상태 확인</button></div>
  <p class="note">API Secret은 관리자 서버에만 저장되며 화면에는 다시 표시하지 않습니다. Render 재배포에도 절대 잃지 않으려면 Render Environment에도 같은 값을 등록하거나 Persistent Disk를 연결하세요.</p>
 </div></div>
+
+<style id="v725-final-visual-fixes">
+/* v7.25: 기존 기능 유지, 보이는 오류만 강제 교정 */
+.exact-receipt,.exact-receipt *{box-sizing:border-box!important}
+.exact-receipt{width:794px!important;max-width:calc(100vw - 70px)!important;height:auto!important;min-height:0!important;overflow:visible!important;background:#fff!important;color:#111!important;padding:32px 36px 28px!important}
+.receipt-detail-box{width:auto!important;max-width:880px!important;overflow:visible!important;background:#f2f3f5!important}
+#receiptDetailBody{overflow-x:auto!important;padding-bottom:8px!important}
+.receipt-detail-modal .er-items,.receipt-detail-modal .er-items thead,.receipt-detail-modal .er-items tbody,.receipt-detail-modal .er-items tr,.receipt-detail-modal .er-items th,.receipt-detail-modal .er-items td{background:#fff!important;color:#111!important}
+.receipt-detail-modal .er-items{width:100%!important;table-layout:fixed!important;border-collapse:collapse!important;margin-top:16px!important}
+.receipt-detail-modal .er-items thead{display:table-header-group!important}
+.receipt-detail-modal .er-items th{background:#f1f2f4!important;color:#111!important;border:1px solid #777!important;position:static!important;top:auto!important;font-weight:900!important}
+.receipt-detail-modal .er-items td{border:1px solid #999!important}
+.receipt-detail-modal .er-items tbody tr:hover td{background:#eef0f3!important;color:#111!important}
+#receipts table tbody tr:hover td,#customers table tbody tr:hover td,#payments table tbody tr:hover td,#shipping table tbody tr:hover td,.scroll table tbody tr:hover td{background:#eef0f3!important;color:#1f2937!important}
+#receipts table tbody tr:hover *,#customers table tbody tr:hover *,#payments table tbody tr:hover *,#shipping table tbody tr:hover *{color:inherit!important}
+.er-info,.er-tracking{width:100%!important;min-width:0!important}.er-info dd,.er-tracking span{overflow-wrap:anywhere!important;word-break:break-word!important}
+.er-top{grid-template-columns:150px minmax(0,1fr) 190px!important}.er-title{letter-spacing:10px!important}.er-order{min-width:0!important}
+.er-sum,.er-grand,.er-notice,.er-bank,.er-bottom{width:100%!important;max-width:100%!important}
+.shipping-modern-wrap{overflow-x:auto!important}.shipping-modern{min-width:1050px!important}
+@media print{
+ .exact-receipt,.exact-receipt *{box-sizing:border-box!important}
+ .exact-receipt{width:210mm!important;max-width:210mm!important;min-height:297mm!important;margin:0!important;padding:10mm 11mm!important;overflow:hidden!important;box-shadow:none!important}
+ .receipt-detail-box{width:210mm!important;max-width:210mm!important;padding:0!important;margin:0!important;background:#fff!important;overflow:visible!important}
+ #receiptDetailBody{overflow:visible!important;padding:0!important}
+ .receipt-detail-modal .er-items th{background:#f1f2f4!important;color:#111!important;-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}
+}
+</style>
 </body></html>`);w.document.close();w.print();
 }
 const paymentAliases={payer:['입금자','입금자명','보낸분','거래내용','내용','적요','성명'],amount:['입금액','금액','거래금액','입금'],date:['거래일시','거래일','날짜','시간']};
@@ -1073,7 +1100,34 @@ async function syncShippingScans(renderAfter=false){
  }catch(e){console.warn('포장상태 동기화 실패',e);return false}
 }
 function downloadShippingList(){renderShipping();const rows=(window.currentShipping||[]).map((g,i)=>({'번호':i+1,'포장상태':state.shippingScans?.[g.code]?'포장완료':'대기','택배코드':g.code,'받는분':g.name,'닉네임':g.nick,'연락처':g.phone,'주소':g.address,'방송일':[...g.dates].join(', '),'상품내역':g.items.map((x,j)=>`#${x.number||j+1} ${x.item} ${x.qty}개 단가 ${x.unit} 금액 ${x.amount}`).join(' / '),'상품합계':g.subtotal,'배송비':g.fee,'토탈금액':g.total}));exportXlsx(rows,'FIRST_OMS_택배리스트.xlsx','택배리스트')}
-function printShipping(){renderShipping();const arr=window.currentShipping||[];if(!arr.length)return alert('출력할 택배 대상이 없습니다.');const data=JSON.stringify(arr.map(g=>({code:g.code,url:location.origin+'/packing.html?code='+encodeURIComponent(g.code)})));const pages=arr.map((g,i)=>`<section class="page"><header><div><h1>땡라이브 고객별 포장리스트</h1><b>${esc(g.name||g.nick)}</b> · ${esc(g.nick)}</div><div id="qr-${i}" class="qr"></div></header><div class="meta"><div><b>연락처</b> ${esc(g.phone)}</div><div><b>방송일</b> ${[...g.dates].join(', ')}</div><div class="address"><b>주소</b> ${esc(g.address)}</div><div><b>택배코드</b> ${esc(g.code)}</div></div><table><thead><tr><th>번호</th><th>상품명</th><th>수량</th><th>단가</th><th>금액</th><th>확인</th></tr></thead><tbody>${g.items.map((x,j)=>`<tr><td>#${esc(x.number||j+1)}</td><td>${esc(x.item)}</td><td>${x.qty}</td><td>${money(x.unit)}</td><td>${money(x.amount)}</td><td>□</td></tr>`).join('')}</tbody></table><div class="totals"><div>상품 합계 <b>${money(g.subtotal)}</b></div><div>택배비 <b>${money(g.fee)}</b></div><div class="grand">토탈 금액 <b>${money(g.total)}</b></div></div><footer>QR을 휴대폰 기본 카메라로 스캔하면 이 고객의 포장리스트가 열립니다.</footer></section>`).join('');const w=window.open('','_blank');w.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>고객별 택배리스트</title><script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"><\/script><style>*{box-sizing:border-box}body{margin:0;font-family:Arial,'Noto Sans KR',sans-serif;color:#111}.page{width:210mm;min-height:297mm;padding:14mm;page-break-after:always;position:relative}.page:last-child{page-break-after:auto}header{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:3px solid #111;padding-bottom:12px}h1{font-size:25px;margin:0 0 8px}.qr img,.qr canvas{width:110px!important;height:110px!important}.meta{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:18px 0;font-size:14px}.address{grid-column:1/-1;line-height:1.5}table{width:100%;border-collapse:collapse;table-layout:fixed}th,td{border:1px solid #555;padding:11px 8px;text-align:center;word-break:keep-all}th:nth-child(2),td:nth-child(2){text-align:left;width:42%}.totals{margin:18px 0 0 auto;width:330px;font-size:16px;line-height:2;text-align:right}.grand{font-size:23px;border-top:2px solid #111;margin-top:4px;padding-top:5px}footer{position:absolute;bottom:12mm;left:14mm;right:14mm;text-align:center;color:#555}@page{size:A4 portrait;margin:0}</style></head><body>${pages}<script>const d=${data};window.onload=()=>{d.forEach((x,i)=>new QRCode(document.getElementById('qr-'+i),{text:x.url,width:180,height:180}));setTimeout(()=>window.print(),700)};<\/script></body></html>`);w.document.close()}
+function printShipping(){renderShipping();const arr=window.currentShipping||[];if(!arr.length)return alert('출력할 택배 대상이 없습니다.');const data=JSON.stringify(arr.map(g=>({code:g.code,url:location.origin+'/packing.html?code='+encodeURIComponent(g.code)})));const pages=arr.map((g,i)=>`<section class="page"><header><div><h1>땡라이브 고객별 포장리스트</h1><b>${esc(g.name||g.nick)}</b> · ${esc(g.nick)}</div><div id="qr-${i}" class="qr"></div></header><div class="meta"><div><b>연락처</b> ${esc(g.phone)}</div><div><b>방송일</b> ${[...g.dates].join(', ')}</div><div class="address"><b>주소</b> ${esc(g.address)}</div><div><b>택배코드</b> ${esc(g.code)}</div></div><table><thead><tr><th>번호</th><th>상품명</th><th>수량</th><th>단가</th><th>금액</th><th>확인</th></tr></thead><tbody>${g.items.map((x,j)=>`<tr><td>#${esc(x.number||j+1)}</td><td>${esc(x.item)}</td><td>${x.qty}</td><td>${money(x.unit)}</td><td>${money(x.amount)}</td><td>□</td></tr>`).join('')}</tbody></table><div class="totals"><div>상품 합계 <b>${money(g.subtotal)}</b></div><div>택배비 <b>${money(g.fee)}</b></div><div class="grand">토탈 금액 <b>${money(g.total)}</b></div></div><footer>QR을 휴대폰 기본 카메라로 스캔하면 이 고객의 포장리스트가 열립니다.</footer></section>`).join('');const w=window.open('','_blank');w.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>고객별 택배리스트</title><script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"><\/script><style>*{box-sizing:border-box}body{margin:0;font-family:Arial,'Noto Sans KR',sans-serif;color:#111}.page{width:210mm;min-height:297mm;padding:14mm;page-break-after:always;position:relative}.page:last-child{page-break-after:auto}header{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:3px solid #111;padding-bottom:12px}h1{font-size:25px;margin:0 0 8px}.qr img,.qr canvas{width:110px!important;height:110px!important}.meta{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:18px 0;font-size:14px}.address{grid-column:1/-1;line-height:1.5}table{width:100%;border-collapse:collapse;table-layout:fixed}th,td{border:1px solid #555;padding:11px 8px;text-align:center;word-break:keep-all}th:nth-child(2),td:nth-child(2){text-align:left;width:42%}.totals{margin:18px 0 0 auto;width:330px;font-size:16px;line-height:2;text-align:right}.grand{font-size:23px;border-top:2px solid #111;margin-top:4px;padding-top:5px}footer{position:absolute;bottom:12mm;left:14mm;right:14mm;text-align:center;color:#555}@page{size:A4 portrait;margin:0}</style></head><body>${pages}<script>const d=${data};window.onload=()=>{d.forEach((x,i)=>new QRCode(document.getElementById('qr-'+i),{text:x.url,width:180,height:180}));setTimeout(()=>window.print(),700)};<\/script>
+<style id="v725-final-visual-fixes">
+/* v7.25: 기존 기능 유지, 보이는 오류만 강제 교정 */
+.exact-receipt,.exact-receipt *{box-sizing:border-box!important}
+.exact-receipt{width:794px!important;max-width:calc(100vw - 70px)!important;height:auto!important;min-height:0!important;overflow:visible!important;background:#fff!important;color:#111!important;padding:32px 36px 28px!important}
+.receipt-detail-box{width:auto!important;max-width:880px!important;overflow:visible!important;background:#f2f3f5!important}
+#receiptDetailBody{overflow-x:auto!important;padding-bottom:8px!important}
+.receipt-detail-modal .er-items,.receipt-detail-modal .er-items thead,.receipt-detail-modal .er-items tbody,.receipt-detail-modal .er-items tr,.receipt-detail-modal .er-items th,.receipt-detail-modal .er-items td{background:#fff!important;color:#111!important}
+.receipt-detail-modal .er-items{width:100%!important;table-layout:fixed!important;border-collapse:collapse!important;margin-top:16px!important}
+.receipt-detail-modal .er-items thead{display:table-header-group!important}
+.receipt-detail-modal .er-items th{background:#f1f2f4!important;color:#111!important;border:1px solid #777!important;position:static!important;top:auto!important;font-weight:900!important}
+.receipt-detail-modal .er-items td{border:1px solid #999!important}
+.receipt-detail-modal .er-items tbody tr:hover td{background:#eef0f3!important;color:#111!important}
+#receipts table tbody tr:hover td,#customers table tbody tr:hover td,#payments table tbody tr:hover td,#shipping table tbody tr:hover td,.scroll table tbody tr:hover td{background:#eef0f3!important;color:#1f2937!important}
+#receipts table tbody tr:hover *,#customers table tbody tr:hover *,#payments table tbody tr:hover *,#shipping table tbody tr:hover *{color:inherit!important}
+.er-info,.er-tracking{width:100%!important;min-width:0!important}.er-info dd,.er-tracking span{overflow-wrap:anywhere!important;word-break:break-word!important}
+.er-top{grid-template-columns:150px minmax(0,1fr) 190px!important}.er-title{letter-spacing:10px!important}.er-order{min-width:0!important}
+.er-sum,.er-grand,.er-notice,.er-bank,.er-bottom{width:100%!important;max-width:100%!important}
+.shipping-modern-wrap{overflow-x:auto!important}.shipping-modern{min-width:1050px!important}
+@media print{
+ .exact-receipt,.exact-receipt *{box-sizing:border-box!important}
+ .exact-receipt{width:210mm!important;max-width:210mm!important;min-height:297mm!important;margin:0!important;padding:10mm 11mm!important;overflow:hidden!important;box-shadow:none!important}
+ .receipt-detail-box{width:210mm!important;max-width:210mm!important;padding:0!important;margin:0!important;background:#fff!important;overflow:visible!important}
+ #receiptDetailBody{overflow:visible!important;padding:0!important}
+ .receipt-detail-modal .er-items th{background:#f1f2f4!important;color:#111!important;-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}
+}
+</style>
+</body></html>`);w.document.close()}
 function downloadReceiptList(){
  const rows=getReceipts().map((r,i)=>({'정산번호':r.date.replaceAll('-','')+'-'+String(i+1).padStart(3,'0'),'방송일':r.date,'실명':r.customer?.name||'','닉네임':r.nick,'전화번호':r.customer?.phone||'','주소':[r.customer?.postalCode,r.customer?.address,r.customer?.detailAddress].filter(Boolean).join(' '),'상품내역':r.items.map(x=>x.item+' '+x.qty+'개').join(' / '),'상품합계':r.subtotal,'배송비':r.fee,'결제금액':r.total,'고객매칭':r.customer?'완료':'확인필요','입금상태':r.payment.status==='paid'?'입금완료':'미입금/확인필요'}));
  exportXlsx(rows,'FIRST_OMS_정산서목록.xlsx','정산서');
@@ -1369,5 +1423,110 @@ tr:hover td{background:#f6f7f9!important;color:inherit!important}.exact-receipt 
 })();
 </script>
 
+
+<style id="v724-only-fixes">
+/* 요청한 3개 화면만 보정 */
+.exact-receipt{width:794px!important;max-width:100%!important;min-height:0!important;height:auto!important;padding:34px 38px 30px!important;overflow:hidden!important;background:#fff!important;color:#111!important}
+.er-items{margin-top:16px!important;border:1px solid #777!important}
+.er-items thead{display:table-header-group!important}
+.er-items th{background:#f1f2f4!important;color:#111!important;border:1px solid #777!important;font-weight:900!important;padding:9px 7px!important}
+.er-items td{background:#fff!important;color:#111!important;border:1px solid #999!important;padding:8px 7px!important}
+.er-items tbody tr:hover td{background:#f3f4f6!important;color:#111!important}
+.er-info{grid-template-columns:86px minmax(0,1fr)!important}.er-info dd{white-space:normal!important}
+.er-tracking{display:grid;grid-template-columns:86px minmax(0,1fr);border-left:1px solid #777}.er-tracking b,.er-tracking span{padding:9px 11px;border-right:1px solid #777;border-bottom:1px solid #777}.er-tracking b{background:#f2f2f2;text-align:center}
+.receipt-detail-modal{overflow:auto!important}.receipt-detail-box{max-width:900px!important;width:calc(100vw - 30px)!important;overflow:auto!important}.receipt-detail-box *{box-sizing:border-box!important}
+#receiptCards tr:hover td,#paymentTable tr:hover td,#customerTable tr:hover td,#shippingTable tr:hover td{background:#eef0f3!important;color:#222!important}
+#receiptCards tr:hover a,#paymentTable tr:hover a,#customerTable tr:hover a,#shippingTable tr:hover a{color:#222!important}
+.ship-searchbar{display:flex;gap:8px;margin:0 0 12px}.ship-searchbar input{flex:1;min-width:0;background:#fff;color:#222;border:1px solid #cfd4da;border-radius:8px;padding:10px 12px}.ship-searchbar button{white-space:nowrap}
+.shipping-modern tbody tr:hover td{background:#eef0f3!important;color:#222!important}.shipping-modern tbody tr:hover .customer strong,.shipping-modern tbody tr:hover .real,.shipping-modern tbody tr:hover .phone{color:#222!important}
+@media print{
+ .exact-receipt{width:210mm!important;max-width:210mm!important;min-height:297mm!important;padding:10mm 11mm!important;page-break-after:always!important;overflow:hidden!important}
+ .er-items th{background:#f1f2f4!important;color:#111!important;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+ .receipt-detail-box{width:210mm!important;max-width:210mm!important;overflow:visible!important}
+}
+</style>
+<script id="v724-only-functions">
+(function(){
+ const oldReceiptHTML=window.receiptHTML;
+ window.receiptHTML=function(r,i){
+  let html=oldReceiptHTML(r,i);
+  const code=shippingCodeFor({key:r.key,name:r.customer?.name||'',nick:r.nick,phone:r.customer?.phone||'',address:[r.customer?.postalCode,r.customer?.address,r.customer?.detailAddress].filter(Boolean).join(' '),dates:new Set([r.date]),items:r.items,subtotal:r.subtotal,fee:r.fee,total:r.total,status:r.payment?.status||'unpaid'});
+  const tracking=state.shippingScans?.[code]?.trackingNumber||'';
+  html=html.replace('</dl>','</dl><div class="er-tracking"><b>송장번호</b><span>'+esc(tracking)+'</span></div>');
+  return html;
+ };
+ window.renderShipping=function(){
+  const filter=$('shippingFilter')?.value||'all',bundle=$('bundleMode')?.value||'customer';let rs=getReceipts();if(filter==='paid')rs=rs.filter(r=>r.payment.status==='paid');
+  const groups=new Map();rs.forEach(r=>{const k=bundle==='customer'?(r.customer?.id||r.nick):r.key;if(!groups.has(k))groups.set(k,{key:r.key,name:r.customer?.name||'',nick:r.nick,phone:r.customer?.phone||'',address:[r.customer?.postalCode,r.customer?.address,r.customer?.detailAddress].filter(Boolean).join(' '),dates:new Set(),items:[],subtotal:0,fee:0,total:0,status:r.payment.status,paid:v722PaidAmount(r)});const g=groups.get(k);g.dates.add(r.date);g.items.push(...r.items);g.subtotal+=r.subtotal;g.fee+=r.fee;g.total+=r.total;g.status=r.payment.status;g.paid=Math.max(g.paid,v722PaidAmount(r));});
+  let arr=[...groups.values()].map(g=>({...g,code:shippingCodeFor(g)}));state.shippingScans=state.shippingScans||{};
+  const q=(window.__shipSearch||'').trim().toLowerCase();if(q)arr=arr.filter(g=>[g.nick,g.name,g.phone,g.address,g.code,state.shippingScans?.[g.code]?.trackingNumber].some(v=>String(v||'').toLowerCase().includes(q)));
+  window.currentShipping=arr;const box=$('shippingTable');if(!box)return;
+  const search=`<div class="ship-searchbar"><input id="shipSearchInput" value="${esc(window.__shipSearch||'')}" placeholder="닉네임 / 이름 / 연락처 / 주소 / 송장번호 검색" onkeydown="if(event.key==='Enter'){window.__shipSearch=this.value;renderShipping()}"><button class="btn secondary" onclick="window.__shipSearch=$('shipSearchInput').value;renderShipping()">검색</button><button class="btn secondary" onclick="window.__shipSearch='';renderShipping()">초기화</button></div>`;
+  if(!arr.length){box.innerHTML=search+'<div class="empty">택배 대상이 없습니다.</div>';return}
+  box.innerHTML=search+`<div class="shipping-modern-wrap"><table class="shipping-modern"><thead><tr><th>선택</th><th>고객정보</th><th>주문정보</th><th>결제정보</th><th>배송지 / 연락처</th><th>입금상태</th><th>송장번호</th><th>주문일시</th><th>관리</th></tr></thead><tbody>${arr.map(g=>{const track=state.shippingScans?.[g.code]?.trackingNumber||'';const diff=g.paid-g.total;return `<tr><td><input type="checkbox"></td><td class="customer"><strong>${esc(g.nick)}</strong><div class="real">(${esc(g.name||'이름 미등록')})</div><div class="phone">${esc(g.phone||'연락처 없음')}</div></td><td class="items">${g.items.slice(0,5).map(x=>`${esc(x.item)} <b>× ${Number(x.qty)||0}</b>`).join('<br>')}${g.items.length>5?`<br>외 ${g.items.length-5}건`:''}</td><td class="amount">상품 ${money(g.subtotal)}<br>배송비 ${money(g.fee)}<div class="total">청구 ${money(g.total)}</div>${g.status==='amount-mismatch'?`<div class="mismatch-detail">입금 ${money(g.paid)}<br>${diff<0?'부족':'초과'} ${money(Math.abs(diff))}</div>`:''}</td><td class="addr">${esc(g.address||'주소 미등록')}<br><br>${esc(g.phone||'-')}</td><td><span class="payment-pill ${v722StatusClass(g.status)}">${v722StatusText(g.status)}</span></td><td><b>${esc(track||'-')}</b></td><td>${[...g.dates].join(', ')}</td><td class="actions"><button class="btn secondary" onclick="openReceiptDetail('${esc(g.key)}')">정산서 보기</button><button class="btn secondary" onclick="openCustomerForKey('${esc(g.key)}')">상세보기</button><button class="btn" onclick="togglePackingStatus('${esc(g.code)}')">작업</button></td></tr>`}).join('')}</tbody></table></div>`;
+ };
+ window.printShipping=function(){
+  renderShipping();const arr=window.currentShipping||[];if(!arr.length)return alert('출력할 택배 대상이 없습니다.');
+  const per=12,pages=[];arr.forEach(g=>{const chunks=[];for(let i=0;i<g.items.length;i+=per)chunks.push(g.items.slice(i,i+per));if(!chunks.length)chunks.push([]);chunks.forEach((items,pi)=>pages.push({g,items,pi,total:chunks.length}))});
+  const data=JSON.stringify(pages.map(p=>({url:location.origin+'/packing.html?code='+encodeURIComponent(p.g.code)})));
+  const body=pages.map((p,i)=>{const g=p.g;const title=`${esc(g.nick)}님 포장리스트${p.total>1?` #${p.pi+1}`:''}`;return `<section class="page"><header><div class="headtext"><h1>${title}</h1><div class="person">${esc(g.nick)} <span>(${esc(g.name||'이름 미등록')})</span></div></div><div id="qr-${i}" class="qr"></div></header><div class="meta"><div><b>연락처</b> ${esc(g.phone)}</div><div><b>방송일</b> ${[...g.dates].join(', ')}</div><div class="address"><b>주소</b> ${esc(g.address)}</div><div><b>택배코드</b> ${esc(g.code)}</div><div class="address"><b>송장번호</b> ${esc(state.shippingScans?.[g.code]?.trackingNumber||'')}</div></div><table><thead><tr><th>번호</th><th>상품명</th><th>수량</th><th>단가</th><th>금액</th><th>확인</th></tr></thead><tbody>${p.items.map((x,j)=>`<tr><td>#${esc(x.number||(p.pi*per+j+1))}</td><td>${esc(x.item)}</td><td>${x.qty}</td><td>${money(x.unit)}</td><td>${money(x.amount)}</td><td>□</td></tr>`).join('')}</tbody></table><div class="totals"><div>상품 합계 <b>${money(g.subtotal)}</b></div><div>택배비 <b>${money(g.fee)}</b></div><div class="grand">토탈 금액 <b>${money(g.total)}</b></div></div><footer>${title}</footer></section>`}).join('');
+  const w=window.open('','_blank');w.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>고객별 택배리스트</title><script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"><\/script><style>*{box-sizing:border-box}body{margin:0;font-family:Arial,'Noto Sans KR',sans-serif;color:#111}.page{width:210mm;height:297mm;padding:12mm 13mm;page-break-after:always;position:relative;overflow:hidden}.page:last-child{page-break-after:auto}header{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:3px solid #111;padding-bottom:12px}h1{font-size:30px;margin:0 0 10px;font-weight:900}.person{font-size:25px;font-weight:900}.person span{font-size:20px}.qr img,.qr canvas{width:105px!important;height:105px!important}.meta{display:grid;grid-template-columns:1fr 1fr;gap:8px 18px;margin:16px 0;font-size:16px}.address{grid-column:1/-1;line-height:1.45}table{width:100%;border-collapse:collapse;table-layout:fixed;font-size:16px}th,td{border:1px solid #555;padding:10px 8px;text-align:center;word-break:keep-all}th{background:#f1f2f4}th:nth-child(2),td:nth-child(2){text-align:left;width:42%}.totals{margin:15px 0 0 auto;width:350px;font-size:17px;line-height:1.9;text-align:right}.grand{font-size:24px;border-top:2px solid #111;margin-top:4px;padding-top:5px}footer{position:absolute;bottom:9mm;left:13mm;right:13mm;text-align:center;font-size:15px;font-weight:800}@page{size:A4 portrait;margin:0}</style></head><body>${body}<script>const d=${data};window.onload=()=>{d.forEach((x,i)=>new QRCode(document.getElementById('qr-'+i),{text:x.url,width:180,height:180}));setTimeout(()=>window.print(),700)};<\/script>
+<style id="v725-final-visual-fixes">
+/* v7.25: 기존 기능 유지, 보이는 오류만 강제 교정 */
+.exact-receipt,.exact-receipt *{box-sizing:border-box!important}
+.exact-receipt{width:794px!important;max-width:calc(100vw - 70px)!important;height:auto!important;min-height:0!important;overflow:visible!important;background:#fff!important;color:#111!important;padding:32px 36px 28px!important}
+.receipt-detail-box{width:auto!important;max-width:880px!important;overflow:visible!important;background:#f2f3f5!important}
+#receiptDetailBody{overflow-x:auto!important;padding-bottom:8px!important}
+.receipt-detail-modal .er-items,.receipt-detail-modal .er-items thead,.receipt-detail-modal .er-items tbody,.receipt-detail-modal .er-items tr,.receipt-detail-modal .er-items th,.receipt-detail-modal .er-items td{background:#fff!important;color:#111!important}
+.receipt-detail-modal .er-items{width:100%!important;table-layout:fixed!important;border-collapse:collapse!important;margin-top:16px!important}
+.receipt-detail-modal .er-items thead{display:table-header-group!important}
+.receipt-detail-modal .er-items th{background:#f1f2f4!important;color:#111!important;border:1px solid #777!important;position:static!important;top:auto!important;font-weight:900!important}
+.receipt-detail-modal .er-items td{border:1px solid #999!important}
+.receipt-detail-modal .er-items tbody tr:hover td{background:#eef0f3!important;color:#111!important}
+#receipts table tbody tr:hover td,#customers table tbody tr:hover td,#payments table tbody tr:hover td,#shipping table tbody tr:hover td,.scroll table tbody tr:hover td{background:#eef0f3!important;color:#1f2937!important}
+#receipts table tbody tr:hover *,#customers table tbody tr:hover *,#payments table tbody tr:hover *,#shipping table tbody tr:hover *{color:inherit!important}
+.er-info,.er-tracking{width:100%!important;min-width:0!important}.er-info dd,.er-tracking span{overflow-wrap:anywhere!important;word-break:break-word!important}
+.er-top{grid-template-columns:150px minmax(0,1fr) 190px!important}.er-title{letter-spacing:10px!important}.er-order{min-width:0!important}
+.er-sum,.er-grand,.er-notice,.er-bank,.er-bottom{width:100%!important;max-width:100%!important}
+.shipping-modern-wrap{overflow-x:auto!important}.shipping-modern{min-width:1050px!important}
+@media print{
+ .exact-receipt,.exact-receipt *{box-sizing:border-box!important}
+ .exact-receipt{width:210mm!important;max-width:210mm!important;min-height:297mm!important;margin:0!important;padding:10mm 11mm!important;overflow:hidden!important;box-shadow:none!important}
+ .receipt-detail-box{width:210mm!important;max-width:210mm!important;padding:0!important;margin:0!important;background:#fff!important;overflow:visible!important}
+ #receiptDetailBody{overflow:visible!important;padding:0!important}
+ .receipt-detail-modal .er-items th{background:#f1f2f4!important;color:#111!important;-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}
+}
+</style>
+</body></html>`);w.document.close();
+ };
+})();
+</script>
+
+<style id="v725-final-visual-fixes">
+/* v7.25: 기존 기능 유지, 보이는 오류만 강제 교정 */
+.exact-receipt,.exact-receipt *{box-sizing:border-box!important}
+.exact-receipt{width:794px!important;max-width:calc(100vw - 70px)!important;height:auto!important;min-height:0!important;overflow:visible!important;background:#fff!important;color:#111!important;padding:32px 36px 28px!important}
+.receipt-detail-box{width:auto!important;max-width:880px!important;overflow:visible!important;background:#f2f3f5!important}
+#receiptDetailBody{overflow-x:auto!important;padding-bottom:8px!important}
+.receipt-detail-modal .er-items,.receipt-detail-modal .er-items thead,.receipt-detail-modal .er-items tbody,.receipt-detail-modal .er-items tr,.receipt-detail-modal .er-items th,.receipt-detail-modal .er-items td{background:#fff!important;color:#111!important}
+.receipt-detail-modal .er-items{width:100%!important;table-layout:fixed!important;border-collapse:collapse!important;margin-top:16px!important}
+.receipt-detail-modal .er-items thead{display:table-header-group!important}
+.receipt-detail-modal .er-items th{background:#f1f2f4!important;color:#111!important;border:1px solid #777!important;position:static!important;top:auto!important;font-weight:900!important}
+.receipt-detail-modal .er-items td{border:1px solid #999!important}
+.receipt-detail-modal .er-items tbody tr:hover td{background:#eef0f3!important;color:#111!important}
+#receipts table tbody tr:hover td,#customers table tbody tr:hover td,#payments table tbody tr:hover td,#shipping table tbody tr:hover td,.scroll table tbody tr:hover td{background:#eef0f3!important;color:#1f2937!important}
+#receipts table tbody tr:hover *,#customers table tbody tr:hover *,#payments table tbody tr:hover *,#shipping table tbody tr:hover *{color:inherit!important}
+.er-info,.er-tracking{width:100%!important;min-width:0!important}.er-info dd,.er-tracking span{overflow-wrap:anywhere!important;word-break:break-word!important}
+.er-top{grid-template-columns:150px minmax(0,1fr) 190px!important}.er-title{letter-spacing:10px!important}.er-order{min-width:0!important}
+.er-sum,.er-grand,.er-notice,.er-bank,.er-bottom{width:100%!important;max-width:100%!important}
+.shipping-modern-wrap{overflow-x:auto!important}.shipping-modern{min-width:1050px!important}
+@media print{
+ .exact-receipt,.exact-receipt *{box-sizing:border-box!important}
+ .exact-receipt{width:210mm!important;max-width:210mm!important;min-height:297mm!important;margin:0!important;padding:10mm 11mm!important;overflow:hidden!important;box-shadow:none!important}
+ .receipt-detail-box{width:210mm!important;max-width:210mm!important;padding:0!important;margin:0!important;background:#fff!important;overflow:visible!important}
+ #receiptDetailBody{overflow:visible!important;padding:0!important}
+ .receipt-detail-modal .er-items th{background:#f1f2f4!important;color:#111!important;-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}
+}
+</style>
 </body>
 </html>
