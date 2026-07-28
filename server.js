@@ -130,8 +130,7 @@ function ensureTenantStorage(account){
   'message-history.json':'[]',
   'solapi-settings.json':'{}',
   'youtube-auth.json':'{}',
-  'tenant-settings.json':JSON.stringify({tenantCode:account.code,company:account.company||'',createdAt:new Date().toISOString()},null,2),
-  'courier-settings.json':'{}'
+  'tenant-settings.json':JSON.stringify({tenantCode:account.code,company:account.company||'',createdAt:new Date().toISOString()},null,2)
  };
  for(const [name,text] of Object.entries(defaults)){const f=path.join(dir,name);if(!fs.existsSync(f))atomicWrite(f,text)}
 }
@@ -281,6 +280,20 @@ function restoreDdaengCustomersAndSeparateSolapiOnce(){
 }
 migrateOwnerLegacyDataOnce();
 restoreDdaengCustomersAndSeparateSolapiOnce();
+function restoreBundledDdaengDataIfEmpty(){
+ try{
+  const current=tenantReadState(DDAENG_TENANT_CODE);
+  if(Array.isArray(current.orders)&&current.orders.length>0)return;
+  const bundled=path.join(ROOT,'data','initial-backup.json');
+  if(!fs.existsSync(bundled))return;
+  const backup=readJsonObject(bundled,{}),source=backup.state||backup;
+  if(!Array.isArray(source.orders)||source.orders.length===0)return;
+  const restored={...current,...source,shippingScans:current.shippingScans||source.shippingScans||{},updatedAt:new Date().toISOString()};
+  tenantWriteState(DDAENG_TENANT_CODE,restored);
+  console.log(`[DATA RECOVERY] ${DDAENG_TENANT_CODE}: orders ${restored.orders.length}, customers ${(restored.customers||[]).length}, payments ${(restored.payments||[]).length}`);
+ }catch(e){console.error('[DATA RECOVERY] 실패:',e.message)}
+}
+restoreBundledDdaengDataIfEmpty();
 
 function readBody(req,max=1024*1024){
  return new Promise((resolve,reject)=>{
@@ -580,33 +593,16 @@ const server=http.createServer((req,res)=>{
   if(!found)return json(res,404,{ok:false,error:'포장리스트를 찾을 수 없습니다.'});return json(res,200,{ok:true,job:found})
  }
  if(u.pathname==='/api/public/packing/complete'&&req.method==='POST')return readBody(req).then(body=>{try{const d=JSON.parse(body||'{}'),code=String(d.code||'').trim().toUpperCase(),tc=String(d.tenantCode||'');if(!code||!tc)return json(res,400,{ok:false,error:'QR 코드 또는 거래처 코드가 없습니다.'});const st=tenantReadState(tc);st.shippingScans=st.shippingScans||{};const completedAt=new Date().toISOString();const prev=st.shippingScans[code]||{};st.shippingScans[code]={...prev,at:completedAt,source:'mobile-public',worker:String(d.worker||'').trim()};tenantWriteState(tc,st);return json(res,200,{ok:true,completedAt})}catch(e){return json(res,400,{ok:false,error:e.message})}})
- if(u.pathname==='/api/public/packing/tracking'&&req.method==='POST')return readBody(req).then(body=>{try{const d=JSON.parse(body||'{}'),code=String(d.code||'').trim().toUpperCase(),tc=String(d.tenantCode||''),trackingNumber=String(d.trackingNumber||'').replace(/\s+/g,'').trim();if(!code||!tc)return json(res,400,{ok:false,error:'QR 코드 또는 거래처 코드가 없습니다.'});if(!trackingNumber)return json(res,400,{ok:false,error:'송장번호를 입력하거나 스캔해 주세요.'});if(trackingNumber.length<6||trackingNumber.length>40)return json(res,400,{ok:false,error:'송장번호 형식을 확인해 주세요.'});const st=tenantReadState(tc);st.shippingScans=st.shippingScans||{};const prev=st.shippingScans[code]||{};const trackingUpdatedAt=new Date().toISOString();const courier=String(d.courier||prev.courier||'').trim(),trackingSource=String(d.source||prev.trackingSource||'manual').trim();st.shippingScans[code]={...prev,trackingNumber,courier,trackingSource,trackingUpdatedAt};tenantWriteState(tc,st);return json(res,200,{ok:true,trackingNumber,courier,trackingSource,trackingUpdatedAt})}catch(e){return json(res,400,{ok:false,error:e.message})}})
+ if(u.pathname==='/api/public/packing/tracking'&&req.method==='POST')return readBody(req).then(body=>{try{const d=JSON.parse(body||'{}'),code=String(d.code||'').trim().toUpperCase(),tc=String(d.tenantCode||''),trackingNumber=String(d.trackingNumber||'').replace(/\s+/g,'').trim();if(!code||!tc)return json(res,400,{ok:false,error:'QR 코드 또는 거래처 코드가 없습니다.'});if(!trackingNumber)return json(res,400,{ok:false,error:'송장번호를 입력하거나 스캔해 주세요.'});if(trackingNumber.length<6||trackingNumber.length>40)return json(res,400,{ok:false,error:'송장번호 형식을 확인해 주세요.'});const st=tenantReadState(tc);st.shippingScans=st.shippingScans||{};const prev=st.shippingScans[code]||{};const trackingUpdatedAt=new Date().toISOString();st.shippingScans[code]={...prev,trackingNumber,trackingUpdatedAt};tenantWriteState(tc,st);return json(res,200,{ok:true,trackingNumber,trackingUpdatedAt})}catch(e){return json(res,400,{ok:false,error:e.message})}})
 
 
+ if(u.pathname==='/api/packing/tracking/bulk'&&req.method==='POST')return readBody(req,5*1024*1024).then(body=>{try{const d=JSON.parse(body||'{}'),updates=Array.isArray(d.updates)?d.updates:[];if(!updates.length)return json(res,400,{ok:false,error:'등록할 송장정보가 없습니다.'});const st=tenantReadState(tenantCode);st.shippingScans=st.shippingScans||{};let updated=0,skipped=0;for(const u of updates){const code=String(u.code||'').trim().toUpperCase(),trackingNumber=String(u.trackingNumber||'').replace(/\s+/g,'').trim(),courier=String(u.courier||'파일접수').trim();if(!code||!trackingNumber){skipped++;continue}const prev=st.shippingScans[code]||{};if(prev.trackingNumber&&prev.trackingNumber!==trackingNumber){skipped++;continue}st.shippingScans[code]={...prev,trackingNumber,courier,trackingUpdatedAt:new Date().toISOString(),trackingSource:'file-upload'};updated++}tenantWriteState(tenantCode,st);return json(res,200,{ok:true,updated,skipped})}catch(e){return json(res,400,{ok:false,error:e.message})}})
  if(u.pathname==='/api/packing/scans'&&req.method==='GET'){const st=tenantReadState(tenantCode);return json(res,200,{ok:true,shippingScans:st.shippingScans||{}})}
  if(u.pathname==='/api/packing/status'&&req.method==='POST')return readBody(req).then(body=>{try{const d=JSON.parse(body||'{}'),code=String(d.code||'').trim().toUpperCase();if(!code)return json(res,400,{ok:false,error:'택배코드가 없습니다.'});const st=tenantReadState(tenantCode);st.shippingScans=st.shippingScans||{};const prev=st.shippingScans[code]||{};st.shippingScans[code]={...prev,at:new Date().toISOString(),source:String(d.source||'admin-manual'),worker:String(d.worker||'관리자')};tenantWriteState(tenantCode,st);return json(res,200,{ok:true,scan:st.shippingScans[code]})}catch(e){return json(res,400,{ok:false,error:e.message})}})
  if(u.pathname==='/api/packing/status'&&req.method==='DELETE'){const code=String(u.query.code||'').trim().toUpperCase();if(!code)return json(res,400,{ok:false,error:'택배코드가 없습니다.'});const st=tenantReadState(tenantCode);st.shippingScans=st.shippingScans||{};delete st.shippingScans[code];tenantWriteState(tenantCode,st);return json(res,200,{ok:true})}
  if(u.pathname==='/api/state'&&req.method==='GET')return json(res,200,{ok:true,state:tenantReadState(tenantCode),archives:tenantListSalesArchives(tenantCode),tenantCode});
- if(u.pathname==='/api/courier/config'&&req.method==='GET'){
-  const cfg=readJsonObject(tenantFile(tenantCode,'courier-settings.json'),{});
-  return json(res,200,{ok:true,config:{...cfg,apiSecret:cfg.apiSecret?'••••••••':'',hasSecret:!!cfg.apiSecret}})
- }
- if(u.pathname==='/api/courier/config'&&req.method==='POST'){
-  return readBody(req).then(body=>{try{const d=JSON.parse(body||'{}'),old=readJsonObject(tenantFile(tenantCode,'courier-settings.json'),{});const next={courier:String(d.courier||old.courier||'').trim(),customerCode:String(d.customerCode||old.customerCode||'').trim(),apiKey:String(d.apiKey||old.apiKey||'').trim(),apiSecret:String((d.apiSecret&&d.apiSecret!=='••••••••')?d.apiSecret:old.apiSecret||'').trim(),contractCode:String(d.contractCode||old.contractCode||'').trim(),trackingBaseUrl:String(d.trackingBaseUrl||old.trackingBaseUrl||'').trim(),updatedAt:new Date().toISOString()};if(!next.courier)return json(res,400,{ok:false,error:'택배사를 선택해 주세요.'});atomicWrite(tenantFile(tenantCode,'courier-settings.json'),JSON.stringify(next,null,2));return json(res,200,{ok:true,configured:true,courier:next.courier})}catch(e){return json(res,400,{ok:false,error:e.message})}})
- }
  if(u.pathname==='/api/state'&&req.method==='POST'){
-  return readBody(req,20*1024*1024).then(body=>{try{
-   const incoming=JSON.parse(body||'{}'),current=tenantReadState(tenantCode);
-   const mergeById=(oldList,newList,keyFn)=>{if(!Array.isArray(newList))return oldList||[];const m=new Map((oldList||[]).map(x=>[keyFn(x),x]));for(const x of newList){const k=keyFn(x);m.set(k,m.has(k)?{...m.get(k),...x}:x)}return [...m.values()]};
-   const st={...current,...incoming};
-   st.orders=mergeById(current.orders,incoming.orders,x=>x.id||[x.date,x.nick,x.number,x.item,x.qty,x.amount].join('|'));
-   st.customers=mergeById(current.customers,incoming.customers,x=>x.id||x.phone||x.nickname||x.nick||x.name);
-   st.payments=mergeById(current.payments,incoming.payments,x=>x.id||[x.payer,x.amount,x.date].join('|'));
-   st.csRecords=mergeById(current.csRecords,incoming.csRecords,x=>x.id||[x.customerId,x.createdAt,x.text].join('|'));
-   st.shippingRecords=mergeById(current.shippingRecords,incoming.shippingRecords,x=>x.id||x.code||x.trackingNumber);
-   st.shippingScans={...(current.shippingScans||{}),...(incoming.shippingScans||{})};
-   const saved=tenantWriteState(tenantCode,st);return json(res,200,{ok:true,protectedMerge:true,updatedAt:saved.updatedAt,orders:(saved.orders||[]).length,customers:(saved.customers||[]).length})
-  }catch(e){return json(res,400,{ok:false,error:e.message})}})
+  return readBody(req,20*1024*1024).then(body=>{try{const st=JSON.parse(body||'{}'),current=tenantReadState(tenantCode);st.shippingScans=current.shippingScans||{};const saved=tenantWriteState(tenantCode,st);return json(res,200,{ok:true,updatedAt:saved.updatedAt,orders:(saved.orders||[]).length,customers:(saved.customers||[]).length})}catch(e){return json(res,400,{ok:false,error:e.message})}})
  }
  if(u.pathname==='/api/state/backup'&&req.method==='GET'){
   const st=tenantReadState(tenantCode);const payload={version:7.5,tenantCode,exportedAt:new Date().toISOString(),state:st};
