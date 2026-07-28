@@ -176,7 +176,7 @@ main{padding-top:18px}
 <header>
   <div><div class="brand"><b>FIRST OMS</b> 땡라이브 정산서버 v7.11</div><div class="sub">고객DB·판매리스트 3중 자동보존 · 정산 · 입금 · 택배</div></div>
   <div class="actions no-print">
-    <span id="loginUser" class="sub">로그인 확인 중</span><button id="accountAdminBtn" class="btn secondary" style="display:none" onclick="location.href='/superadmin.html'">거래처 계정관리</button><button class="btn secondary" onclick="location.href='/change-password.html'">비밀번호 변경</button><button class="btn secondary" onclick="runFunctionCheck()">기능점검</button><button class="btn secondary" onclick="logoutNow()">로그아웃</button>
+    <span id="loginUser" class="sub">로그인 확인 중</span><button id="accountAdminBtn" class="btn secondary" style="display:none" onclick="location.href='/superadmin.html'">거래처 계정관리</button><button class="btn secondary" onclick="location.href='/change-password.html'">비밀번호 변경</button><button class="btn secondary" onclick="runFunctionCheck()">기능점검</button><button id="alwaysSettingsBtn" class="btn" type="button" onclick="go('settings')">⚙ 설정</button><button class="btn secondary" onclick="logoutNow()">로그아웃</button>
     <button class="btn secondary" onclick="recoverOldData()">이전 고객DB 복구</button>
     <a class="btn secondary" href="/api/customers/export.xlsx">고객DB 엑셀 받기</a><button class="btn secondary" onclick="downloadCustomerBackup()">고객정보 백업</button>
     <button class="btn secondary" onclick="downloadBackup()">전체 백업</button>
@@ -192,6 +192,7 @@ main{padding-top:18px}
     <button type="button" class="tab" data-page="receipts" onclick="go('receipts')">정산서</button>
     <button type="button" class="tab" data-page="payments" onclick="go('payments')">입금대조</button>
     <button type="button" class="tab" data-page="shipping" onclick="go('shipping')">택배실</button>
+    <button type="button" class="tab" data-page="settings" onclick="go('settings')">설정</button>
   </div>
   <div id="serverSaveStatus" class="note no-print" style="margin-top:0">고객DB와 판매리스트를 서버 JSON · 백업 JSON · 엑셀로 자동 보존합니다.</div>
 
@@ -212,6 +213,7 @@ main{padding-top:18px}
       <button class="btn secondary" onclick="go('payments')">입금 대조</button>
       <button class="btn secondary" onclick="go('shipping')">택배리스트</button>
       <button class="btn" onclick="openSolapiSettings()">솔라피 API 입력·연결</button>
+      <button class="btn" type="button" onclick="go('settings')">⚙ 전체 설정 열기</button>
     </div>
   </section>
 
@@ -346,6 +348,12 @@ main{padding-top:18px}
       <video id="shippingScanVideo" playsinline style="display:none;width:100%;max-width:520px;margin-top:10px;border-radius:12px"></video>
     </div>
     <div id="shippingTable"></div>
+  </section>
+
+  <section id="settings" class="page">
+    <div class="section-title"><h2>설정</h2><div class="actions"><button class="btn" onclick="saveMessageSettings();saveCourierSettings()">전체 설정 저장</button></div></div>
+    <div id="settingsMessageMount"></div>
+    <div id="settingsCourierMount" style="margin-top:16px"></div>
   </section>
 </main>
 
@@ -957,6 +965,44 @@ main{padding-top:18px}
  .receipt-detail-modal .er-items th{background:#f1f2f4!important;color:#111!important;-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}
 }
 </style>
+
+<style id="v728-settings-visible-fix">
+.tabs{overflow-x:auto!important;flex-wrap:nowrap!important;scrollbar-width:thin!important}
+.tabs .tab[data-page="settings"]{position:sticky!important;right:0!important;z-index:12!important;background:#f6c453!important;color:#111!important;border:2px solid #d29a13!important;box-shadow:-8px 0 12px rgba(12,18,28,.45)!important;flex:0 0 auto!important}
+#alwaysSettingsBtn{background:#f6c453!important;color:#111!important;border-color:#d29a13!important;font-weight:900!important}
+#settings.page.active{display:block!important}
+#settings .settings-box,#settings .v723-courier-panel{display:block!important;visibility:visible!important;opacity:1!important}
+#settingsMessageMount:empty::before,#settingsCourierMount:empty::before{content:'설정 불러오는 중…';display:block;padding:22px;background:#fff;color:#111;border-radius:12px}
+</style>
+<script id="v728-settings-visible-script">
+(function(){
+ function ensureSettings(){
+   var page=document.getElementById('settings');
+   var mm=document.getElementById('settingsMessageMount');
+   var cm=document.getElementById('settingsCourierMount');
+   var message=document.querySelector('#receipts .settings-box') || document.querySelector('#settings .settings-box');
+   var courier=document.querySelector('#shipping .v723-courier-panel') || document.querySelector('#settings .v723-courier-panel');
+   if(message&&mm&&message.parentElement!==mm) mm.appendChild(message);
+   if(courier&&cm&&courier.parentElement!==cm) cm.appendChild(courier);
+   if(page){ page.style.visibility='visible'; page.style.opacity='1'; }
+   try{ if(typeof renderMessageSettings==='function') renderMessageSettings(true); }catch(e){console.warn(e)}
+   try{ if(typeof loadCourierSettingsUI==='function') loadCourierSettingsUI(); }catch(e){console.warn(e)}
+ }
+ document.addEventListener('DOMContentLoaded',ensureSettings);
+ window.addEventListener('load',ensureSettings);
+ var previousGo=window.go;
+ window.go=function(id){
+   if(typeof previousGo==='function') previousGo.apply(this,arguments);
+   if(id==='settings'){
+     ensureSettings();
+     var tab=document.querySelector('.tab[data-page="settings"]');
+     if(tab) tab.scrollIntoView({behavior:'auto',block:'nearest',inline:'end'});
+   }
+ };
+ setTimeout(ensureSettings,100);
+})();
+</script>
+
 </body></html>`);w.document.close();w.print();
 }
 const paymentAliases={payer:['입금자','입금자명','보낸분','거래내용','내용','적요','성명'],amount:['입금액','금액','거래금액','입금'],date:['거래일시','거래일','날짜','시간']};
@@ -1127,6 +1173,44 @@ function printShipping(){renderShipping();const arr=window.currentShipping||[];i
  .receipt-detail-modal .er-items th{background:#f1f2f4!important;color:#111!important;-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}
 }
 </style>
+
+<style id="v728-settings-visible-fix">
+.tabs{overflow-x:auto!important;flex-wrap:nowrap!important;scrollbar-width:thin!important}
+.tabs .tab[data-page="settings"]{position:sticky!important;right:0!important;z-index:12!important;background:#f6c453!important;color:#111!important;border:2px solid #d29a13!important;box-shadow:-8px 0 12px rgba(12,18,28,.45)!important;flex:0 0 auto!important}
+#alwaysSettingsBtn{background:#f6c453!important;color:#111!important;border-color:#d29a13!important;font-weight:900!important}
+#settings.page.active{display:block!important}
+#settings .settings-box,#settings .v723-courier-panel{display:block!important;visibility:visible!important;opacity:1!important}
+#settingsMessageMount:empty::before,#settingsCourierMount:empty::before{content:'설정 불러오는 중…';display:block;padding:22px;background:#fff;color:#111;border-radius:12px}
+</style>
+<script id="v728-settings-visible-script">
+(function(){
+ function ensureSettings(){
+   var page=document.getElementById('settings');
+   var mm=document.getElementById('settingsMessageMount');
+   var cm=document.getElementById('settingsCourierMount');
+   var message=document.querySelector('#receipts .settings-box') || document.querySelector('#settings .settings-box');
+   var courier=document.querySelector('#shipping .v723-courier-panel') || document.querySelector('#settings .v723-courier-panel');
+   if(message&&mm&&message.parentElement!==mm) mm.appendChild(message);
+   if(courier&&cm&&courier.parentElement!==cm) cm.appendChild(courier);
+   if(page){ page.style.visibility='visible'; page.style.opacity='1'; }
+   try{ if(typeof renderMessageSettings==='function') renderMessageSettings(true); }catch(e){console.warn(e)}
+   try{ if(typeof loadCourierSettingsUI==='function') loadCourierSettingsUI(); }catch(e){console.warn(e)}
+ }
+ document.addEventListener('DOMContentLoaded',ensureSettings);
+ window.addEventListener('load',ensureSettings);
+ var previousGo=window.go;
+ window.go=function(id){
+   if(typeof previousGo==='function') previousGo.apply(this,arguments);
+   if(id==='settings'){
+     ensureSettings();
+     var tab=document.querySelector('.tab[data-page="settings"]');
+     if(tab) tab.scrollIntoView({behavior:'auto',block:'nearest',inline:'end'});
+   }
+ };
+ setTimeout(ensureSettings,100);
+})();
+</script>
+
 </body></html>`);w.document.close()}
 function downloadReceiptList(){
  const rows=getReceipts().map((r,i)=>({'정산번호':r.date.replaceAll('-','')+'-'+String(i+1).padStart(3,'0'),'방송일':r.date,'실명':r.customer?.name||'','닉네임':r.nick,'전화번호':r.customer?.phone||'','주소':[r.customer?.postalCode,r.customer?.address,r.customer?.detailAddress].filter(Boolean).join(' '),'상품내역':r.items.map(x=>x.item+' '+x.qty+'개').join(' / '),'상품합계':r.subtotal,'배송비':r.fee,'결제금액':r.total,'고객매칭':r.customer?'완료':'확인필요','입금상태':r.payment.status==='paid'?'입금완료':'미입금/확인필요'}));
@@ -1497,6 +1581,44 @@ tr:hover td{background:#f6f7f9!important;color:inherit!important}.exact-receipt 
  .receipt-detail-modal .er-items th{background:#f1f2f4!important;color:#111!important;-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}
 }
 </style>
+
+<style id="v728-settings-visible-fix">
+.tabs{overflow-x:auto!important;flex-wrap:nowrap!important;scrollbar-width:thin!important}
+.tabs .tab[data-page="settings"]{position:sticky!important;right:0!important;z-index:12!important;background:#f6c453!important;color:#111!important;border:2px solid #d29a13!important;box-shadow:-8px 0 12px rgba(12,18,28,.45)!important;flex:0 0 auto!important}
+#alwaysSettingsBtn{background:#f6c453!important;color:#111!important;border-color:#d29a13!important;font-weight:900!important}
+#settings.page.active{display:block!important}
+#settings .settings-box,#settings .v723-courier-panel{display:block!important;visibility:visible!important;opacity:1!important}
+#settingsMessageMount:empty::before,#settingsCourierMount:empty::before{content:'설정 불러오는 중…';display:block;padding:22px;background:#fff;color:#111;border-radius:12px}
+</style>
+<script id="v728-settings-visible-script">
+(function(){
+ function ensureSettings(){
+   var page=document.getElementById('settings');
+   var mm=document.getElementById('settingsMessageMount');
+   var cm=document.getElementById('settingsCourierMount');
+   var message=document.querySelector('#receipts .settings-box') || document.querySelector('#settings .settings-box');
+   var courier=document.querySelector('#shipping .v723-courier-panel') || document.querySelector('#settings .v723-courier-panel');
+   if(message&&mm&&message.parentElement!==mm) mm.appendChild(message);
+   if(courier&&cm&&courier.parentElement!==cm) cm.appendChild(courier);
+   if(page){ page.style.visibility='visible'; page.style.opacity='1'; }
+   try{ if(typeof renderMessageSettings==='function') renderMessageSettings(true); }catch(e){console.warn(e)}
+   try{ if(typeof loadCourierSettingsUI==='function') loadCourierSettingsUI(); }catch(e){console.warn(e)}
+ }
+ document.addEventListener('DOMContentLoaded',ensureSettings);
+ window.addEventListener('load',ensureSettings);
+ var previousGo=window.go;
+ window.go=function(id){
+   if(typeof previousGo==='function') previousGo.apply(this,arguments);
+   if(id==='settings'){
+     ensureSettings();
+     var tab=document.querySelector('.tab[data-page="settings"]');
+     if(tab) tab.scrollIntoView({behavior:'auto',block:'nearest',inline:'end'});
+   }
+ };
+ setTimeout(ensureSettings,100);
+})();
+</script>
+
 </body></html>`);w.document.close();
  };
 })();
@@ -1528,5 +1650,151 @@ tr:hover td{background:#f6f7f9!important;color:inherit!important}.exact-receipt 
  .receipt-detail-modal .er-items th{background:#f1f2f4!important;color:#111!important;-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}
 }
 </style>
+
+<style id="v726-definitive-fixes">
+/* v7.26: 기존 기능 유지, 요청한 표시/설정만 수정 */
+.receipt-detail-modal{padding:18px!important;overflow:auto!important}
+.receipt-detail-box{width:min(900px,calc(100vw - 36px))!important;max-width:none!important;margin:auto!important;padding:14px!important;overflow:hidden!important;background:#eef0f3!important}
+#receiptDetailBody{width:100%!important;overflow:hidden!important}
+.exact-receipt{box-sizing:border-box!important;width:100%!important;max-width:794px!important;min-width:0!important;min-height:0!important;height:auto!important;margin:0 auto!important;padding:30px 34px 26px!important;overflow:hidden!important;background:#fff!important;color:#111!important}
+.exact-receipt *{box-sizing:border-box!important;max-width:100%}
+.exact-receipt .er-top{grid-template-columns:135px minmax(0,1fr) 180px!important;gap:8px!important}
+.exact-receipt .er-title{font-size:34px!important;letter-spacing:8px!important;white-space:nowrap!important}
+.exact-receipt .er-order{width:180px!important;min-width:0!important}
+.exact-receipt .er-info,.exact-receipt .er-tracking,.exact-receipt .er-items,.exact-receipt .er-sum,.exact-receipt .er-grand,.exact-receipt .er-notice,.exact-receipt .er-bank,.exact-receipt .er-bottom{width:100%!important;max-width:100%!important;min-width:0!important}
+.exact-receipt .er-info dd,.exact-receipt .er-tracking span{min-width:0!important;overflow-wrap:anywhere!important;word-break:break-word!important}
+.exact-receipt .er-items{table-layout:fixed!important;border-collapse:collapse!important;background:#fff!important;color:#111!important}
+.exact-receipt .er-items thead{display:table-header-group!important}
+.exact-receipt .er-items th{position:static!important;top:auto!important;background:#f1f2f4!important;color:#111!important;border:1px solid #777!important;font-weight:900!important}
+.exact-receipt .er-items td{background:#fff!important;color:#111!important;border:1px solid #999!important}
+.exact-receipt .er-items tbody tr:hover td{background:#eef0f3!important;color:#111!important}
+#receipts tbody tr:hover td,#customers tbody tr:hover td,#payments tbody tr:hover td,#shipping tbody tr:hover td,.scroll tbody tr:hover td,.shipping-modern tbody tr:hover td{background:#eef0f3!important;color:#1f2937!important}
+#receipts tbody tr:hover *,#customers tbody tr:hover *,#payments tbody tr:hover *,#shipping tbody tr:hover *,.shipping-modern tbody tr:hover *{color:inherit!important}
+.shipping-modern-wrap{overflow-x:auto!important;background:#fff!important}
+.shipping-modern{background:#fff!important;color:#222!important}
+.shipping-modern td,.shipping-modern th{color:#222!important}
+#settings .settings-box,#settings .v723-courier-panel{display:block!important;margin:0!important}
+@media(max-width:760px){.exact-receipt{padding:22px 18px!important}.exact-receipt .er-top{grid-template-columns:1fr!important}.exact-receipt .er-brand,.exact-receipt .er-title{text-align:center!important}.exact-receipt .er-order{width:100%!important}.exact-receipt .er-bottom{grid-template-columns:1fr!important}}
+@media print{
+ body>*{display:none!important}.receipt-detail-modal,.receipt-detail-modal *{display:block!important}.receipt-detail-modal{position:static!important;padding:0!important;background:#fff!important;overflow:visible!important}.receipt-detail-box{width:210mm!important;max-width:210mm!important;padding:0!important;margin:0!important;background:#fff!important;overflow:visible!important}.receipt-detail-actions{display:none!important}#receiptDetailBody{overflow:visible!important}.exact-receipt{width:210mm!important;max-width:210mm!important;min-height:297mm!important;margin:0!important;padding:10mm 11mm!important;overflow:hidden!important;box-shadow:none!important}.exact-receipt .er-items th{background:#f1f2f4!important;color:#111!important;-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}@page{size:A4 portrait;margin:0}
+}
+</style>
+<script id="v726-settings-mount">
+(function(){
+ function mountSettings(){
+  const message=document.querySelector('#receipts .settings-box');
+  const courier=document.querySelector('#shipping .v723-courier-panel');
+  const mm=document.getElementById('settingsMessageMount');
+  const cm=document.getElementById('settingsCourierMount');
+  if(message&&mm&&!mm.contains(message))mm.appendChild(message);
+  if(courier&&cm&&!cm.contains(courier))cm.appendChild(courier);
+  if(typeof loadCourierSettingsUI==='function')loadCourierSettingsUI();
+ }
+ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',mountSettings);else mountSettings();
+ const oldGo=window.go;
+ window.go=function(id){const out=oldGo.apply(this,arguments);if(id==='settings')setTimeout(mountSettings,0);return out};
+})();
+</script>
+
+
+<style id="v727-page-and-mms-exact-fix">
+/* v7.27 — 다른 기능은 유지하고 정산서 화면/문자 이미지 표시만 교정 */
+.receipt-detail-modal .receipt-detail-box{max-width:900px!important;width:calc(100vw - 28px)!important;overflow:auto!important}
+.receipt-detail-modal #receiptDetailBody{display:flex!important;justify-content:center!important;overflow:auto!important}
+.receipt-detail-modal .exact-receipt{flex:0 0 794px!important;width:794px!important;max-width:none!important;min-height:1123px!important;height:auto!important;overflow:hidden!important;background:#fff!important;color:#111!important;padding:36px 40px 30px!important}
+.receipt-detail-modal .exact-receipt .er-top,.receipt-detail-modal .exact-receipt .er-info,.receipt-detail-modal .exact-receipt .er-items,.receipt-detail-modal .exact-receipt .er-sum,.receipt-detail-modal .exact-receipt .er-grand,.receipt-detail-modal .exact-receipt .er-notice,.receipt-detail-modal .exact-receipt .er-bank,.receipt-detail-modal .exact-receipt .er-bottom{width:100%!important;max-width:100%!important;min-width:0!important}
+.receipt-detail-modal .exact-receipt .er-items{table-layout:fixed!important;background:#fff!important;color:#111!important}
+.receipt-detail-modal .exact-receipt .er-items thead,.receipt-detail-modal .exact-receipt .er-items tbody,.receipt-detail-modal .exact-receipt .er-items tr,.receipt-detail-modal .exact-receipt .er-items th,.receipt-detail-modal .exact-receipt .er-items td{background:#fff!important;color:#111!important}
+.receipt-detail-modal .exact-receipt .er-items th{background:#f1f2f4!important;color:#111!important;border:1px solid #777!important}
+.receipt-detail-modal .exact-receipt .er-items td{border:1px solid #999!important;overflow-wrap:anywhere!important}
+.receipt-detail-modal .exact-receipt .er-items tbody tr:hover td{background:#eef0f3!important;color:#111!important}
+@media(max-width:850px){.receipt-detail-modal #receiptDetailBody{justify-content:flex-start!important}}
+@media print{
+ .receipt-detail-modal .exact-receipt{width:210mm!important;max-width:210mm!important;min-height:297mm!important;padding:10mm 11mm!important;margin:0!important;overflow:hidden!important;box-shadow:none!important}
+ .receipt-detail-modal .receipt-detail-box{width:210mm!important;max-width:210mm!important;overflow:visible!important;padding:0!important}
+}
+</style>
+<script id="v727-page-matched-mms">
+/* 문자 MMS 이미지를 관리자 페이지의 정산서와 동일한 HTML/CSS로 캡처 */
+window.receiptImageBase64 = async function(r){
+  const index = typeof indexOfReceiptKey==='function' ? indexOfReceiptKey(r.key) : 0;
+  const host=document.createElement('div');
+  host.setAttribute('aria-hidden','true');
+  host.style.cssText='position:fixed;left:-10000px;top:0;width:794px;background:#fff;z-index:-1;pointer-events:none;';
+  host.innerHTML=receiptHTML(r,index);
+  document.body.appendChild(host);
+  const article=host.querySelector('.exact-receipt');
+  article.style.cssText+='width:794px!important;max-width:794px!important;min-height:1123px!important;height:auto!important;overflow:hidden!important;box-shadow:none!important;margin:0!important;background:#fff!important;color:#111!important;padding:36px 40px 30px!important;';
+  const css=`
+    *{box-sizing:border-box}body{margin:0;background:#fff;font-family:Arial,'Noto Sans KR',sans-serif;color:#111}
+    .exact-receipt{width:794px;min-height:1123px;background:#fff;color:#111;padding:36px 40px 30px;font-family:Arial,'Noto Sans KR',sans-serif;overflow:hidden}
+    .er-top{display:grid;grid-template-columns:150px 1fr 190px;align-items:start;border-bottom:3px solid #111;padding-bottom:14px}
+    .er-brand{font-size:13px;font-weight:900}.er-title{text-align:center;font-size:38px;font-weight:900;letter-spacing:10px}
+    .er-order{border:1px solid #222;font-size:12px}.er-order div{display:grid;grid-template-columns:66px 1fr}.er-order b,.er-order span{padding:6px;border-bottom:1px solid #bbb}.er-order div:last-child b,.er-order div:last-child span{border-bottom:0}.er-order b{background:#f1f1f1;border-right:1px solid #bbb}
+    .er-customer-title{display:flex;align-items:end;justify-content:space-between;margin:22px 0 11px}.er-customer-title strong{font-size:24px}.er-page-no{font-size:15px;font-weight:900}
+    .er-info{display:grid;grid-template-columns:90px 1fr;border-top:2px solid #111;border-left:1px solid #777}.er-info dt,.er-info dd{margin:0;padding:8px 10px;border-right:1px solid #777;border-bottom:1px solid #777;min-height:36px;overflow-wrap:anywhere}.er-info dt{background:#f2f2f2;text-align:center;font-weight:900}.er-info dd.name{font-size:18px;font-weight:900}
+    .er-tracking{display:grid;grid-template-columns:90px 1fr;border-left:1px solid #777}.er-tracking b,.er-tracking span{padding:8px 10px;border-right:1px solid #777;border-bottom:1px solid #777}.er-tracking b{background:#f2f2f2;text-align:center}
+    .er-items{width:100%;border-collapse:collapse;margin-top:16px;table-layout:fixed;background:#fff;color:#111}.er-items th{background:#f1f2f4;color:#111;padding:9px 6px;border:1px solid #777;font-size:13px}.er-items td{background:#fff;color:#111;border:1px solid #999;padding:8px 6px;text-align:center;font-size:13px;overflow-wrap:anywhere}.er-items td:nth-child(2){text-align:left}
+    .er-sum{margin-top:12px;border:2px solid #111}.er-sum-row{display:grid;grid-template-columns:1fr 180px;border-bottom:1px solid #777}.er-sum-row:last-child{border-bottom:0}.er-sum-row span,.er-sum-row b{padding:8px 11px}.er-sum-row span{text-align:right;background:#f4f4f4}.er-sum-row b{text-align:right;border-left:1px solid #777}
+    .er-grand{display:grid;grid-template-columns:1fr 230px;align-items:center;margin-top:10px;border:3px solid #111}.er-grand span{font-size:19px;font-weight:900;padding:13px}.er-grand b{font-size:29px;text-align:right;padding:13px;border-left:2px solid #111}
+    .er-notice{margin-top:13px;border:2px solid #e32424;background:#fff8f8;color:#d40000;padding:10px 14px;text-align:center;font-size:16px;font-weight:900;white-space:pre-line}
+    .er-bank{display:grid;grid-template-columns:130px 1fr;margin-top:10px;border:1px solid #b79a00;background:#fff6a5}.er-bank b,.er-bank div{padding:10px}.er-bank b{border-right:1px solid #b79a00;text-align:center}
+    .er-bottom{display:grid;grid-template-columns:1fr 145px;gap:18px;margin-top:14px;align-items:center}.er-cs{border-top:2px solid #111;padding-top:10px;line-height:1.6;font-size:13px}.er-qr{height:110px;border:1px solid #999;display:flex;align-items:center;justify-content:center;text-align:center;font-weight:900;background:#f6f6f6}.er-footer{text-align:center;border-top:1px solid #aaa;margin-top:14px;padding-top:9px;font-size:12px;color:#555}
+    .payment-pill{display:inline-block;border-radius:999px;padding:6px 11px;font-weight:900;font-size:12px}.payment-pill.paid{background:#dff6e7;color:#087a36}.payment-pill.unpaid{background:#ffe2e2;color:#bd1515}.payment-pill.mismatch{background:#fff0cf;color:#a95a00}.payment-pill.review{background:#dfeeff;color:#155ea8}
+  `;
+  try{
+    const clone=article.cloneNode(true);
+    clone.style.boxShadow='none'; clone.style.margin='0';
+    const serialized=new XMLSerializer().serializeToString(clone);
+    const svg=`<svg xmlns="http://www.w3.org/2000/svg" width="794" height="1123"><foreignObject width="100%" height="100%"><div xmlns="http://www.w3.org/1999/xhtml"><style>${css}</style>${serialized}</div></foreignObject></svg>`;
+    const blob=new Blob([svg],{type:'image/svg+xml;charset=utf-8'}),url=URL.createObjectURL(blob);
+    const img=new Image();
+    await new Promise((resolve,reject)=>{img.onload=resolve;img.onerror=()=>reject(new Error('정산서 이미지 변환 실패'));img.src=url});
+    const canvas=document.createElement('canvas');canvas.width=794;canvas.height=1123;
+    const ctx=canvas.getContext('2d');ctx.fillStyle='#fff';ctx.fillRect(0,0,794,1123);ctx.drawImage(img,0,0,794,1123);URL.revokeObjectURL(url);
+    let quality=.9,data=canvas.toDataURL('image/jpeg',quality);
+    while(data.length>265000&&quality>.35){quality-=.07;data=canvas.toDataURL('image/jpeg',quality)}
+    return data.split(',')[1];
+  } finally { host.remove(); }
+};
+</script>
+
+<style id="v728-settings-visible-fix">
+.tabs{overflow-x:auto!important;flex-wrap:nowrap!important;scrollbar-width:thin!important}
+.tabs .tab[data-page="settings"]{position:sticky!important;right:0!important;z-index:12!important;background:#f6c453!important;color:#111!important;border:2px solid #d29a13!important;box-shadow:-8px 0 12px rgba(12,18,28,.45)!important;flex:0 0 auto!important}
+#alwaysSettingsBtn{background:#f6c453!important;color:#111!important;border-color:#d29a13!important;font-weight:900!important}
+#settings.page.active{display:block!important}
+#settings .settings-box,#settings .v723-courier-panel{display:block!important;visibility:visible!important;opacity:1!important}
+#settingsMessageMount:empty::before,#settingsCourierMount:empty::before{content:'설정 불러오는 중…';display:block;padding:22px;background:#fff;color:#111;border-radius:12px}
+</style>
+<script id="v728-settings-visible-script">
+(function(){
+ function ensureSettings(){
+   var page=document.getElementById('settings');
+   var mm=document.getElementById('settingsMessageMount');
+   var cm=document.getElementById('settingsCourierMount');
+   var message=document.querySelector('#receipts .settings-box') || document.querySelector('#settings .settings-box');
+   var courier=document.querySelector('#shipping .v723-courier-panel') || document.querySelector('#settings .v723-courier-panel');
+   if(message&&mm&&message.parentElement!==mm) mm.appendChild(message);
+   if(courier&&cm&&courier.parentElement!==cm) cm.appendChild(courier);
+   if(page){ page.style.visibility='visible'; page.style.opacity='1'; }
+   try{ if(typeof renderMessageSettings==='function') renderMessageSettings(true); }catch(e){console.warn(e)}
+   try{ if(typeof loadCourierSettingsUI==='function') loadCourierSettingsUI(); }catch(e){console.warn(e)}
+ }
+ document.addEventListener('DOMContentLoaded',ensureSettings);
+ window.addEventListener('load',ensureSettings);
+ var previousGo=window.go;
+ window.go=function(id){
+   if(typeof previousGo==='function') previousGo.apply(this,arguments);
+   if(id==='settings'){
+     ensureSettings();
+     var tab=document.querySelector('.tab[data-page="settings"]');
+     if(tab) tab.scrollIntoView({behavior:'auto',block:'nearest',inline:'end'});
+   }
+ };
+ setTimeout(ensureSettings,100);
+})();
+</script>
+
 </body>
 </html>
