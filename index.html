@@ -176,7 +176,7 @@ main{padding-top:18px}
 <header>
   <div><div class="brand"><b>FIRST OMS</b> 땡라이브 정산서버 v7.11</div><div class="sub">고객DB·판매리스트 3중 자동보존 · 정산 · 입금 · 택배</div></div>
   <div class="actions no-print">
-    <span id="loginUser" class="sub">로그인 확인 중</span><button id="accountAdminBtn" class="btn secondary" style="display:none" onclick="location.href='/superadmin.html'">거래처 계정관리</button><button class="btn secondary" onclick="location.href='/change-password.html'">비밀번호 변경</button><button class="btn secondary" onclick="runFunctionCheck()">기능점검</button><button id="alwaysSettingsBtn" class="btn" type="button" onclick="go('settings')">⚙ 설정</button><button class="btn secondary" onclick="logoutNow()">로그아웃</button>
+    <span id="loginUser" class="sub">로그인 확인 중</span><button id="accountAdminBtn" class="btn secondary" style="display:none" onclick="location.href='/superadmin.html'">거래처 계정관리</button><button class="btn secondary" onclick="location.href='/change-password.html'">비밀번호 변경</button><button class="btn secondary" onclick="runFunctionCheck()">기능점검</button><button class="btn secondary" onclick="logoutNow()">로그아웃</button>
     <button class="btn secondary" onclick="recoverOldData()">이전 고객DB 복구</button>
     <a class="btn secondary" href="/api/customers/export.xlsx">고객DB 엑셀 받기</a><button class="btn secondary" onclick="downloadCustomerBackup()">고객정보 백업</button>
     <button class="btn secondary" onclick="downloadBackup()">전체 백업</button>
@@ -213,7 +213,6 @@ main{padding-top:18px}
       <button class="btn secondary" onclick="go('payments')">입금 대조</button>
       <button class="btn secondary" onclick="go('shipping')">택배리스트</button>
       <button class="btn" onclick="openSolapiSettings()">솔라피 API 입력·연결</button>
-      <button class="btn" type="button" onclick="go('settings')">⚙ 전체 설정 열기</button>
     </div>
   </section>
 
@@ -965,98 +964,6 @@ main{padding-top:18px}
  .receipt-detail-modal .er-items th{background:#f1f2f4!important;color:#111!important;-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}
 }
 </style>
-
-<style id="v728-settings-visible-fix">
-.tabs{overflow-x:auto!important;flex-wrap:nowrap!important;scrollbar-width:thin!important}
-.tabs .tab[data-page="settings"]{position:sticky!important;right:0!important;z-index:12!important;background:#f6c453!important;color:#111!important;border:2px solid #d29a13!important;box-shadow:-8px 0 12px rgba(12,18,28,.45)!important;flex:0 0 auto!important}
-#alwaysSettingsBtn{background:#f6c453!important;color:#111!important;border-color:#d29a13!important;font-weight:900!important}
-#settings.page.active{display:block!important}
-#settings .settings-box,#settings .v723-courier-panel{display:block!important;visibility:visible!important;opacity:1!important}
-#settingsMessageMount:empty::before,#settingsCourierMount:empty::before{content:'설정 불러오는 중…';display:block;padding:22px;background:#fff;color:#111;border-radius:12px}
-</style>
-<script id="v728-settings-visible-script">
-(function(){
- function ensureSettings(){
-   var page=document.getElementById('settings');
-   var mm=document.getElementById('settingsMessageMount');
-   var cm=document.getElementById('settingsCourierMount');
-   var message=document.querySelector('#receipts .settings-box') || document.querySelector('#settings .settings-box');
-   var courier=document.querySelector('#shipping .v723-courier-panel') || document.querySelector('#settings .v723-courier-panel');
-   if(message&&mm&&message.parentElement!==mm) mm.appendChild(message);
-   if(courier&&cm&&courier.parentElement!==cm) cm.appendChild(courier);
-   if(page){ page.style.visibility='visible'; page.style.opacity='1'; }
-   try{ if(typeof renderMessageSettings==='function') renderMessageSettings(true); }catch(e){console.warn(e)}
-   try{ if(typeof loadCourierSettingsUI==='function') loadCourierSettingsUI(); }catch(e){console.warn(e)}
- }
- document.addEventListener('DOMContentLoaded',ensureSettings);
- window.addEventListener('load',ensureSettings);
- var previousGo=window.go;
- window.go=function(id){
-   if(typeof previousGo==='function') previousGo.apply(this,arguments);
-   if(id==='settings'){
-     ensureSettings();
-     var tab=document.querySelector('.tab[data-page="settings"]');
-     if(tab) tab.scrollIntoView({behavior:'auto',block:'nearest',inline:'end'});
-   }
- };
- setTimeout(ensureSettings,100);
-})();
-</script>
-
-<style id="v730-final-receipt-fix">
-#receiptDetailBody{background:#eef0f3!important;padding:12px!important;overflow:auto!important}
-.v730-receipt{width:794px;max-width:100%;min-height:1123px;margin:0 auto;background:#fff!important;color:#111!important;padding:38px 42px 28px;box-sizing:border-box;font-family:Arial,'Noto Sans KR',sans-serif;box-shadow:0 3px 18px rgba(0,0,0,.15);overflow:hidden}
-.v730-receipt *{box-sizing:border-box;color:#111}
-.v730-top{display:grid;grid-template-columns:130px 1fr 190px;align-items:start;border-bottom:3px solid #111;padding-bottom:11px}
-.v730-brand{font-weight:900;font-size:13px}.v730-title{text-align:center;font-size:36px;font-weight:900;letter-spacing:9px;white-space:nowrap}
-.v730-order{border:1px solid #555;font-size:11px}.v730-order div{display:grid;grid-template-columns:62px 1fr}.v730-order b,.v730-order span{padding:6px;border-bottom:1px solid #aaa}.v730-order div:last-child b,.v730-order div:last-child span{border-bottom:0}.v730-order b{background:#f1f2f4;border-right:1px solid #aaa}
-.v730-name-row{display:flex;justify-content:space-between;align-items:center;margin:18px 0 10px}.v730-name-row strong{font-size:23px}.v730-status{border-radius:999px;padding:6px 12px;font-size:12px;font-weight:900}.v730-status.paid{background:#dff6e7;color:#087a36}.v730-status.unpaid{background:#ffe2e2;color:#bd1515}.v730-status.mismatch{background:#fff0cf;color:#a95a00}
-.v730-info{display:grid;grid-template-columns:90px minmax(0,1fr);border-top:2px solid #222;border-left:1px solid #888}.v730-info b,.v730-info span{padding:8px 10px;border-right:1px solid #888;border-bottom:1px solid #888;min-height:36px;overflow-wrap:anywhere}.v730-info b{background:#f2f3f5;text-align:center}.v730-info .customer-name{font-size:17px;font-weight:900}
-.v730-items{display:table!important;width:100%!important;border-collapse:collapse!important;table-layout:fixed!important;margin-top:14px!important;background:#fff!important;color:#111!important}.v730-items thead{display:table-header-group!important}.v730-items tr{display:table-row!important}.v730-items th,.v730-items td{display:table-cell!important;border:1px solid #888!important;padding:8px 6px!important;color:#111!important;background:#fff!important;font-size:12px!important;vertical-align:middle!important;word-break:break-word!important}.v730-items th{background:#f0f1f3!important;font-weight:900!important;text-align:center!important}.v730-items td{text-align:center!important}.v730-items td:nth-child(2){text-align:left!important}
-.v730-sums{width:340px;margin:11px 0 0 auto}.v730-sum{display:grid;grid-template-columns:1fr 130px;border:1px solid #777;border-bottom:0}.v730-sum:last-child{border-bottom:1px solid #777}.v730-sum span,.v730-sum b{padding:8px 10px;text-align:right}.v730-sum span{background:#f3f3f3}.v730-sum b{border-left:1px solid #777}
-.v730-total{display:grid;grid-template-columns:1fr 230px;align-items:center;border:3px solid #111;margin-top:10px}.v730-total span{padding:12px;font-size:18px;font-weight:900}.v730-total b{padding:12px;border-left:2px solid #111;text-align:right;font-size:26px}
-.v730-notice{margin-top:12px;padding:10px;border:2px solid #e22;background:#fff8f8;color:#cf0000!important;text-align:center;font-weight:900;white-space:pre-line}.v730-bank{display:grid;grid-template-columns:120px 1fr;margin-top:9px;border:1px solid #b79a00;background:#fff6a5}.v730-bank b,.v730-bank span{padding:10px}.v730-bank b{border-right:1px solid #b79a00;text-align:center}
-.v730-bottom{display:grid;grid-template-columns:1fr 130px;gap:14px;align-items:center;margin-top:12px}.v730-cs{border-top:2px solid #111;padding-top:9px;font-size:12px;line-height:1.65}.v730-qr{height:102px;border:1px solid #999;background:#f7f7f7;display:flex;align-items:center;justify-content:center;text-align:center;font-weight:900}.v730-qr img{max-width:92px;max-height:92px}.v730-footer{text-align:center;border-top:1px solid #aaa;margin-top:10px;padding-top:8px;font-size:11px;color:#666!important}
-@media print{.v730-receipt{width:210mm!important;min-height:297mm!important;max-width:none!important;box-shadow:none!important;margin:0!important;padding:10mm 11mm!important}@page{size:A4 portrait;margin:0}}
-</style>
-<script id="v730-final-receipt-script">
-(function(){
- const E=s=>String(s??'').replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]));
- function statusInfo(r){const s=String(r.payment?.status||r.paymentStatus||r.payStatus||'').toLowerCase();if(s==='paid'||s.includes('입금완료'))return['입금완료','paid'];if(s.includes('mismatch')||s.includes('불일치'))return['금액불일치','mismatch'];return['미입금','unpaid']}
- function tracking(r){const scan=(state.shippingScans||{})[r.key]||{};return scan.trackingNumber||r.trackingNumber||r.trackingNo||r.invoiceNo||''}
- window.v730ReceiptHTML=function(r,i){
-  const c=r.customer||{},S=state.settings||{},st=statusInfo(r),items=r.items||[],orderNo=r.orderNo||`${String(r.date||'').replaceAll('-','')}-${String((i||0)+1).padStart(3,'0')}`;
-  const qr=S.kakaoQrUrl?`<img src="${E(S.kakaoQrUrl)}" alt="카카오채널 QR">`:'카카오채널<br>QR';
-  return `<article class="v730-receipt">
-   <div class="v730-top"><div class="v730-brand">FIRST OMS</div><div class="v730-title">정 산 서</div><div class="v730-order"><div><b>주문일</b><span>${E(r.date||'')}</span></div><div><b>주문번호</b><span>${E(orderNo)}</span></div></div></div>
-   <div class="v730-name-row"><strong>${E(r.nick||c.name||'고객')}님 정산서</strong><span class="v730-status ${st[1]}">${st[0]}</span></div>
-   <div class="v730-info"><b>고객명</b><span class="customer-name">${E(c.name||r.nick||'')}</span><b>배송지</b><span>${E([c.address,c.detailAddress].filter(Boolean).join(' '))}</span><b>연락처</b><span>${E(c.phone||'')}</span><b>메모</b><span>${E(c.memo||r.memo||'')}</span><b>송장번호</b><span>${E(tracking(r))}</span></div>
-   <table class="v730-items"><colgroup><col style="width:9%"><col style="width:51%"><col style="width:10%"><col style="width:14%"><col style="width:16%"></colgroup><thead><tr><th>번호</th><th>상품명</th><th>수량</th><th>단가</th><th>합계</th></tr></thead><tbody>${items.map((x,n)=>`<tr><td>${E(x.number||x.no||('#'+(n+1)))}</td><td>${E(x.item||x.name||'')}</td><td>${Number(x.qty)||0}</td><td>${money(Number(x.unit)||0)}</td><td>${money(Number(x.amount)||((Number(x.qty)||0)*(Number(x.unit)||0)))}</td></tr>`).join('')}</tbody></table>
-   <div class="v730-sums"><div class="v730-sum"><span>상품합계</span><b>${money(r.subtotal||0)}</b></div><div class="v730-sum"><span>배송비</span><b>${money(r.fee||0)}</b></div></div>
-   <div class="v730-total"><span>총 결제금액</span><b>${money(r.total||0)}</b></div>
-   <div class="v730-notice">${E(S.paymentNotice||'일요일 12시까지 입금 요망\n입금자명은 주문자명과 동일하게 부탁드립니다.')}</div>
-   <div class="v730-bank"><b>입금계좌</b><span>${E(S.bank||'')} ${E(S.account||'계좌번호 미설정')} · 예금주 ${E(S.holder||'')}</span></div>
-   <div class="v730-bottom"><div class="v730-cs"><b>고객센터</b><br>${E(S.contact||'')}<br>카카오채널 ${E(S.kakaoChannelName||S.channelName||'')}</div><div class="v730-qr">${qr}</div></div>
-   <div class="v730-footer">FIRST OMS · 주문내역을 확인해 주세요.</div>
-  </article>`;
- };
- window.receiptHTML=window.v730ReceiptHTML;
- window.openReceiptDetail=async function(key){const r=receiptByKey(key);if(!r)return alert('정산서를 찾을 수 없습니다.');let modal=document.getElementById('receiptDetailModal');if(!modal){modal=document.createElement('div');modal.id='receiptDetailModal';modal.className='receipt-detail-modal';modal.innerHTML='<div class="receipt-detail-box"><div class="receipt-detail-actions no-print"><button class="btn warn" id="detailEditBtn">수정</button><button class="btn secondary" id="detailPrintBtn">인쇄</button><button class="btn bad" onclick="closeReceiptDetail()">닫기</button></div><div id="receiptDetailBody"></div></div>';document.body.appendChild(modal);modal.addEventListener('click',e=>{if(e.target===modal)closeReceiptDetail()})}modal.classList.add('show');document.getElementById('receiptDetailBody').innerHTML=v730ReceiptHTML(r,indexOfReceiptKey(key));document.getElementById('detailEditBtn').onclick=()=>openReceiptEditByKey(key);document.getElementById('detailPrintBtn').onclick=()=>v730Print(key)};
- window.v730Print=function(key){const r=receiptByKey(key);if(!r)return alert('정산서를 찾을 수 없습니다.');const w=window.open('','_blank','width=900,height=1100');if(!w)return alert('팝업 차단을 해제해 주세요.');const css=document.getElementById('v730-final-receipt-fix').textContent;w.document.write('<!doctype html><html><head><meta charset="utf-8"><title>정산서</title><style>'+css+'</style></head><body>'+v730ReceiptHTML(r,indexOfReceiptKey(key))+'<script>onload=()=>setTimeout(()=>print(),200)<\/script></body></html>');w.document.close()};
- window.printByKey=window.v730Print;window.printOne=function(i){const r=getReceipts()[i];if(r)v730Print(r.key)};
- window.receiptImageBase64=async function(r){
-  const W=794,H=1123,c=document.createElement('canvas');c.width=W;c.height=H;const g=c.getContext('2d');g.fillStyle='#fff';g.fillRect(0,0,W,H);const S=state.settings||{},C=r.customer||{},L=42,R=752;
-  const txt=(s,x,y,size=13,bold=false,align='left',color='#111',max)=>{g.font=`${bold?'700':'400'} ${size}px Arial,sans-serif`;g.textAlign=align;g.textBaseline='middle';g.fillStyle=color;max?g.fillText(String(s??''),x,y,max):g.fillText(String(s??''),x,y)};
-  const rect=(x,y,w,h,fill='#fff',stroke='#888',lw=1)=>{g.fillStyle=fill;g.fillRect(x,y,w,h);g.strokeStyle=stroke;g.lineWidth=lw;g.strokeRect(x,y,w,h)};
-  txt('FIRST OMS',L,48,13,true);txt('정 산 서',397,55,36,true,'center');rect(562,28,190,62);rect(562,28,64,31,'#f1f2f4');rect(562,59,64,31,'#f1f2f4');txt('주문일',594,44,11,true,'center');txt(r.date||'',635,44,11);txt('주문번호',594,75,11,true,'center');txt(r.orderNo||r.key||'',635,75,10);g.fillStyle='#111';g.fillRect(L,105,R-L,3);txt(`${r.nick||C.name||'고객'}님 정산서`,L,136,23,true);
-  let y=160;[['고객명',C.name||r.nick||''],['배송지',[C.address,C.detailAddress].filter(Boolean).join(' ')],['연락처',C.phone||''],['메모',C.memo||r.memo||''],['송장번호',tracking(r)]].forEach(([a,b])=>{rect(L,y,90,37,'#f2f3f5');rect(L+90,y,R-L-90,37);txt(a,L+45,y+18.5,12,true,'center');txt(b,L+100,y+18.5,a==='고객명'?16:12,a==='고객명', 'left','#111',R-L-110);y+=37});y+=15;
-  const widths=[54,356,70,105,125],heads=['번호','상품명','수량','단가','합계'];let x=L;heads.forEach((h,i)=>{rect(x,y,widths[i],32,'#f0f1f3');txt(h,x+widths[i]/2,y+16,12,true,'center');x+=widths[i]});y+=32;(r.items||[]).slice(0,14).forEach((it,n)=>{x=L;const vals=[it.number||it.no||('#'+(n+1)),it.item||it.name||'',Number(it.qty)||0,money(Number(it.unit)||0),money(Number(it.amount)||((Number(it.qty)||0)*(Number(it.unit)||0))];vals.forEach((v,i)=>{rect(x,y,widths[i],35);txt(v,i===1?x+6:x+widths[i]/2,y+17.5,11,false,i===1?'left':'center','#111',widths[i]-10);x+=widths[i]});y+=35});y+=10;
-  const sx=412;[['상품합계',money(r.subtotal||0)],['배송비',money(r.fee||0)]].forEach(([a,b])=>{rect(sx,y,210,32,'#f3f3f3');rect(sx+210,y,130,32);txt(a,sx+200,y+16,12,true,'right');txt(b,742,y+16,13,true,'right');y+=32});y+=8;rect(sx,y,210,48,'#fff','#111',3);rect(sx+210,y,130,48,'#fff','#111',3);txt('총 결제금액',sx+200,y+24,17,true,'right');txt(money(r.total||0),742,y+24,23,true,'right');y+=60;rect(L,y,R-L,50,'#fff8f8','#e22',2);txt(S.paymentNotice||'일요일 12시까지 입금 요망',397,y+25,14,true,'center','#cf0000',R-L-20);y+=59;rect(L,y,120,54,'#fff6a5','#b79a00');rect(L+120,y,R-L-120,54,'#fff6a5','#b79a00');txt('입금계좌',L+60,y+27,14,true,'center');txt(`${S.bank||''} ${S.account||'계좌번호 미설정'} · 예금주 ${S.holder||''}`,L+132,y+27,14,true,'left','#111',R-L-145);txt('FIRST OMS · 주문내역을 확인해 주세요.',397,1090,11,false,'center','#666');
-  let q=.88,d=c.toDataURL('image/jpeg',q);while(d.length>250000&&q>.35){q-=.06;d=c.toDataURL('image/jpeg',q)}return d.split(',')[1];
- };
-})();
-</script>
-
 </body></html>`);w.document.close();w.print();
 }
 const paymentAliases={payer:['입금자','입금자명','보낸분','거래내용','내용','적요','성명'],amount:['입금액','금액','거래금액','입금'],date:['거래일시','거래일','날짜','시간']};
@@ -1227,98 +1134,6 @@ function printShipping(){renderShipping();const arr=window.currentShipping||[];i
  .receipt-detail-modal .er-items th{background:#f1f2f4!important;color:#111!important;-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}
 }
 </style>
-
-<style id="v728-settings-visible-fix">
-.tabs{overflow-x:auto!important;flex-wrap:nowrap!important;scrollbar-width:thin!important}
-.tabs .tab[data-page="settings"]{position:sticky!important;right:0!important;z-index:12!important;background:#f6c453!important;color:#111!important;border:2px solid #d29a13!important;box-shadow:-8px 0 12px rgba(12,18,28,.45)!important;flex:0 0 auto!important}
-#alwaysSettingsBtn{background:#f6c453!important;color:#111!important;border-color:#d29a13!important;font-weight:900!important}
-#settings.page.active{display:block!important}
-#settings .settings-box,#settings .v723-courier-panel{display:block!important;visibility:visible!important;opacity:1!important}
-#settingsMessageMount:empty::before,#settingsCourierMount:empty::before{content:'설정 불러오는 중…';display:block;padding:22px;background:#fff;color:#111;border-radius:12px}
-</style>
-<script id="v728-settings-visible-script">
-(function(){
- function ensureSettings(){
-   var page=document.getElementById('settings');
-   var mm=document.getElementById('settingsMessageMount');
-   var cm=document.getElementById('settingsCourierMount');
-   var message=document.querySelector('#receipts .settings-box') || document.querySelector('#settings .settings-box');
-   var courier=document.querySelector('#shipping .v723-courier-panel') || document.querySelector('#settings .v723-courier-panel');
-   if(message&&mm&&message.parentElement!==mm) mm.appendChild(message);
-   if(courier&&cm&&courier.parentElement!==cm) cm.appendChild(courier);
-   if(page){ page.style.visibility='visible'; page.style.opacity='1'; }
-   try{ if(typeof renderMessageSettings==='function') renderMessageSettings(true); }catch(e){console.warn(e)}
-   try{ if(typeof loadCourierSettingsUI==='function') loadCourierSettingsUI(); }catch(e){console.warn(e)}
- }
- document.addEventListener('DOMContentLoaded',ensureSettings);
- window.addEventListener('load',ensureSettings);
- var previousGo=window.go;
- window.go=function(id){
-   if(typeof previousGo==='function') previousGo.apply(this,arguments);
-   if(id==='settings'){
-     ensureSettings();
-     var tab=document.querySelector('.tab[data-page="settings"]');
-     if(tab) tab.scrollIntoView({behavior:'auto',block:'nearest',inline:'end'});
-   }
- };
- setTimeout(ensureSettings,100);
-})();
-</script>
-
-<style id="v730-final-receipt-fix">
-#receiptDetailBody{background:#eef0f3!important;padding:12px!important;overflow:auto!important}
-.v730-receipt{width:794px;max-width:100%;min-height:1123px;margin:0 auto;background:#fff!important;color:#111!important;padding:38px 42px 28px;box-sizing:border-box;font-family:Arial,'Noto Sans KR',sans-serif;box-shadow:0 3px 18px rgba(0,0,0,.15);overflow:hidden}
-.v730-receipt *{box-sizing:border-box;color:#111}
-.v730-top{display:grid;grid-template-columns:130px 1fr 190px;align-items:start;border-bottom:3px solid #111;padding-bottom:11px}
-.v730-brand{font-weight:900;font-size:13px}.v730-title{text-align:center;font-size:36px;font-weight:900;letter-spacing:9px;white-space:nowrap}
-.v730-order{border:1px solid #555;font-size:11px}.v730-order div{display:grid;grid-template-columns:62px 1fr}.v730-order b,.v730-order span{padding:6px;border-bottom:1px solid #aaa}.v730-order div:last-child b,.v730-order div:last-child span{border-bottom:0}.v730-order b{background:#f1f2f4;border-right:1px solid #aaa}
-.v730-name-row{display:flex;justify-content:space-between;align-items:center;margin:18px 0 10px}.v730-name-row strong{font-size:23px}.v730-status{border-radius:999px;padding:6px 12px;font-size:12px;font-weight:900}.v730-status.paid{background:#dff6e7;color:#087a36}.v730-status.unpaid{background:#ffe2e2;color:#bd1515}.v730-status.mismatch{background:#fff0cf;color:#a95a00}
-.v730-info{display:grid;grid-template-columns:90px minmax(0,1fr);border-top:2px solid #222;border-left:1px solid #888}.v730-info b,.v730-info span{padding:8px 10px;border-right:1px solid #888;border-bottom:1px solid #888;min-height:36px;overflow-wrap:anywhere}.v730-info b{background:#f2f3f5;text-align:center}.v730-info .customer-name{font-size:17px;font-weight:900}
-.v730-items{display:table!important;width:100%!important;border-collapse:collapse!important;table-layout:fixed!important;margin-top:14px!important;background:#fff!important;color:#111!important}.v730-items thead{display:table-header-group!important}.v730-items tr{display:table-row!important}.v730-items th,.v730-items td{display:table-cell!important;border:1px solid #888!important;padding:8px 6px!important;color:#111!important;background:#fff!important;font-size:12px!important;vertical-align:middle!important;word-break:break-word!important}.v730-items th{background:#f0f1f3!important;font-weight:900!important;text-align:center!important}.v730-items td{text-align:center!important}.v730-items td:nth-child(2){text-align:left!important}
-.v730-sums{width:340px;margin:11px 0 0 auto}.v730-sum{display:grid;grid-template-columns:1fr 130px;border:1px solid #777;border-bottom:0}.v730-sum:last-child{border-bottom:1px solid #777}.v730-sum span,.v730-sum b{padding:8px 10px;text-align:right}.v730-sum span{background:#f3f3f3}.v730-sum b{border-left:1px solid #777}
-.v730-total{display:grid;grid-template-columns:1fr 230px;align-items:center;border:3px solid #111;margin-top:10px}.v730-total span{padding:12px;font-size:18px;font-weight:900}.v730-total b{padding:12px;border-left:2px solid #111;text-align:right;font-size:26px}
-.v730-notice{margin-top:12px;padding:10px;border:2px solid #e22;background:#fff8f8;color:#cf0000!important;text-align:center;font-weight:900;white-space:pre-line}.v730-bank{display:grid;grid-template-columns:120px 1fr;margin-top:9px;border:1px solid #b79a00;background:#fff6a5}.v730-bank b,.v730-bank span{padding:10px}.v730-bank b{border-right:1px solid #b79a00;text-align:center}
-.v730-bottom{display:grid;grid-template-columns:1fr 130px;gap:14px;align-items:center;margin-top:12px}.v730-cs{border-top:2px solid #111;padding-top:9px;font-size:12px;line-height:1.65}.v730-qr{height:102px;border:1px solid #999;background:#f7f7f7;display:flex;align-items:center;justify-content:center;text-align:center;font-weight:900}.v730-qr img{max-width:92px;max-height:92px}.v730-footer{text-align:center;border-top:1px solid #aaa;margin-top:10px;padding-top:8px;font-size:11px;color:#666!important}
-@media print{.v730-receipt{width:210mm!important;min-height:297mm!important;max-width:none!important;box-shadow:none!important;margin:0!important;padding:10mm 11mm!important}@page{size:A4 portrait;margin:0}}
-</style>
-<script id="v730-final-receipt-script">
-(function(){
- const E=s=>String(s??'').replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]));
- function statusInfo(r){const s=String(r.payment?.status||r.paymentStatus||r.payStatus||'').toLowerCase();if(s==='paid'||s.includes('입금완료'))return['입금완료','paid'];if(s.includes('mismatch')||s.includes('불일치'))return['금액불일치','mismatch'];return['미입금','unpaid']}
- function tracking(r){const scan=(state.shippingScans||{})[r.key]||{};return scan.trackingNumber||r.trackingNumber||r.trackingNo||r.invoiceNo||''}
- window.v730ReceiptHTML=function(r,i){
-  const c=r.customer||{},S=state.settings||{},st=statusInfo(r),items=r.items||[],orderNo=r.orderNo||`${String(r.date||'').replaceAll('-','')}-${String((i||0)+1).padStart(3,'0')}`;
-  const qr=S.kakaoQrUrl?`<img src="${E(S.kakaoQrUrl)}" alt="카카오채널 QR">`:'카카오채널<br>QR';
-  return `<article class="v730-receipt">
-   <div class="v730-top"><div class="v730-brand">FIRST OMS</div><div class="v730-title">정 산 서</div><div class="v730-order"><div><b>주문일</b><span>${E(r.date||'')}</span></div><div><b>주문번호</b><span>${E(orderNo)}</span></div></div></div>
-   <div class="v730-name-row"><strong>${E(r.nick||c.name||'고객')}님 정산서</strong><span class="v730-status ${st[1]}">${st[0]}</span></div>
-   <div class="v730-info"><b>고객명</b><span class="customer-name">${E(c.name||r.nick||'')}</span><b>배송지</b><span>${E([c.address,c.detailAddress].filter(Boolean).join(' '))}</span><b>연락처</b><span>${E(c.phone||'')}</span><b>메모</b><span>${E(c.memo||r.memo||'')}</span><b>송장번호</b><span>${E(tracking(r))}</span></div>
-   <table class="v730-items"><colgroup><col style="width:9%"><col style="width:51%"><col style="width:10%"><col style="width:14%"><col style="width:16%"></colgroup><thead><tr><th>번호</th><th>상품명</th><th>수량</th><th>단가</th><th>합계</th></tr></thead><tbody>${items.map((x,n)=>`<tr><td>${E(x.number||x.no||('#'+(n+1)))}</td><td>${E(x.item||x.name||'')}</td><td>${Number(x.qty)||0}</td><td>${money(Number(x.unit)||0)}</td><td>${money(Number(x.amount)||((Number(x.qty)||0)*(Number(x.unit)||0)))}</td></tr>`).join('')}</tbody></table>
-   <div class="v730-sums"><div class="v730-sum"><span>상품합계</span><b>${money(r.subtotal||0)}</b></div><div class="v730-sum"><span>배송비</span><b>${money(r.fee||0)}</b></div></div>
-   <div class="v730-total"><span>총 결제금액</span><b>${money(r.total||0)}</b></div>
-   <div class="v730-notice">${E(S.paymentNotice||'일요일 12시까지 입금 요망\n입금자명은 주문자명과 동일하게 부탁드립니다.')}</div>
-   <div class="v730-bank"><b>입금계좌</b><span>${E(S.bank||'')} ${E(S.account||'계좌번호 미설정')} · 예금주 ${E(S.holder||'')}</span></div>
-   <div class="v730-bottom"><div class="v730-cs"><b>고객센터</b><br>${E(S.contact||'')}<br>카카오채널 ${E(S.kakaoChannelName||S.channelName||'')}</div><div class="v730-qr">${qr}</div></div>
-   <div class="v730-footer">FIRST OMS · 주문내역을 확인해 주세요.</div>
-  </article>`;
- };
- window.receiptHTML=window.v730ReceiptHTML;
- window.openReceiptDetail=async function(key){const r=receiptByKey(key);if(!r)return alert('정산서를 찾을 수 없습니다.');let modal=document.getElementById('receiptDetailModal');if(!modal){modal=document.createElement('div');modal.id='receiptDetailModal';modal.className='receipt-detail-modal';modal.innerHTML='<div class="receipt-detail-box"><div class="receipt-detail-actions no-print"><button class="btn warn" id="detailEditBtn">수정</button><button class="btn secondary" id="detailPrintBtn">인쇄</button><button class="btn bad" onclick="closeReceiptDetail()">닫기</button></div><div id="receiptDetailBody"></div></div>';document.body.appendChild(modal);modal.addEventListener('click',e=>{if(e.target===modal)closeReceiptDetail()})}modal.classList.add('show');document.getElementById('receiptDetailBody').innerHTML=v730ReceiptHTML(r,indexOfReceiptKey(key));document.getElementById('detailEditBtn').onclick=()=>openReceiptEditByKey(key);document.getElementById('detailPrintBtn').onclick=()=>v730Print(key)};
- window.v730Print=function(key){const r=receiptByKey(key);if(!r)return alert('정산서를 찾을 수 없습니다.');const w=window.open('','_blank','width=900,height=1100');if(!w)return alert('팝업 차단을 해제해 주세요.');const css=document.getElementById('v730-final-receipt-fix').textContent;w.document.write('<!doctype html><html><head><meta charset="utf-8"><title>정산서</title><style>'+css+'</style></head><body>'+v730ReceiptHTML(r,indexOfReceiptKey(key))+'<script>onload=()=>setTimeout(()=>print(),200)<\/script></body></html>');w.document.close()};
- window.printByKey=window.v730Print;window.printOne=function(i){const r=getReceipts()[i];if(r)v730Print(r.key)};
- window.receiptImageBase64=async function(r){
-  const W=794,H=1123,c=document.createElement('canvas');c.width=W;c.height=H;const g=c.getContext('2d');g.fillStyle='#fff';g.fillRect(0,0,W,H);const S=state.settings||{},C=r.customer||{},L=42,R=752;
-  const txt=(s,x,y,size=13,bold=false,align='left',color='#111',max)=>{g.font=`${bold?'700':'400'} ${size}px Arial,sans-serif`;g.textAlign=align;g.textBaseline='middle';g.fillStyle=color;max?g.fillText(String(s??''),x,y,max):g.fillText(String(s??''),x,y)};
-  const rect=(x,y,w,h,fill='#fff',stroke='#888',lw=1)=>{g.fillStyle=fill;g.fillRect(x,y,w,h);g.strokeStyle=stroke;g.lineWidth=lw;g.strokeRect(x,y,w,h)};
-  txt('FIRST OMS',L,48,13,true);txt('정 산 서',397,55,36,true,'center');rect(562,28,190,62);rect(562,28,64,31,'#f1f2f4');rect(562,59,64,31,'#f1f2f4');txt('주문일',594,44,11,true,'center');txt(r.date||'',635,44,11);txt('주문번호',594,75,11,true,'center');txt(r.orderNo||r.key||'',635,75,10);g.fillStyle='#111';g.fillRect(L,105,R-L,3);txt(`${r.nick||C.name||'고객'}님 정산서`,L,136,23,true);
-  let y=160;[['고객명',C.name||r.nick||''],['배송지',[C.address,C.detailAddress].filter(Boolean).join(' ')],['연락처',C.phone||''],['메모',C.memo||r.memo||''],['송장번호',tracking(r)]].forEach(([a,b])=>{rect(L,y,90,37,'#f2f3f5');rect(L+90,y,R-L-90,37);txt(a,L+45,y+18.5,12,true,'center');txt(b,L+100,y+18.5,a==='고객명'?16:12,a==='고객명', 'left','#111',R-L-110);y+=37});y+=15;
-  const widths=[54,356,70,105,125],heads=['번호','상품명','수량','단가','합계'];let x=L;heads.forEach((h,i)=>{rect(x,y,widths[i],32,'#f0f1f3');txt(h,x+widths[i]/2,y+16,12,true,'center');x+=widths[i]});y+=32;(r.items||[]).slice(0,14).forEach((it,n)=>{x=L;const vals=[it.number||it.no||('#'+(n+1)),it.item||it.name||'',Number(it.qty)||0,money(Number(it.unit)||0),money(Number(it.amount)||((Number(it.qty)||0)*(Number(it.unit)||0))];vals.forEach((v,i)=>{rect(x,y,widths[i],35);txt(v,i===1?x+6:x+widths[i]/2,y+17.5,11,false,i===1?'left':'center','#111',widths[i]-10);x+=widths[i]});y+=35});y+=10;
-  const sx=412;[['상품합계',money(r.subtotal||0)],['배송비',money(r.fee||0)]].forEach(([a,b])=>{rect(sx,y,210,32,'#f3f3f3');rect(sx+210,y,130,32);txt(a,sx+200,y+16,12,true,'right');txt(b,742,y+16,13,true,'right');y+=32});y+=8;rect(sx,y,210,48,'#fff','#111',3);rect(sx+210,y,130,48,'#fff','#111',3);txt('총 결제금액',sx+200,y+24,17,true,'right');txt(money(r.total||0),742,y+24,23,true,'right');y+=60;rect(L,y,R-L,50,'#fff8f8','#e22',2);txt(S.paymentNotice||'일요일 12시까지 입금 요망',397,y+25,14,true,'center','#cf0000',R-L-20);y+=59;rect(L,y,120,54,'#fff6a5','#b79a00');rect(L+120,y,R-L-120,54,'#fff6a5','#b79a00');txt('입금계좌',L+60,y+27,14,true,'center');txt(`${S.bank||''} ${S.account||'계좌번호 미설정'} · 예금주 ${S.holder||''}`,L+132,y+27,14,true,'left','#111',R-L-145);txt('FIRST OMS · 주문내역을 확인해 주세요.',397,1090,11,false,'center','#666');
-  let q=.88,d=c.toDataURL('image/jpeg',q);while(d.length>250000&&q>.35){q-=.06;d=c.toDataURL('image/jpeg',q)}return d.split(',')[1];
- };
-})();
-</script>
-
 </body></html>`);w.document.close()}
 function downloadReceiptList(){
  const rows=getReceipts().map((r,i)=>({'정산번호':r.date.replaceAll('-','')+'-'+String(i+1).padStart(3,'0'),'방송일':r.date,'실명':r.customer?.name||'','닉네임':r.nick,'전화번호':r.customer?.phone||'','주소':[r.customer?.postalCode,r.customer?.address,r.customer?.detailAddress].filter(Boolean).join(' '),'상품내역':r.items.map(x=>x.item+' '+x.qty+'개').join(' / '),'상품합계':r.subtotal,'배송비':r.fee,'결제금액':r.total,'고객매칭':r.customer?'완료':'확인필요','입금상태':r.payment.status==='paid'?'입금완료':'미입금/확인필요'}));
@@ -1689,98 +1504,6 @@ tr:hover td{background:#f6f7f9!important;color:inherit!important}.exact-receipt 
  .receipt-detail-modal .er-items th{background:#f1f2f4!important;color:#111!important;-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}
 }
 </style>
-
-<style id="v728-settings-visible-fix">
-.tabs{overflow-x:auto!important;flex-wrap:nowrap!important;scrollbar-width:thin!important}
-.tabs .tab[data-page="settings"]{position:sticky!important;right:0!important;z-index:12!important;background:#f6c453!important;color:#111!important;border:2px solid #d29a13!important;box-shadow:-8px 0 12px rgba(12,18,28,.45)!important;flex:0 0 auto!important}
-#alwaysSettingsBtn{background:#f6c453!important;color:#111!important;border-color:#d29a13!important;font-weight:900!important}
-#settings.page.active{display:block!important}
-#settings .settings-box,#settings .v723-courier-panel{display:block!important;visibility:visible!important;opacity:1!important}
-#settingsMessageMount:empty::before,#settingsCourierMount:empty::before{content:'설정 불러오는 중…';display:block;padding:22px;background:#fff;color:#111;border-radius:12px}
-</style>
-<script id="v728-settings-visible-script">
-(function(){
- function ensureSettings(){
-   var page=document.getElementById('settings');
-   var mm=document.getElementById('settingsMessageMount');
-   var cm=document.getElementById('settingsCourierMount');
-   var message=document.querySelector('#receipts .settings-box') || document.querySelector('#settings .settings-box');
-   var courier=document.querySelector('#shipping .v723-courier-panel') || document.querySelector('#settings .v723-courier-panel');
-   if(message&&mm&&message.parentElement!==mm) mm.appendChild(message);
-   if(courier&&cm&&courier.parentElement!==cm) cm.appendChild(courier);
-   if(page){ page.style.visibility='visible'; page.style.opacity='1'; }
-   try{ if(typeof renderMessageSettings==='function') renderMessageSettings(true); }catch(e){console.warn(e)}
-   try{ if(typeof loadCourierSettingsUI==='function') loadCourierSettingsUI(); }catch(e){console.warn(e)}
- }
- document.addEventListener('DOMContentLoaded',ensureSettings);
- window.addEventListener('load',ensureSettings);
- var previousGo=window.go;
- window.go=function(id){
-   if(typeof previousGo==='function') previousGo.apply(this,arguments);
-   if(id==='settings'){
-     ensureSettings();
-     var tab=document.querySelector('.tab[data-page="settings"]');
-     if(tab) tab.scrollIntoView({behavior:'auto',block:'nearest',inline:'end'});
-   }
- };
- setTimeout(ensureSettings,100);
-})();
-</script>
-
-<style id="v730-final-receipt-fix">
-#receiptDetailBody{background:#eef0f3!important;padding:12px!important;overflow:auto!important}
-.v730-receipt{width:794px;max-width:100%;min-height:1123px;margin:0 auto;background:#fff!important;color:#111!important;padding:38px 42px 28px;box-sizing:border-box;font-family:Arial,'Noto Sans KR',sans-serif;box-shadow:0 3px 18px rgba(0,0,0,.15);overflow:hidden}
-.v730-receipt *{box-sizing:border-box;color:#111}
-.v730-top{display:grid;grid-template-columns:130px 1fr 190px;align-items:start;border-bottom:3px solid #111;padding-bottom:11px}
-.v730-brand{font-weight:900;font-size:13px}.v730-title{text-align:center;font-size:36px;font-weight:900;letter-spacing:9px;white-space:nowrap}
-.v730-order{border:1px solid #555;font-size:11px}.v730-order div{display:grid;grid-template-columns:62px 1fr}.v730-order b,.v730-order span{padding:6px;border-bottom:1px solid #aaa}.v730-order div:last-child b,.v730-order div:last-child span{border-bottom:0}.v730-order b{background:#f1f2f4;border-right:1px solid #aaa}
-.v730-name-row{display:flex;justify-content:space-between;align-items:center;margin:18px 0 10px}.v730-name-row strong{font-size:23px}.v730-status{border-radius:999px;padding:6px 12px;font-size:12px;font-weight:900}.v730-status.paid{background:#dff6e7;color:#087a36}.v730-status.unpaid{background:#ffe2e2;color:#bd1515}.v730-status.mismatch{background:#fff0cf;color:#a95a00}
-.v730-info{display:grid;grid-template-columns:90px minmax(0,1fr);border-top:2px solid #222;border-left:1px solid #888}.v730-info b,.v730-info span{padding:8px 10px;border-right:1px solid #888;border-bottom:1px solid #888;min-height:36px;overflow-wrap:anywhere}.v730-info b{background:#f2f3f5;text-align:center}.v730-info .customer-name{font-size:17px;font-weight:900}
-.v730-items{display:table!important;width:100%!important;border-collapse:collapse!important;table-layout:fixed!important;margin-top:14px!important;background:#fff!important;color:#111!important}.v730-items thead{display:table-header-group!important}.v730-items tr{display:table-row!important}.v730-items th,.v730-items td{display:table-cell!important;border:1px solid #888!important;padding:8px 6px!important;color:#111!important;background:#fff!important;font-size:12px!important;vertical-align:middle!important;word-break:break-word!important}.v730-items th{background:#f0f1f3!important;font-weight:900!important;text-align:center!important}.v730-items td{text-align:center!important}.v730-items td:nth-child(2){text-align:left!important}
-.v730-sums{width:340px;margin:11px 0 0 auto}.v730-sum{display:grid;grid-template-columns:1fr 130px;border:1px solid #777;border-bottom:0}.v730-sum:last-child{border-bottom:1px solid #777}.v730-sum span,.v730-sum b{padding:8px 10px;text-align:right}.v730-sum span{background:#f3f3f3}.v730-sum b{border-left:1px solid #777}
-.v730-total{display:grid;grid-template-columns:1fr 230px;align-items:center;border:3px solid #111;margin-top:10px}.v730-total span{padding:12px;font-size:18px;font-weight:900}.v730-total b{padding:12px;border-left:2px solid #111;text-align:right;font-size:26px}
-.v730-notice{margin-top:12px;padding:10px;border:2px solid #e22;background:#fff8f8;color:#cf0000!important;text-align:center;font-weight:900;white-space:pre-line}.v730-bank{display:grid;grid-template-columns:120px 1fr;margin-top:9px;border:1px solid #b79a00;background:#fff6a5}.v730-bank b,.v730-bank span{padding:10px}.v730-bank b{border-right:1px solid #b79a00;text-align:center}
-.v730-bottom{display:grid;grid-template-columns:1fr 130px;gap:14px;align-items:center;margin-top:12px}.v730-cs{border-top:2px solid #111;padding-top:9px;font-size:12px;line-height:1.65}.v730-qr{height:102px;border:1px solid #999;background:#f7f7f7;display:flex;align-items:center;justify-content:center;text-align:center;font-weight:900}.v730-qr img{max-width:92px;max-height:92px}.v730-footer{text-align:center;border-top:1px solid #aaa;margin-top:10px;padding-top:8px;font-size:11px;color:#666!important}
-@media print{.v730-receipt{width:210mm!important;min-height:297mm!important;max-width:none!important;box-shadow:none!important;margin:0!important;padding:10mm 11mm!important}@page{size:A4 portrait;margin:0}}
-</style>
-<script id="v730-final-receipt-script">
-(function(){
- const E=s=>String(s??'').replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]));
- function statusInfo(r){const s=String(r.payment?.status||r.paymentStatus||r.payStatus||'').toLowerCase();if(s==='paid'||s.includes('입금완료'))return['입금완료','paid'];if(s.includes('mismatch')||s.includes('불일치'))return['금액불일치','mismatch'];return['미입금','unpaid']}
- function tracking(r){const scan=(state.shippingScans||{})[r.key]||{};return scan.trackingNumber||r.trackingNumber||r.trackingNo||r.invoiceNo||''}
- window.v730ReceiptHTML=function(r,i){
-  const c=r.customer||{},S=state.settings||{},st=statusInfo(r),items=r.items||[],orderNo=r.orderNo||`${String(r.date||'').replaceAll('-','')}-${String((i||0)+1).padStart(3,'0')}`;
-  const qr=S.kakaoQrUrl?`<img src="${E(S.kakaoQrUrl)}" alt="카카오채널 QR">`:'카카오채널<br>QR';
-  return `<article class="v730-receipt">
-   <div class="v730-top"><div class="v730-brand">FIRST OMS</div><div class="v730-title">정 산 서</div><div class="v730-order"><div><b>주문일</b><span>${E(r.date||'')}</span></div><div><b>주문번호</b><span>${E(orderNo)}</span></div></div></div>
-   <div class="v730-name-row"><strong>${E(r.nick||c.name||'고객')}님 정산서</strong><span class="v730-status ${st[1]}">${st[0]}</span></div>
-   <div class="v730-info"><b>고객명</b><span class="customer-name">${E(c.name||r.nick||'')}</span><b>배송지</b><span>${E([c.address,c.detailAddress].filter(Boolean).join(' '))}</span><b>연락처</b><span>${E(c.phone||'')}</span><b>메모</b><span>${E(c.memo||r.memo||'')}</span><b>송장번호</b><span>${E(tracking(r))}</span></div>
-   <table class="v730-items"><colgroup><col style="width:9%"><col style="width:51%"><col style="width:10%"><col style="width:14%"><col style="width:16%"></colgroup><thead><tr><th>번호</th><th>상품명</th><th>수량</th><th>단가</th><th>합계</th></tr></thead><tbody>${items.map((x,n)=>`<tr><td>${E(x.number||x.no||('#'+(n+1)))}</td><td>${E(x.item||x.name||'')}</td><td>${Number(x.qty)||0}</td><td>${money(Number(x.unit)||0)}</td><td>${money(Number(x.amount)||((Number(x.qty)||0)*(Number(x.unit)||0)))}</td></tr>`).join('')}</tbody></table>
-   <div class="v730-sums"><div class="v730-sum"><span>상품합계</span><b>${money(r.subtotal||0)}</b></div><div class="v730-sum"><span>배송비</span><b>${money(r.fee||0)}</b></div></div>
-   <div class="v730-total"><span>총 결제금액</span><b>${money(r.total||0)}</b></div>
-   <div class="v730-notice">${E(S.paymentNotice||'일요일 12시까지 입금 요망\n입금자명은 주문자명과 동일하게 부탁드립니다.')}</div>
-   <div class="v730-bank"><b>입금계좌</b><span>${E(S.bank||'')} ${E(S.account||'계좌번호 미설정')} · 예금주 ${E(S.holder||'')}</span></div>
-   <div class="v730-bottom"><div class="v730-cs"><b>고객센터</b><br>${E(S.contact||'')}<br>카카오채널 ${E(S.kakaoChannelName||S.channelName||'')}</div><div class="v730-qr">${qr}</div></div>
-   <div class="v730-footer">FIRST OMS · 주문내역을 확인해 주세요.</div>
-  </article>`;
- };
- window.receiptHTML=window.v730ReceiptHTML;
- window.openReceiptDetail=async function(key){const r=receiptByKey(key);if(!r)return alert('정산서를 찾을 수 없습니다.');let modal=document.getElementById('receiptDetailModal');if(!modal){modal=document.createElement('div');modal.id='receiptDetailModal';modal.className='receipt-detail-modal';modal.innerHTML='<div class="receipt-detail-box"><div class="receipt-detail-actions no-print"><button class="btn warn" id="detailEditBtn">수정</button><button class="btn secondary" id="detailPrintBtn">인쇄</button><button class="btn bad" onclick="closeReceiptDetail()">닫기</button></div><div id="receiptDetailBody"></div></div>';document.body.appendChild(modal);modal.addEventListener('click',e=>{if(e.target===modal)closeReceiptDetail()})}modal.classList.add('show');document.getElementById('receiptDetailBody').innerHTML=v730ReceiptHTML(r,indexOfReceiptKey(key));document.getElementById('detailEditBtn').onclick=()=>openReceiptEditByKey(key);document.getElementById('detailPrintBtn').onclick=()=>v730Print(key)};
- window.v730Print=function(key){const r=receiptByKey(key);if(!r)return alert('정산서를 찾을 수 없습니다.');const w=window.open('','_blank','width=900,height=1100');if(!w)return alert('팝업 차단을 해제해 주세요.');const css=document.getElementById('v730-final-receipt-fix').textContent;w.document.write('<!doctype html><html><head><meta charset="utf-8"><title>정산서</title><style>'+css+'</style></head><body>'+v730ReceiptHTML(r,indexOfReceiptKey(key))+'<script>onload=()=>setTimeout(()=>print(),200)<\/script></body></html>');w.document.close()};
- window.printByKey=window.v730Print;window.printOne=function(i){const r=getReceipts()[i];if(r)v730Print(r.key)};
- window.receiptImageBase64=async function(r){
-  const W=794,H=1123,c=document.createElement('canvas');c.width=W;c.height=H;const g=c.getContext('2d');g.fillStyle='#fff';g.fillRect(0,0,W,H);const S=state.settings||{},C=r.customer||{},L=42,R=752;
-  const txt=(s,x,y,size=13,bold=false,align='left',color='#111',max)=>{g.font=`${bold?'700':'400'} ${size}px Arial,sans-serif`;g.textAlign=align;g.textBaseline='middle';g.fillStyle=color;max?g.fillText(String(s??''),x,y,max):g.fillText(String(s??''),x,y)};
-  const rect=(x,y,w,h,fill='#fff',stroke='#888',lw=1)=>{g.fillStyle=fill;g.fillRect(x,y,w,h);g.strokeStyle=stroke;g.lineWidth=lw;g.strokeRect(x,y,w,h)};
-  txt('FIRST OMS',L,48,13,true);txt('정 산 서',397,55,36,true,'center');rect(562,28,190,62);rect(562,28,64,31,'#f1f2f4');rect(562,59,64,31,'#f1f2f4');txt('주문일',594,44,11,true,'center');txt(r.date||'',635,44,11);txt('주문번호',594,75,11,true,'center');txt(r.orderNo||r.key||'',635,75,10);g.fillStyle='#111';g.fillRect(L,105,R-L,3);txt(`${r.nick||C.name||'고객'}님 정산서`,L,136,23,true);
-  let y=160;[['고객명',C.name||r.nick||''],['배송지',[C.address,C.detailAddress].filter(Boolean).join(' ')],['연락처',C.phone||''],['메모',C.memo||r.memo||''],['송장번호',tracking(r)]].forEach(([a,b])=>{rect(L,y,90,37,'#f2f3f5');rect(L+90,y,R-L-90,37);txt(a,L+45,y+18.5,12,true,'center');txt(b,L+100,y+18.5,a==='고객명'?16:12,a==='고객명', 'left','#111',R-L-110);y+=37});y+=15;
-  const widths=[54,356,70,105,125],heads=['번호','상품명','수량','단가','합계'];let x=L;heads.forEach((h,i)=>{rect(x,y,widths[i],32,'#f0f1f3');txt(h,x+widths[i]/2,y+16,12,true,'center');x+=widths[i]});y+=32;(r.items||[]).slice(0,14).forEach((it,n)=>{x=L;const vals=[it.number||it.no||('#'+(n+1)),it.item||it.name||'',Number(it.qty)||0,money(Number(it.unit)||0),money(Number(it.amount)||((Number(it.qty)||0)*(Number(it.unit)||0))];vals.forEach((v,i)=>{rect(x,y,widths[i],35);txt(v,i===1?x+6:x+widths[i]/2,y+17.5,11,false,i===1?'left':'center','#111',widths[i]-10);x+=widths[i]});y+=35});y+=10;
-  const sx=412;[['상품합계',money(r.subtotal||0)],['배송비',money(r.fee||0)]].forEach(([a,b])=>{rect(sx,y,210,32,'#f3f3f3');rect(sx+210,y,130,32);txt(a,sx+200,y+16,12,true,'right');txt(b,742,y+16,13,true,'right');y+=32});y+=8;rect(sx,y,210,48,'#fff','#111',3);rect(sx+210,y,130,48,'#fff','#111',3);txt('총 결제금액',sx+200,y+24,17,true,'right');txt(money(r.total||0),742,y+24,23,true,'right');y+=60;rect(L,y,R-L,50,'#fff8f8','#e22',2);txt(S.paymentNotice||'일요일 12시까지 입금 요망',397,y+25,14,true,'center','#cf0000',R-L-20);y+=59;rect(L,y,120,54,'#fff6a5','#b79a00');rect(L+120,y,R-L-120,54,'#fff6a5','#b79a00');txt('입금계좌',L+60,y+27,14,true,'center');txt(`${S.bank||''} ${S.account||'계좌번호 미설정'} · 예금주 ${S.holder||''}`,L+132,y+27,14,true,'left','#111',R-L-145);txt('FIRST OMS · 주문내역을 확인해 주세요.',397,1090,11,false,'center','#666');
-  let q=.88,d=c.toDataURL('image/jpeg',q);while(d.length>250000&&q>.35){q-=.06;d=c.toDataURL('image/jpeg',q)}return d.split(',')[1];
- };
-})();
-</script>
-
 </body></html>`);w.document.close();
  };
 })();
@@ -1921,14 +1644,7 @@ window.receiptImageBase64 = async function(r){
 };
 </script>
 
-<style id="v728-settings-visible-fix">
-.tabs{overflow-x:auto!important;flex-wrap:nowrap!important;scrollbar-width:thin!important}
-.tabs .tab[data-page="settings"]{position:sticky!important;right:0!important;z-index:12!important;background:#f6c453!important;color:#111!important;border:2px solid #d29a13!important;box-shadow:-8px 0 12px rgba(12,18,28,.45)!important;flex:0 0 auto!important}
-#alwaysSettingsBtn{background:#f6c453!important;color:#111!important;border-color:#d29a13!important;font-weight:900!important}
-#settings.page.active{display:block!important}
-#settings .settings-box,#settings .v723-courier-panel{display:block!important;visibility:visible!important;opacity:1!important}
-#settingsMessageMount:empty::before,#settingsCourierMount:empty::before{content:'설정 불러오는 중…';display:block;padding:22px;background:#fff;color:#111;border-radius:12px}
-</style>
+<!-- v7.31 verified emergency fixes -->
 <script id="v728-settings-visible-script">
 (function(){
  function ensureSettings(){
@@ -1957,8 +1673,6 @@ window.receiptImageBase64 = async function(r){
  setTimeout(ensureSettings,100);
 })();
 </script>
-
-
 <script id="v729-mms-tainted-canvas-fix">
 /* v7.29: 외부 QR/이미지로 인한 Tainted canvas 오류 제거. 문자용 정산서는 페이지와 같은 구성으로 순수 Canvas에 직접 그린다. */
 window.receiptImageBase64 = async function(r){
@@ -2018,176 +1732,6 @@ window.receiptImageBase64 = async function(r){
   return data.split(',')[1];
 };
 </script>
-
-<style id="v729-clean-print-style">
-/* v7.29: 정산서 팝업은 한 장 폭으로 고정하고, 인쇄는 별도 창에서 독립 렌더링 */
-.receipt-detail-modal #receiptDetailBody{display:block!important;overflow:auto!important}
-.receipt-detail-modal .exact-receipt{margin:0 auto!important;width:794px!important;max-width:794px!important;box-sizing:border-box!important}
-</style>
-<script id="v729-clean-print-script">
-(function(){
- const PRINT_CSS=`
- *{box-sizing:border-box}html,body{margin:0;padding:0;background:#fff;color:#111;font-family:Arial,'Noto Sans KR',sans-serif}
- .exact-receipt{width:210mm;min-height:297mm;margin:0 auto;padding:10mm 11mm;background:#fff;color:#111;overflow:hidden}
- .er-top{display:grid;grid-template-columns:150px minmax(0,1fr) 190px;align-items:start;border-bottom:3px solid #111;padding-bottom:12px}
- .er-brand{font-size:13px;font-weight:900}.er-title{text-align:center;font-size:36px;font-weight:900;letter-spacing:9px}
- .er-order{border:1px solid #222;font-size:12px}.er-order div{display:grid;grid-template-columns:66px 1fr}.er-order b,.er-order span{padding:6px;border-bottom:1px solid #bbb}.er-order div:last-child b,.er-order div:last-child span{border-bottom:0}.er-order b{background:#f1f1f1;border-right:1px solid #bbb}
- .er-customer-title{display:flex;align-items:end;justify-content:space-between;margin:20px 0 10px}.er-customer-title strong{font-size:23px}.er-page-no{font-size:14px;font-weight:900}
- .er-info{display:grid;grid-template-columns:90px minmax(0,1fr);border-top:2px solid #111;border-left:1px solid #777;margin:0}
- .er-info dt,.er-info dd{margin:0;padding:8px 10px;border-right:1px solid #777;border-bottom:1px solid #777;min-height:36px;overflow-wrap:anywhere;word-break:break-word}
- .er-info dt{background:#f2f2f2;text-align:center;font-weight:900}.er-info dd.name{font-size:18px;font-weight:900}
- .er-tracking{display:grid;grid-template-columns:90px minmax(0,1fr);border-left:1px solid #777}.er-tracking b,.er-tracking span{padding:8px 10px;border-right:1px solid #777;border-bottom:1px solid #777}.er-tracking b{background:#f2f2f2;text-align:center}
- .er-items{display:table!important;width:100%!important;border-collapse:collapse!important;margin-top:16px!important;table-layout:fixed!important;background:#fff!important;color:#111!important}
- .er-items thead{display:table-header-group!important}.er-items tbody{display:table-row-group!important}.er-items tr{display:table-row!important}.er-items th,.er-items td{display:table-cell!important}
- .er-items th{background:#f1f2f4!important;color:#111!important;padding:9px 6px!important;border:1px solid #777!important;font-size:13px!important;text-align:center!important;position:static!important}
- .er-items td{background:#fff!important;color:#111!important;border:1px solid #999!important;padding:8px 6px!important;text-align:center!important;font-size:13px!important;overflow-wrap:anywhere!important;word-break:break-word!important}
- .er-items td:nth-child(2){text-align:left!important}
- .er-sum{margin-top:12px;border:2px solid #111}.er-sum-row{display:grid;grid-template-columns:1fr 180px;border-bottom:1px solid #777}.er-sum-row:last-child{border-bottom:0}.er-sum-row span,.er-sum-row b{padding:8px 11px}.er-sum-row span{text-align:right;background:#f4f4f4}.er-sum-row b{text-align:right;border-left:1px solid #777}
- .er-grand{display:grid;grid-template-columns:1fr 230px;align-items:center;margin-top:10px;border:3px solid #111}.er-grand span{font-size:19px;font-weight:900;padding:13px}.er-grand b{font-size:28px;text-align:right;padding:13px;border-left:2px solid #111}
- .er-notice{margin-top:13px;border:2px solid #e32424;background:#fff8f8;color:#d40000;padding:10px 14px;text-align:center;font-size:16px;font-weight:900;white-space:pre-line}
- .er-bank{display:grid;grid-template-columns:130px 1fr;margin-top:10px;border:1px solid #b79a00;background:#fff6a5}.er-bank b,.er-bank div{padding:10px}.er-bank b{border-right:1px solid #b79a00;text-align:center}
- .er-bottom{display:grid;grid-template-columns:1fr 145px;gap:18px;margin-top:14px;align-items:center}.er-cs{border-top:2px solid #111;padding-top:10px;line-height:1.6;font-size:13px}.er-qr{height:110px;border:1px solid #999;display:flex;align-items:center;justify-content:center;text-align:center;font-weight:900;background:#f6f6f6}.er-qr img{max-width:96px;max-height:96px}
- .er-footer{text-align:center;border-top:1px solid #aaa;margin-top:14px;padding-top:9px;font-size:12px;color:#555}
- .payment-pill{display:inline-block;border-radius:999px;padding:6px 11px;font-weight:900;font-size:12px}.payment-pill.paid{background:#dff6e7;color:#087a36}.payment-pill.unpaid{background:#ffe2e2;color:#bd1515}.payment-pill.mismatch{background:#fff0cf;color:#a95a00}.payment-pill.review{background:#dfeeff;color:#155ea8}
- @page{size:A4 portrait;margin:0}@media print{html,body{width:210mm}.exact-receipt{page-break-after:always}.exact-receipt:last-child{page-break-after:auto}}
- `;
- window.printReceiptClean=function(key){
-   const r=typeof receiptByKey==='function'?receiptByKey(key):null;
-   if(!r)return alert('정산서를 찾을 수 없습니다.');
-   const i=typeof indexOfReceiptKey==='function'?indexOfReceiptKey(key):0;
-   const w=window.open('','_blank','width=920,height=1100');
-   if(!w)return alert('팝업 차단을 해제해 주세요.');
-   w.document.open();
-   w.document.write('<!doctype html><html><head><meta charset="utf-8"><title>'+String(r.nick||'고객')+' 정산서</title><style>'+PRINT_CSS+'</style></head><body>'+receiptHTML(r,i)+'<script>window.onload=function(){setTimeout(function(){window.print()},250)}<\\/script><style id="v730-final-receipt-fix">
-#receiptDetailBody{background:#eef0f3!important;padding:12px!important;overflow:auto!important}
-.v730-receipt{width:794px;max-width:100%;min-height:1123px;margin:0 auto;background:#fff!important;color:#111!important;padding:38px 42px 28px;box-sizing:border-box;font-family:Arial,'Noto Sans KR',sans-serif;box-shadow:0 3px 18px rgba(0,0,0,.15);overflow:hidden}
-.v730-receipt *{box-sizing:border-box;color:#111}
-.v730-top{display:grid;grid-template-columns:130px 1fr 190px;align-items:start;border-bottom:3px solid #111;padding-bottom:11px}
-.v730-brand{font-weight:900;font-size:13px}.v730-title{text-align:center;font-size:36px;font-weight:900;letter-spacing:9px;white-space:nowrap}
-.v730-order{border:1px solid #555;font-size:11px}.v730-order div{display:grid;grid-template-columns:62px 1fr}.v730-order b,.v730-order span{padding:6px;border-bottom:1px solid #aaa}.v730-order div:last-child b,.v730-order div:last-child span{border-bottom:0}.v730-order b{background:#f1f2f4;border-right:1px solid #aaa}
-.v730-name-row{display:flex;justify-content:space-between;align-items:center;margin:18px 0 10px}.v730-name-row strong{font-size:23px}.v730-status{border-radius:999px;padding:6px 12px;font-size:12px;font-weight:900}.v730-status.paid{background:#dff6e7;color:#087a36}.v730-status.unpaid{background:#ffe2e2;color:#bd1515}.v730-status.mismatch{background:#fff0cf;color:#a95a00}
-.v730-info{display:grid;grid-template-columns:90px minmax(0,1fr);border-top:2px solid #222;border-left:1px solid #888}.v730-info b,.v730-info span{padding:8px 10px;border-right:1px solid #888;border-bottom:1px solid #888;min-height:36px;overflow-wrap:anywhere}.v730-info b{background:#f2f3f5;text-align:center}.v730-info .customer-name{font-size:17px;font-weight:900}
-.v730-items{display:table!important;width:100%!important;border-collapse:collapse!important;table-layout:fixed!important;margin-top:14px!important;background:#fff!important;color:#111!important}.v730-items thead{display:table-header-group!important}.v730-items tr{display:table-row!important}.v730-items th,.v730-items td{display:table-cell!important;border:1px solid #888!important;padding:8px 6px!important;color:#111!important;background:#fff!important;font-size:12px!important;vertical-align:middle!important;word-break:break-word!important}.v730-items th{background:#f0f1f3!important;font-weight:900!important;text-align:center!important}.v730-items td{text-align:center!important}.v730-items td:nth-child(2){text-align:left!important}
-.v730-sums{width:340px;margin:11px 0 0 auto}.v730-sum{display:grid;grid-template-columns:1fr 130px;border:1px solid #777;border-bottom:0}.v730-sum:last-child{border-bottom:1px solid #777}.v730-sum span,.v730-sum b{padding:8px 10px;text-align:right}.v730-sum span{background:#f3f3f3}.v730-sum b{border-left:1px solid #777}
-.v730-total{display:grid;grid-template-columns:1fr 230px;align-items:center;border:3px solid #111;margin-top:10px}.v730-total span{padding:12px;font-size:18px;font-weight:900}.v730-total b{padding:12px;border-left:2px solid #111;text-align:right;font-size:26px}
-.v730-notice{margin-top:12px;padding:10px;border:2px solid #e22;background:#fff8f8;color:#cf0000!important;text-align:center;font-weight:900;white-space:pre-line}.v730-bank{display:grid;grid-template-columns:120px 1fr;margin-top:9px;border:1px solid #b79a00;background:#fff6a5}.v730-bank b,.v730-bank span{padding:10px}.v730-bank b{border-right:1px solid #b79a00;text-align:center}
-.v730-bottom{display:grid;grid-template-columns:1fr 130px;gap:14px;align-items:center;margin-top:12px}.v730-cs{border-top:2px solid #111;padding-top:9px;font-size:12px;line-height:1.65}.v730-qr{height:102px;border:1px solid #999;background:#f7f7f7;display:flex;align-items:center;justify-content:center;text-align:center;font-weight:900}.v730-qr img{max-width:92px;max-height:92px}.v730-footer{text-align:center;border-top:1px solid #aaa;margin-top:10px;padding-top:8px;font-size:11px;color:#666!important}
-@media print{.v730-receipt{width:210mm!important;min-height:297mm!important;max-width:none!important;box-shadow:none!important;margin:0!important;padding:10mm 11mm!important}@page{size:A4 portrait;margin:0}}
-</style>
-<script id="v730-final-receipt-script">
-(function(){
- const E=s=>String(s??'').replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]));
- function statusInfo(r){const s=String(r.payment?.status||r.paymentStatus||r.payStatus||'').toLowerCase();if(s==='paid'||s.includes('입금완료'))return['입금완료','paid'];if(s.includes('mismatch')||s.includes('불일치'))return['금액불일치','mismatch'];return['미입금','unpaid']}
- function tracking(r){const scan=(state.shippingScans||{})[r.key]||{};return scan.trackingNumber||r.trackingNumber||r.trackingNo||r.invoiceNo||''}
- window.v730ReceiptHTML=function(r,i){
-  const c=r.customer||{},S=state.settings||{},st=statusInfo(r),items=r.items||[],orderNo=r.orderNo||`${String(r.date||'').replaceAll('-','')}-${String((i||0)+1).padStart(3,'0')}`;
-  const qr=S.kakaoQrUrl?`<img src="${E(S.kakaoQrUrl)}" alt="카카오채널 QR">`:'카카오채널<br>QR';
-  return `<article class="v730-receipt">
-   <div class="v730-top"><div class="v730-brand">FIRST OMS</div><div class="v730-title">정 산 서</div><div class="v730-order"><div><b>주문일</b><span>${E(r.date||'')}</span></div><div><b>주문번호</b><span>${E(orderNo)}</span></div></div></div>
-   <div class="v730-name-row"><strong>${E(r.nick||c.name||'고객')}님 정산서</strong><span class="v730-status ${st[1]}">${st[0]}</span></div>
-   <div class="v730-info"><b>고객명</b><span class="customer-name">${E(c.name||r.nick||'')}</span><b>배송지</b><span>${E([c.address,c.detailAddress].filter(Boolean).join(' '))}</span><b>연락처</b><span>${E(c.phone||'')}</span><b>메모</b><span>${E(c.memo||r.memo||'')}</span><b>송장번호</b><span>${E(tracking(r))}</span></div>
-   <table class="v730-items"><colgroup><col style="width:9%"><col style="width:51%"><col style="width:10%"><col style="width:14%"><col style="width:16%"></colgroup><thead><tr><th>번호</th><th>상품명</th><th>수량</th><th>단가</th><th>합계</th></tr></thead><tbody>${items.map((x,n)=>`<tr><td>${E(x.number||x.no||('#'+(n+1)))}</td><td>${E(x.item||x.name||'')}</td><td>${Number(x.qty)||0}</td><td>${money(Number(x.unit)||0)}</td><td>${money(Number(x.amount)||((Number(x.qty)||0)*(Number(x.unit)||0)))}</td></tr>`).join('')}</tbody></table>
-   <div class="v730-sums"><div class="v730-sum"><span>상품합계</span><b>${money(r.subtotal||0)}</b></div><div class="v730-sum"><span>배송비</span><b>${money(r.fee||0)}</b></div></div>
-   <div class="v730-total"><span>총 결제금액</span><b>${money(r.total||0)}</b></div>
-   <div class="v730-notice">${E(S.paymentNotice||'일요일 12시까지 입금 요망\n입금자명은 주문자명과 동일하게 부탁드립니다.')}</div>
-   <div class="v730-bank"><b>입금계좌</b><span>${E(S.bank||'')} ${E(S.account||'계좌번호 미설정')} · 예금주 ${E(S.holder||'')}</span></div>
-   <div class="v730-bottom"><div class="v730-cs"><b>고객센터</b><br>${E(S.contact||'')}<br>카카오채널 ${E(S.kakaoChannelName||S.channelName||'')}</div><div class="v730-qr">${qr}</div></div>
-   <div class="v730-footer">FIRST OMS · 주문내역을 확인해 주세요.</div>
-  </article>`;
- };
- window.receiptHTML=window.v730ReceiptHTML;
- window.openReceiptDetail=async function(key){const r=receiptByKey(key);if(!r)return alert('정산서를 찾을 수 없습니다.');let modal=document.getElementById('receiptDetailModal');if(!modal){modal=document.createElement('div');modal.id='receiptDetailModal';modal.className='receipt-detail-modal';modal.innerHTML='<div class="receipt-detail-box"><div class="receipt-detail-actions no-print"><button class="btn warn" id="detailEditBtn">수정</button><button class="btn secondary" id="detailPrintBtn">인쇄</button><button class="btn bad" onclick="closeReceiptDetail()">닫기</button></div><div id="receiptDetailBody"></div></div>';document.body.appendChild(modal);modal.addEventListener('click',e=>{if(e.target===modal)closeReceiptDetail()})}modal.classList.add('show');document.getElementById('receiptDetailBody').innerHTML=v730ReceiptHTML(r,indexOfReceiptKey(key));document.getElementById('detailEditBtn').onclick=()=>openReceiptEditByKey(key);document.getElementById('detailPrintBtn').onclick=()=>v730Print(key)};
- window.v730Print=function(key){const r=receiptByKey(key);if(!r)return alert('정산서를 찾을 수 없습니다.');const w=window.open('','_blank','width=900,height=1100');if(!w)return alert('팝업 차단을 해제해 주세요.');const css=document.getElementById('v730-final-receipt-fix').textContent;w.document.write('<!doctype html><html><head><meta charset="utf-8"><title>정산서</title><style>'+css+'</style></head><body>'+v730ReceiptHTML(r,indexOfReceiptKey(key))+'<script>onload=()=>setTimeout(()=>print(),200)<\/script></body></html>');w.document.close()};
- window.printByKey=window.v730Print;window.printOne=function(i){const r=getReceipts()[i];if(r)v730Print(r.key)};
- window.receiptImageBase64=async function(r){
-  const W=794,H=1123,c=document.createElement('canvas');c.width=W;c.height=H;const g=c.getContext('2d');g.fillStyle='#fff';g.fillRect(0,0,W,H);const S=state.settings||{},C=r.customer||{},L=42,R=752;
-  const txt=(s,x,y,size=13,bold=false,align='left',color='#111',max)=>{g.font=`${bold?'700':'400'} ${size}px Arial,sans-serif`;g.textAlign=align;g.textBaseline='middle';g.fillStyle=color;max?g.fillText(String(s??''),x,y,max):g.fillText(String(s??''),x,y)};
-  const rect=(x,y,w,h,fill='#fff',stroke='#888',lw=1)=>{g.fillStyle=fill;g.fillRect(x,y,w,h);g.strokeStyle=stroke;g.lineWidth=lw;g.strokeRect(x,y,w,h)};
-  txt('FIRST OMS',L,48,13,true);txt('정 산 서',397,55,36,true,'center');rect(562,28,190,62);rect(562,28,64,31,'#f1f2f4');rect(562,59,64,31,'#f1f2f4');txt('주문일',594,44,11,true,'center');txt(r.date||'',635,44,11);txt('주문번호',594,75,11,true,'center');txt(r.orderNo||r.key||'',635,75,10);g.fillStyle='#111';g.fillRect(L,105,R-L,3);txt(`${r.nick||C.name||'고객'}님 정산서`,L,136,23,true);
-  let y=160;[['고객명',C.name||r.nick||''],['배송지',[C.address,C.detailAddress].filter(Boolean).join(' ')],['연락처',C.phone||''],['메모',C.memo||r.memo||''],['송장번호',tracking(r)]].forEach(([a,b])=>{rect(L,y,90,37,'#f2f3f5');rect(L+90,y,R-L-90,37);txt(a,L+45,y+18.5,12,true,'center');txt(b,L+100,y+18.5,a==='고객명'?16:12,a==='고객명', 'left','#111',R-L-110);y+=37});y+=15;
-  const widths=[54,356,70,105,125],heads=['번호','상품명','수량','단가','합계'];let x=L;heads.forEach((h,i)=>{rect(x,y,widths[i],32,'#f0f1f3');txt(h,x+widths[i]/2,y+16,12,true,'center');x+=widths[i]});y+=32;(r.items||[]).slice(0,14).forEach((it,n)=>{x=L;const vals=[it.number||it.no||('#'+(n+1)),it.item||it.name||'',Number(it.qty)||0,money(Number(it.unit)||0),money(Number(it.amount)||((Number(it.qty)||0)*(Number(it.unit)||0))];vals.forEach((v,i)=>{rect(x,y,widths[i],35);txt(v,i===1?x+6:x+widths[i]/2,y+17.5,11,false,i===1?'left':'center','#111',widths[i]-10);x+=widths[i]});y+=35});y+=10;
-  const sx=412;[['상품합계',money(r.subtotal||0)],['배송비',money(r.fee||0)]].forEach(([a,b])=>{rect(sx,y,210,32,'#f3f3f3');rect(sx+210,y,130,32);txt(a,sx+200,y+16,12,true,'right');txt(b,742,y+16,13,true,'right');y+=32});y+=8;rect(sx,y,210,48,'#fff','#111',3);rect(sx+210,y,130,48,'#fff','#111',3);txt('총 결제금액',sx+200,y+24,17,true,'right');txt(money(r.total||0),742,y+24,23,true,'right');y+=60;rect(L,y,R-L,50,'#fff8f8','#e22',2);txt(S.paymentNotice||'일요일 12시까지 입금 요망',397,y+25,14,true,'center','#cf0000',R-L-20);y+=59;rect(L,y,120,54,'#fff6a5','#b79a00');rect(L+120,y,R-L-120,54,'#fff6a5','#b79a00');txt('입금계좌',L+60,y+27,14,true,'center');txt(`${S.bank||''} ${S.account||'계좌번호 미설정'} · 예금주 ${S.holder||''}`,L+132,y+27,14,true,'left','#111',R-L-145);txt('FIRST OMS · 주문내역을 확인해 주세요.',397,1090,11,false,'center','#666');
-  let q=.88,d=c.toDataURL('image/jpeg',q);while(d.length>250000&&q>.35){q-=.06;d=c.toDataURL('image/jpeg',q)}return d.split(',')[1];
- };
-})();
-</script>
-
-</body></html>');
-   w.document.close();
- };
- const previousOpen=window.openReceiptDetail;
- window.openReceiptDetail=async function(key){
-   const r=typeof receiptByKey==='function'?receiptByKey(key):null;
-   if(!r)return alert('정산서를 찾을 수 없습니다.');
-   let modal=document.getElementById('receiptDetailModal');
-   if(!modal){
-     modal=document.createElement('div');modal.id='receiptDetailModal';modal.className='receipt-detail-modal';
-     modal.innerHTML='<div class="receipt-detail-box"><div class="receipt-detail-actions no-print"><button class="btn" id="detailNoticeBtn">입금안내 문구 수정</button><button class="btn warn" id="detailEditBtn">정산서 수정</button><button class="btn secondary" id="detailPrintBtn">인쇄</button><button class="btn bad" onclick="closeReceiptDetail()">닫기</button></div><div id="receiptDetailBody"></div></div>';
-     document.body.appendChild(modal);modal.addEventListener('click',e=>{if(e.target===modal)closeReceiptDetail()});
-   }
-   modal.classList.add('show');
-   document.getElementById('receiptDetailBody').innerHTML=receiptHTML(r,indexOfReceiptKey(key));
-   document.getElementById('detailEditBtn').onclick=()=>openReceiptEditByKey(key);
-   document.getElementById('detailPrintBtn').onclick=()=>printReceiptClean(key);
-   document.getElementById('detailNoticeBtn').onclick=()=>{const v=prompt('이 거래처 정산서에 표시할 입금 안내 문구를 입력하세요.',state.settings?.paymentNotice||'일요일 12시까지 입금 요망\\n입금자명은 주문자명과 동일하게 부탁드립니다.');if(v===null)return;state.settings.paymentNotice=v;saveSilently();document.getElementById('receiptDetailBody').innerHTML=receiptHTML(r,indexOfReceiptKey(key));};
- };
-})();
-</script>
-<style id="v730-final-receipt-fix">
-#receiptDetailBody{background:#eef0f3!important;padding:12px!important;overflow:auto!important}
-.v730-receipt{width:794px;max-width:100%;min-height:1123px;margin:0 auto;background:#fff!important;color:#111!important;padding:38px 42px 28px;box-sizing:border-box;font-family:Arial,'Noto Sans KR',sans-serif;box-shadow:0 3px 18px rgba(0,0,0,.15);overflow:hidden}
-.v730-receipt *{box-sizing:border-box;color:#111}
-.v730-top{display:grid;grid-template-columns:130px 1fr 190px;align-items:start;border-bottom:3px solid #111;padding-bottom:11px}
-.v730-brand{font-weight:900;font-size:13px}.v730-title{text-align:center;font-size:36px;font-weight:900;letter-spacing:9px;white-space:nowrap}
-.v730-order{border:1px solid #555;font-size:11px}.v730-order div{display:grid;grid-template-columns:62px 1fr}.v730-order b,.v730-order span{padding:6px;border-bottom:1px solid #aaa}.v730-order div:last-child b,.v730-order div:last-child span{border-bottom:0}.v730-order b{background:#f1f2f4;border-right:1px solid #aaa}
-.v730-name-row{display:flex;justify-content:space-between;align-items:center;margin:18px 0 10px}.v730-name-row strong{font-size:23px}.v730-status{border-radius:999px;padding:6px 12px;font-size:12px;font-weight:900}.v730-status.paid{background:#dff6e7;color:#087a36}.v730-status.unpaid{background:#ffe2e2;color:#bd1515}.v730-status.mismatch{background:#fff0cf;color:#a95a00}
-.v730-info{display:grid;grid-template-columns:90px minmax(0,1fr);border-top:2px solid #222;border-left:1px solid #888}.v730-info b,.v730-info span{padding:8px 10px;border-right:1px solid #888;border-bottom:1px solid #888;min-height:36px;overflow-wrap:anywhere}.v730-info b{background:#f2f3f5;text-align:center}.v730-info .customer-name{font-size:17px;font-weight:900}
-.v730-items{display:table!important;width:100%!important;border-collapse:collapse!important;table-layout:fixed!important;margin-top:14px!important;background:#fff!important;color:#111!important}.v730-items thead{display:table-header-group!important}.v730-items tr{display:table-row!important}.v730-items th,.v730-items td{display:table-cell!important;border:1px solid #888!important;padding:8px 6px!important;color:#111!important;background:#fff!important;font-size:12px!important;vertical-align:middle!important;word-break:break-word!important}.v730-items th{background:#f0f1f3!important;font-weight:900!important;text-align:center!important}.v730-items td{text-align:center!important}.v730-items td:nth-child(2){text-align:left!important}
-.v730-sums{width:340px;margin:11px 0 0 auto}.v730-sum{display:grid;grid-template-columns:1fr 130px;border:1px solid #777;border-bottom:0}.v730-sum:last-child{border-bottom:1px solid #777}.v730-sum span,.v730-sum b{padding:8px 10px;text-align:right}.v730-sum span{background:#f3f3f3}.v730-sum b{border-left:1px solid #777}
-.v730-total{display:grid;grid-template-columns:1fr 230px;align-items:center;border:3px solid #111;margin-top:10px}.v730-total span{padding:12px;font-size:18px;font-weight:900}.v730-total b{padding:12px;border-left:2px solid #111;text-align:right;font-size:26px}
-.v730-notice{margin-top:12px;padding:10px;border:2px solid #e22;background:#fff8f8;color:#cf0000!important;text-align:center;font-weight:900;white-space:pre-line}.v730-bank{display:grid;grid-template-columns:120px 1fr;margin-top:9px;border:1px solid #b79a00;background:#fff6a5}.v730-bank b,.v730-bank span{padding:10px}.v730-bank b{border-right:1px solid #b79a00;text-align:center}
-.v730-bottom{display:grid;grid-template-columns:1fr 130px;gap:14px;align-items:center;margin-top:12px}.v730-cs{border-top:2px solid #111;padding-top:9px;font-size:12px;line-height:1.65}.v730-qr{height:102px;border:1px solid #999;background:#f7f7f7;display:flex;align-items:center;justify-content:center;text-align:center;font-weight:900}.v730-qr img{max-width:92px;max-height:92px}.v730-footer{text-align:center;border-top:1px solid #aaa;margin-top:10px;padding-top:8px;font-size:11px;color:#666!important}
-@media print{.v730-receipt{width:210mm!important;min-height:297mm!important;max-width:none!important;box-shadow:none!important;margin:0!important;padding:10mm 11mm!important}@page{size:A4 portrait;margin:0}}
-</style>
-<script id="v730-final-receipt-script">
-(function(){
- const E=s=>String(s??'').replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]));
- function statusInfo(r){const s=String(r.payment?.status||r.paymentStatus||r.payStatus||'').toLowerCase();if(s==='paid'||s.includes('입금완료'))return['입금완료','paid'];if(s.includes('mismatch')||s.includes('불일치'))return['금액불일치','mismatch'];return['미입금','unpaid']}
- function tracking(r){const scan=(state.shippingScans||{})[r.key]||{};return scan.trackingNumber||r.trackingNumber||r.trackingNo||r.invoiceNo||''}
- window.v730ReceiptHTML=function(r,i){
-  const c=r.customer||{},S=state.settings||{},st=statusInfo(r),items=r.items||[],orderNo=r.orderNo||`${String(r.date||'').replaceAll('-','')}-${String((i||0)+1).padStart(3,'0')}`;
-  const qr=S.kakaoQrUrl?`<img src="${E(S.kakaoQrUrl)}" alt="카카오채널 QR">`:'카카오채널<br>QR';
-  return `<article class="v730-receipt">
-   <div class="v730-top"><div class="v730-brand">FIRST OMS</div><div class="v730-title">정 산 서</div><div class="v730-order"><div><b>주문일</b><span>${E(r.date||'')}</span></div><div><b>주문번호</b><span>${E(orderNo)}</span></div></div></div>
-   <div class="v730-name-row"><strong>${E(r.nick||c.name||'고객')}님 정산서</strong><span class="v730-status ${st[1]}">${st[0]}</span></div>
-   <div class="v730-info"><b>고객명</b><span class="customer-name">${E(c.name||r.nick||'')}</span><b>배송지</b><span>${E([c.address,c.detailAddress].filter(Boolean).join(' '))}</span><b>연락처</b><span>${E(c.phone||'')}</span><b>메모</b><span>${E(c.memo||r.memo||'')}</span><b>송장번호</b><span>${E(tracking(r))}</span></div>
-   <table class="v730-items"><colgroup><col style="width:9%"><col style="width:51%"><col style="width:10%"><col style="width:14%"><col style="width:16%"></colgroup><thead><tr><th>번호</th><th>상품명</th><th>수량</th><th>단가</th><th>합계</th></tr></thead><tbody>${items.map((x,n)=>`<tr><td>${E(x.number||x.no||('#'+(n+1)))}</td><td>${E(x.item||x.name||'')}</td><td>${Number(x.qty)||0}</td><td>${money(Number(x.unit)||0)}</td><td>${money(Number(x.amount)||((Number(x.qty)||0)*(Number(x.unit)||0)))}</td></tr>`).join('')}</tbody></table>
-   <div class="v730-sums"><div class="v730-sum"><span>상품합계</span><b>${money(r.subtotal||0)}</b></div><div class="v730-sum"><span>배송비</span><b>${money(r.fee||0)}</b></div></div>
-   <div class="v730-total"><span>총 결제금액</span><b>${money(r.total||0)}</b></div>
-   <div class="v730-notice">${E(S.paymentNotice||'일요일 12시까지 입금 요망\n입금자명은 주문자명과 동일하게 부탁드립니다.')}</div>
-   <div class="v730-bank"><b>입금계좌</b><span>${E(S.bank||'')} ${E(S.account||'계좌번호 미설정')} · 예금주 ${E(S.holder||'')}</span></div>
-   <div class="v730-bottom"><div class="v730-cs"><b>고객센터</b><br>${E(S.contact||'')}<br>카카오채널 ${E(S.kakaoChannelName||S.channelName||'')}</div><div class="v730-qr">${qr}</div></div>
-   <div class="v730-footer">FIRST OMS · 주문내역을 확인해 주세요.</div>
-  </article>`;
- };
- window.receiptHTML=window.v730ReceiptHTML;
- window.openReceiptDetail=async function(key){const r=receiptByKey(key);if(!r)return alert('정산서를 찾을 수 없습니다.');let modal=document.getElementById('receiptDetailModal');if(!modal){modal=document.createElement('div');modal.id='receiptDetailModal';modal.className='receipt-detail-modal';modal.innerHTML='<div class="receipt-detail-box"><div class="receipt-detail-actions no-print"><button class="btn warn" id="detailEditBtn">수정</button><button class="btn secondary" id="detailPrintBtn">인쇄</button><button class="btn bad" onclick="closeReceiptDetail()">닫기</button></div><div id="receiptDetailBody"></div></div>';document.body.appendChild(modal);modal.addEventListener('click',e=>{if(e.target===modal)closeReceiptDetail()})}modal.classList.add('show');document.getElementById('receiptDetailBody').innerHTML=v730ReceiptHTML(r,indexOfReceiptKey(key));document.getElementById('detailEditBtn').onclick=()=>openReceiptEditByKey(key);document.getElementById('detailPrintBtn').onclick=()=>v730Print(key)};
- window.v730Print=function(key){const r=receiptByKey(key);if(!r)return alert('정산서를 찾을 수 없습니다.');const w=window.open('','_blank','width=900,height=1100');if(!w)return alert('팝업 차단을 해제해 주세요.');const css=document.getElementById('v730-final-receipt-fix').textContent;w.document.write('<!doctype html><html><head><meta charset="utf-8"><title>정산서</title><style>'+css+'</style></head><body>'+v730ReceiptHTML(r,indexOfReceiptKey(key))+'<script>onload=()=>setTimeout(()=>print(),200)<\/script></body></html>');w.document.close()};
- window.printByKey=window.v730Print;window.printOne=function(i){const r=getReceipts()[i];if(r)v730Print(r.key)};
- window.receiptImageBase64=async function(r){
-  const W=794,H=1123,c=document.createElement('canvas');c.width=W;c.height=H;const g=c.getContext('2d');g.fillStyle='#fff';g.fillRect(0,0,W,H);const S=state.settings||{},C=r.customer||{},L=42,R=752;
-  const txt=(s,x,y,size=13,bold=false,align='left',color='#111',max)=>{g.font=`${bold?'700':'400'} ${size}px Arial,sans-serif`;g.textAlign=align;g.textBaseline='middle';g.fillStyle=color;max?g.fillText(String(s??''),x,y,max):g.fillText(String(s??''),x,y)};
-  const rect=(x,y,w,h,fill='#fff',stroke='#888',lw=1)=>{g.fillStyle=fill;g.fillRect(x,y,w,h);g.strokeStyle=stroke;g.lineWidth=lw;g.strokeRect(x,y,w,h)};
-  txt('FIRST OMS',L,48,13,true);txt('정 산 서',397,55,36,true,'center');rect(562,28,190,62);rect(562,28,64,31,'#f1f2f4');rect(562,59,64,31,'#f1f2f4');txt('주문일',594,44,11,true,'center');txt(r.date||'',635,44,11);txt('주문번호',594,75,11,true,'center');txt(r.orderNo||r.key||'',635,75,10);g.fillStyle='#111';g.fillRect(L,105,R-L,3);txt(`${r.nick||C.name||'고객'}님 정산서`,L,136,23,true);
-  let y=160;[['고객명',C.name||r.nick||''],['배송지',[C.address,C.detailAddress].filter(Boolean).join(' ')],['연락처',C.phone||''],['메모',C.memo||r.memo||''],['송장번호',tracking(r)]].forEach(([a,b])=>{rect(L,y,90,37,'#f2f3f5');rect(L+90,y,R-L-90,37);txt(a,L+45,y+18.5,12,true,'center');txt(b,L+100,y+18.5,a==='고객명'?16:12,a==='고객명', 'left','#111',R-L-110);y+=37});y+=15;
-  const widths=[54,356,70,105,125],heads=['번호','상품명','수량','단가','합계'];let x=L;heads.forEach((h,i)=>{rect(x,y,widths[i],32,'#f0f1f3');txt(h,x+widths[i]/2,y+16,12,true,'center');x+=widths[i]});y+=32;(r.items||[]).slice(0,14).forEach((it,n)=>{x=L;const vals=[it.number||it.no||('#'+(n+1)),it.item||it.name||'',Number(it.qty)||0,money(Number(it.unit)||0),money(Number(it.amount)||((Number(it.qty)||0)*(Number(it.unit)||0))];vals.forEach((v,i)=>{rect(x,y,widths[i],35);txt(v,i===1?x+6:x+widths[i]/2,y+17.5,11,false,i===1?'left':'center','#111',widths[i]-10);x+=widths[i]});y+=35});y+=10;
-  const sx=412;[['상품합계',money(r.subtotal||0)],['배송비',money(r.fee||0)]].forEach(([a,b])=>{rect(sx,y,210,32,'#f3f3f3');rect(sx+210,y,130,32);txt(a,sx+200,y+16,12,true,'right');txt(b,742,y+16,13,true,'right');y+=32});y+=8;rect(sx,y,210,48,'#fff','#111',3);rect(sx+210,y,130,48,'#fff','#111',3);txt('총 결제금액',sx+200,y+24,17,true,'right');txt(money(r.total||0),742,y+24,23,true,'right');y+=60;rect(L,y,R-L,50,'#fff8f8','#e22',2);txt(S.paymentNotice||'일요일 12시까지 입금 요망',397,y+25,14,true,'center','#cf0000',R-L-20);y+=59;rect(L,y,120,54,'#fff6a5','#b79a00');rect(L+120,y,R-L-120,54,'#fff6a5','#b79a00');txt('입금계좌',L+60,y+27,14,true,'center');txt(`${S.bank||''} ${S.account||'계좌번호 미설정'} · 예금주 ${S.holder||''}`,L+132,y+27,14,true,'left','#111',R-L-145);txt('FIRST OMS · 주문내역을 확인해 주세요.',397,1090,11,false,'center','#666');
-  let q=.88,d=c.toDataURL('image/jpeg',q);while(d.length>250000&&q>.35){q-=.06;d=c.toDataURL('image/jpeg',q)}return d.split(',')[1];
- };
-})();
-</script>
-
-
 <script id="v730-emergency-print-mms-fix">
 /* v7.30 긴급 수정: 정산서 인쇄는 기존 화면 CSS와 완전히 분리된 새 창에서만 출력한다. */
 (function(){
@@ -2232,6 +1776,5 @@ window.receiptImageBase64 = async function(r){
   };
 })();
 </script>
-
 </body>
 </html>
