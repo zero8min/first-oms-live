@@ -1599,49 +1599,9 @@ tr:hover td{background:#f6f7f9!important;color:inherit!important}.exact-receipt 
  .receipt-detail-modal .receipt-detail-box{width:210mm!important;max-width:210mm!important;overflow:visible!important;padding:0!important}
 }
 </style>
-<script id="v727-page-matched-mms">
-/* 문자 MMS 이미지를 관리자 페이지의 정산서와 동일한 HTML/CSS로 캡처 */
-window.receiptImageBase64 = async function(r){
-  const index = typeof indexOfReceiptKey==='function' ? indexOfReceiptKey(r.key) : 0;
-  const host=document.createElement('div');
-  host.setAttribute('aria-hidden','true');
-  host.style.cssText='position:fixed;left:-10000px;top:0;width:794px;background:#fff;z-index:-1;pointer-events:none;';
-  host.innerHTML=receiptHTML(r,index);
-  document.body.appendChild(host);
-  const article=host.querySelector('.exact-receipt');
-  article.style.cssText+='width:794px!important;max-width:794px!important;min-height:1123px!important;height:auto!important;overflow:hidden!important;box-shadow:none!important;margin:0!important;background:#fff!important;color:#111!important;padding:36px 40px 30px!important;';
-  const css=`
-    *{box-sizing:border-box}body{margin:0;background:#fff;font-family:Arial,'Noto Sans KR',sans-serif;color:#111}
-    .exact-receipt{width:794px;min-height:1123px;background:#fff;color:#111;padding:36px 40px 30px;font-family:Arial,'Noto Sans KR',sans-serif;overflow:hidden}
-    .er-top{display:grid;grid-template-columns:150px 1fr 190px;align-items:start;border-bottom:3px solid #111;padding-bottom:14px}
-    .er-brand{font-size:13px;font-weight:900}.er-title{text-align:center;font-size:38px;font-weight:900;letter-spacing:10px}
-    .er-order{border:1px solid #222;font-size:12px}.er-order div{display:grid;grid-template-columns:66px 1fr}.er-order b,.er-order span{padding:6px;border-bottom:1px solid #bbb}.er-order div:last-child b,.er-order div:last-child span{border-bottom:0}.er-order b{background:#f1f1f1;border-right:1px solid #bbb}
-    .er-customer-title{display:flex;align-items:end;justify-content:space-between;margin:22px 0 11px}.er-customer-title strong{font-size:24px}.er-page-no{font-size:15px;font-weight:900}
-    .er-info{display:grid;grid-template-columns:90px 1fr;border-top:2px solid #111;border-left:1px solid #777}.er-info dt,.er-info dd{margin:0;padding:8px 10px;border-right:1px solid #777;border-bottom:1px solid #777;min-height:36px;overflow-wrap:anywhere}.er-info dt{background:#f2f2f2;text-align:center;font-weight:900}.er-info dd.name{font-size:18px;font-weight:900}
-    .er-tracking{display:grid;grid-template-columns:90px 1fr;border-left:1px solid #777}.er-tracking b,.er-tracking span{padding:8px 10px;border-right:1px solid #777;border-bottom:1px solid #777}.er-tracking b{background:#f2f2f2;text-align:center}
-    .er-items{width:100%;border-collapse:collapse;margin-top:16px;table-layout:fixed;background:#fff;color:#111}.er-items th{background:#f1f2f4;color:#111;padding:9px 6px;border:1px solid #777;font-size:13px}.er-items td{background:#fff;color:#111;border:1px solid #999;padding:8px 6px;text-align:center;font-size:13px;overflow-wrap:anywhere}.er-items td:nth-child(2){text-align:left}
-    .er-sum{margin-top:12px;border:2px solid #111}.er-sum-row{display:grid;grid-template-columns:1fr 180px;border-bottom:1px solid #777}.er-sum-row:last-child{border-bottom:0}.er-sum-row span,.er-sum-row b{padding:8px 11px}.er-sum-row span{text-align:right;background:#f4f4f4}.er-sum-row b{text-align:right;border-left:1px solid #777}
-    .er-grand{display:grid;grid-template-columns:1fr 230px;align-items:center;margin-top:10px;border:3px solid #111}.er-grand span{font-size:19px;font-weight:900;padding:13px}.er-grand b{font-size:29px;text-align:right;padding:13px;border-left:2px solid #111}
-    .er-notice{margin-top:13px;border:2px solid #e32424;background:#fff8f8;color:#d40000;padding:10px 14px;text-align:center;font-size:16px;font-weight:900;white-space:pre-line}
-    .er-bank{display:grid;grid-template-columns:130px 1fr;margin-top:10px;border:1px solid #b79a00;background:#fff6a5}.er-bank b,.er-bank div{padding:10px}.er-bank b{border-right:1px solid #b79a00;text-align:center}
-    .er-bottom{display:grid;grid-template-columns:1fr 145px;gap:18px;margin-top:14px;align-items:center}.er-cs{border-top:2px solid #111;padding-top:10px;line-height:1.6;font-size:13px}.er-qr{height:110px;border:1px solid #999;display:flex;align-items:center;justify-content:center;text-align:center;font-weight:900;background:#f6f6f6}.er-footer{text-align:center;border-top:1px solid #aaa;margin-top:14px;padding-top:9px;font-size:12px;color:#555}
-    .payment-pill{display:inline-block;border-radius:999px;padding:6px 11px;font-weight:900;font-size:12px}.payment-pill.paid{background:#dff6e7;color:#087a36}.payment-pill.unpaid{background:#ffe2e2;color:#bd1515}.payment-pill.mismatch{background:#fff0cf;color:#a95a00}.payment-pill.review{background:#dfeeff;color:#155ea8}
-  `;
-  try{
-    const clone=article.cloneNode(true);
-    clone.style.boxShadow='none'; clone.style.margin='0';
-    const serialized=new XMLSerializer().serializeToString(clone);
-    const svg=`<svg xmlns="http://www.w3.org/2000/svg" width="794" height="1123"><foreignObject width="100%" height="100%"><div xmlns="http://www.w3.org/1999/xhtml"><style>${css}</style>${serialized}</div></foreignObject></svg>`;
-    const blob=new Blob([svg],{type:'image/svg+xml;charset=utf-8'}),url=URL.createObjectURL(blob);
-    const img=new Image();
-    await new Promise((resolve,reject)=>{img.onload=resolve;img.onerror=()=>reject(new Error('정산서 이미지 변환 실패'));img.src=url});
-    const canvas=document.createElement('canvas');canvas.width=794;canvas.height=1123;
-    const ctx=canvas.getContext('2d');ctx.fillStyle='#fff';ctx.fillRect(0,0,794,1123);ctx.drawImage(img,0,0,794,1123);URL.revokeObjectURL(url);
-    let quality=.9,data=canvas.toDataURL('image/jpeg',quality);
-    while(data.length>265000&&quality>.35){quality-=.07;data=canvas.toDataURL('image/jpeg',quality)}
-    return data.split(',')[1];
-  } finally { host.remove(); }
-};
+<script id="v733-safe-mms-note">
+/* v7.33: 외부 이미지가 포함된 SVG/foreignObject 캡처는 canvas를 오염시켜 toDataURL이 실패하므로 사용하지 않습니다.
+   위에 정의된 순수 Canvas 정산서 생성 함수를 그대로 사용해 SOLAPI MMS 전송을 안정화합니다. */
 </script>
 </body>
 </html>
