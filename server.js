@@ -251,9 +251,9 @@ function selectedTenantCode(req){
 }
 function assertTenantAccess(req,requested){const user=currentUser(req);if(!user)throw new Error('로그인이 필요합니다.');const code=String(requested||selectedTenantCode(req)||'');if(user.role!=='superadmin'&&code!==user.code)throw new Error('다른 거래처 데이터에는 접근할 수 없습니다.');return code}
 function tenantReadCustomers(code){return readJsonObject(tenantFile(code,'customers.json'),[])}
-function tenantReadState(code){return readJsonObject(tenantFile(code,'server-state.json'),{orders:[],customers:tenantReadCustomers(code),payments:[],settings:{},csRecords:[],shippingRecords:[]})}
+function tenantReadState(code){const st=readJsonObject(tenantFile(code,'server-state.json'),{orders:[],customers:[],payments:[],settings:{},csRecords:[],shippingRecords:[]});st.customers=tenantReadCustomers(code);return st}
 function tenantWriteCustomers(code,list){if(!Array.isArray(list))throw new Error('고객 데이터 형식 오류');const file=tenantFile(code,'customers.json'),backup=tenantFile(code,'customers-backup.json'),dir=tenantBackupDir(code,'backups');const old=tenantReadCustomers(code),stamp=new Date().toISOString().replace(/[:.]/g,'-');atomicWrite(backup,JSON.stringify(old,null,2));atomicWrite(path.join(dir,`customers-${stamp}.json`),JSON.stringify(old,null,2));atomicWrite(file,JSON.stringify(list,null,2));broadcastCustomers(list,code);}
-function tenantWriteState(code,patch){const old=tenantReadState(code),next={...old,...patch,customers:Array.isArray(patch.customers)?patch.customers:tenantReadCustomers(code),updatedAt:new Date().toISOString()};const backup=tenantFile(code,'server-state-backup.json'),dir=tenantBackupDir(code,'state-backups');atomicWrite(backup,JSON.stringify(old,null,2));atomicWrite(path.join(dir,`state-${new Date().toISOString().replace(/[:.]/g,'-')}.json`),JSON.stringify(old,null,2));atomicWrite(tenantFile(code,'server-state.json'),JSON.stringify(next,null,2));if(Array.isArray(next.customers))tenantWriteCustomers(code,next.customers);return next}
+function tenantWriteState(code,patch){const old=tenantReadState(code),authoritativeCustomers=tenantReadCustomers(code),safePatch={...(patch||{})};delete safePatch.customers;const next={...old,...safePatch,customers:authoritativeCustomers,updatedAt:new Date().toISOString()};const backup=tenantFile(code,'server-state-backup.json'),dir=tenantBackupDir(code,'state-backups');atomicWrite(backup,JSON.stringify(old,null,2));atomicWrite(path.join(dir,`state-${new Date().toISOString().replace(/[:.]/g,'-')}.json`),JSON.stringify(old,null,2));atomicWrite(tenantFile(code,'server-state.json'),JSON.stringify(next,null,2));return next}
 function tenantReadIntegrations(code){return readJsonObject(tenantFile(code,'solapi-settings.json'),{})}
 function tenantSaveIntegrations(code,v){atomicWrite(tenantFile(code,'solapi-settings.json'),JSON.stringify(v,null,2))}
 function tenantReadSendHistory(code){return readJsonObject(tenantFile(code,'message-history.json'),[])}
@@ -693,7 +693,7 @@ const server=http.createServer((req,res)=>{
    let list=tenantReadCustomers(tenantCode),i=list.findIndex(x=>x.nickname===c.nickname||x.phone===c.phone);
    const next={id:c.id||Date.now().toString(36),joinedAt:c.joinedAt||new Date().toLocaleString('ko-KR'),source:c.source||'가입폼',...c};
    if(i>=0)list[i]={...list[i],...next};else list.push(next);
-   tenantWriteCustomers(tenantCode,list);const st=tenantReadState(tenantCode);st.customers=list;tenantWriteState(tenantCode,st);json(res,200,next)
+   tenantWriteCustomers(tenantCode,list);const st=tenantReadState(tenantCode);st.customers=list;atomicWrite(tenantFile(tenantCode,'server-state.json'),JSON.stringify({...st,customers:list,updatedAt:new Date().toISOString()},null,2));json(res,200,{...next,totalCustomers:list.length})
   }catch(e){json(res,400,{error:'잘못된 요청'})}})
  }
  let p=u.pathname==='/'?'/index.html':u.pathname;
