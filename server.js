@@ -1,8 +1,11 @@
 const http=require('http'),fs=require('fs'),path=require('path'),url=require('url'),crypto=require('crypto'),XLSX=require('xlsx');
-const sseClients=new Set();
-function broadcastCustomers(list){
+const sseClients=new Map();
+function broadcastCustomers(list,tenantCode){
  const payload=`event: customers\ndata: ${JSON.stringify(list)}\n\n`;
- for(const res of [...sseClients]){try{res.write(payload)}catch(e){sseClients.delete(res)}}
+ for(const [res,code] of [...sseClients.entries()]){
+  if(tenantCode&&code!==tenantCode)continue;
+  try{res.write(payload)}catch(e){sseClients.delete(res)}
+ }
 }
 const ROOT=__dirname;
 // Render Persistent Disk mount path. DATA_DIR can be overridden for local tests.
@@ -232,7 +235,7 @@ function selectedTenantCode(req){
 function assertTenantAccess(req,requested){const user=currentUser(req);if(!user)throw new Error('로그인이 필요합니다.');const code=String(requested||selectedTenantCode(req)||'');if(user.role!=='superadmin'&&code!==user.code)throw new Error('다른 거래처 데이터에는 접근할 수 없습니다.');return code}
 function tenantReadCustomers(code){return readJsonObject(tenantFile(code,'customers.json'),[])}
 function tenantReadState(code){return readJsonObject(tenantFile(code,'server-state.json'),{orders:[],customers:tenantReadCustomers(code),payments:[],settings:{},csRecords:[],shippingRecords:[]})}
-function tenantWriteCustomers(code,list){if(!Array.isArray(list))throw new Error('고객 데이터 형식 오류');const file=tenantFile(code,'customers.json'),backup=tenantFile(code,'customers-backup.json'),dir=tenantBackupDir(code,'backups');const old=tenantReadCustomers(code),stamp=new Date().toISOString().replace(/[:.]/g,'-');atomicWrite(backup,JSON.stringify(old,null,2));atomicWrite(path.join(dir,`customers-${stamp}.json`),JSON.stringify(old,null,2));atomicWrite(file,JSON.stringify(list,null,2));}
+function tenantWriteCustomers(code,list){if(!Array.isArray(list))throw new Error('고객 데이터 형식 오류');const file=tenantFile(code,'customers.json'),backup=tenantFile(code,'customers-backup.json'),dir=tenantBackupDir(code,'backups');const old=tenantReadCustomers(code),stamp=new Date().toISOString().replace(/[:.]/g,'-');atomicWrite(backup,JSON.stringify(old,null,2));atomicWrite(path.join(dir,`customers-${stamp}.json`),JSON.stringify(old,null,2));atomicWrite(file,JSON.stringify(list,null,2));broadcastCustomers(list,code);}
 function tenantWriteState(code,patch){const old=tenantReadState(code),next={...old,...patch,customers:Array.isArray(patch.customers)?patch.customers:tenantReadCustomers(code),updatedAt:new Date().toISOString()};const backup=tenantFile(code,'server-state-backup.json'),dir=tenantBackupDir(code,'state-backups');atomicWrite(backup,JSON.stringify(old,null,2));atomicWrite(path.join(dir,`state-${new Date().toISOString().replace(/[:.]/g,'-')}.json`),JSON.stringify(old,null,2));atomicWrite(tenantFile(code,'server-state.json'),JSON.stringify(next,null,2));if(Array.isArray(next.customers))tenantWriteCustomers(code,next.customers);return next}
 function tenantReadIntegrations(code){return readJsonObject(tenantFile(code,'solapi-settings.json'),{})}
 function tenantSaveIntegrations(code,v){atomicWrite(tenantFile(code,'solapi-settings.json'),JSON.stringify(v,null,2))}
@@ -652,7 +655,7 @@ const server=http.createServer((req,res)=>{
    'X-Accel-Buffering':'no'
   });
   res.write(`event: customers\ndata: ${JSON.stringify(tenantReadCustomers(tenantCode))}\n\n`);
-  sseClients.add(res);
+  sseClients.set(res,tenantCode);
   const keep=setInterval(()=>{try{res.write(': keepalive\n\n')}catch(e){}},15000);
   req.on('close',()=>{clearInterval(keep);sseClients.delete(res)});
   return;
