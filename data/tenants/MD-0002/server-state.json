@@ -1,0 +1,20 @@
+{
+  "orders": [],
+  "customers": [],
+  "payments": [],
+  "settings": {
+    "company": "MD유통",
+    "platform": "TikTok",
+    "bank": "",
+    "holder": "",
+    "account": "",
+    "contact": "",
+    "kakaoChannelName": "",
+    "kakaoChannelUrl": "",
+    "messageLink": ""
+  },
+  "csRecords": [],
+  "shippingRecords": [],
+  "paymentOverrides": {},
+  "shippingScans": []
+}

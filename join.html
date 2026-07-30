@@ -89,7 +89,13 @@ function findAddress(){
    alert('주소검색 실행 중 오류가 발생했습니다. 기본주소를 직접 입력해 주세요.');
  }
 }
-const CUSTOMER_TENANT=(new URLSearchParams(location.search).get('tenant')||'FIRST-0001').trim();
+const CUSTOMER_TENANT=(new URLSearchParams(location.search).get('tenant')||'FIRST-0001').trim().toUpperCase();
+const CUSTOMER_BRAND=CUSTOMER_TENANT==='MD-0002'?'MD유통':'FIRST OMS';
+document.title=CUSTOMER_BRAND+' 고객정보 등록';
+window.addEventListener('DOMContentLoaded',()=>{
+ document.querySelectorAll('h1,h2').forEach((e,i)=>{if(i===0)e.textContent=CUSTOMER_BRAND+' 고객정보 등록'});
+ const brand=document.querySelector('.brand,.logo');if(brand)brand.textContent=CUSTOMER_BRAND;
+});
 async function submitJoin(){
  const data={name:el('name').value.trim(),nickname:el('nickname').value.trim(),phone:el('phone').value.trim(),postalCode:el('postalCode').value.trim(),address:el('address').value.trim(),detailAddress:el('detailAddress').value.trim(),memo:el('memo').value.trim(),joinedAt:new Date().toLocaleString('ko-KR'),source:'가입폼'};
  if(!data.name||!data.nickname||!data.phone||!data.address)return alert('성함, 닉네임, 연락처, 기본주소를 모두 입력해 주세요.');

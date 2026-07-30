@@ -223,6 +223,23 @@ function ensureDdaengTenantAccount(){
  return tenant;
 }
 ensureDdaengTenantAccount();
+// v7.34: 두 번째 거래처 MD유통. 기존 계정/비밀번호/데이터가 있으면 절대 덮어쓰지 않는다.
+const MD_TENANT_CODE=process.env.MD_TENANT_CODE||'MD-0002';
+function ensureMdTenantAccount(){
+ let list=readAccounts(),changed=false,tenant=list.find(a=>a.code===MD_TENANT_CODE||String(a.company||'').trim()==='MD유통');
+ if(!tenant){
+  tenant={id:crypto.randomUUID(),code:MD_TENANT_CODE,username:process.env.MD_TENANT_USERNAME||'md0002',passwordHash:passwordHash(process.env.MD_TENANT_PASSWORD||'MD@0002!'),company:'MD유통',ownerName:'MD유통',phone:'',role:'tenant',status:'active',mustChangePassword:true,createdAt:new Date().toISOString(),bootstrapVersion:'7.34'};
+  list.push(tenant);changed=true;
+ }else{
+  if(!tenant.code){tenant.code=MD_TENANT_CODE;changed=true}
+  if(!tenant.company){tenant.company='MD유통';changed=true}
+  if(tenant.role!=='tenant'){tenant.role='tenant';changed=true}
+  if(!tenant.status){tenant.status='active';changed=true}
+ }
+ if(changed)saveAccounts(list);else ensureTenantStorage(tenant);
+ return tenant;
+}
+ensureMdTenantAccount();
 function tenantFile(code,name){ensureTenantStorage({code});return path.join(tenantDir(code),name)}
 function tenantBackupDir(code,name){const d=path.join(tenantDir(code),name);fs.mkdirSync(d,{recursive:true});return d}
 function readJsonObject(file,fallback){try{const v=JSON.parse(fs.readFileSync(file,'utf8'));return v&&typeof v==='object'?v:fallback}catch(e){return fallback}}
@@ -274,10 +291,10 @@ function restoreDdaengCustomersAndSeparateSolapiOnce(){
   if(current.length===0)tenantWriteCustomers(tenant.code,sourceCustomers);
   const st=tenantReadState(tenant.code);if(!Array.isArray(st.customers)||st.customers.length===0){st.customers=sourceCustomers;tenantWriteState(tenant.code,st)}
  }
- // 과거 버전에서 주인님 솔라피가 땡라이브로 복사됐을 수 있으므로 1회 백업 후 빈 설정으로 분리한다.
+ // v7.34: 기존 거래처의 솔라피/카카오 설정은 절대 비우거나 덮어쓰지 않는다.
  const solapiFile=tenantFile(tenant.code,'solapi-settings.json');
- const old=readJsonObject(solapiFile,{});if(Object.keys(old).length){atomicWrite(tenantFile(tenant.code,'solapi-settings-before-v78-backup.json'),JSON.stringify(old,null,2))}
- atomicWrite(solapiFile,'{}');
+ const old=readJsonObject(solapiFile,{});
+ if(Object.keys(old).length){atomicWrite(tenantFile(tenant.code,'solapi-settings-preserved-v734.json'),JSON.stringify(old,null,2))}
  atomicWrite(path.join(tenantDir(tenant.code),'tenant-settings.json'),JSON.stringify({company:'땡라이브',tenantCode:tenant.code,customersRestoredAt:new Date().toISOString(),solapiMode:'tenant-own-setting'},null,2));
  atomicWrite(marker,JSON.stringify({tenantCode:tenant.code,customerCount:sourceCustomers.length,at:new Date().toISOString()},null,2));
 }
