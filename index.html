@@ -983,6 +983,9 @@ main{padding-top:18px}
 </style>
 
 
+
+
+
 </body></html>`);w.document.close();w.print();
 }
 const paymentAliases={payer:['입금자','입금자명','보낸분','거래내용','내용','적요','성명'],amount:['입금액','금액','거래금액','입금'],date:['거래일시','거래일','날짜','시간']};
@@ -1683,5 +1686,68 @@ tr:hover td{background:#f6f7f9!important;color:inherit!important}.exact-receipt 
 })();
 </script>
 <!-- V736_RECEIPT_PATCH_END -->
+<!-- V738_ONLY_RECEIPT_TEMPLATE1_PATCH_START -->
+<style id="v738-template1-only-style">
+.exact-receipt{width:794px!important;max-width:794px!important;min-height:1123px!important;height:1123px!important;overflow:hidden!important;box-sizing:border-box!important;background:#fff!important;color:#111!important}
+.exact-receipt *{box-sizing:border-box}
+.exact-receipt .er-items tbody,.exact-receipt .er-items tr,.exact-receipt .er-items td{background:#fff!important;color:#111!important}
+.exact-receipt .er-items thead th{background:#191919!important;color:#fff!important}
+@media print{html,body{margin:0!important;padding:0!important;background:#fff!important}.receipt-sheet{display:none!important}.exact-receipt{width:210mm!important;max-width:210mm!important;height:297mm!important;min-height:297mm!important;padding:12mm!important;box-shadow:none!important;margin:0!important;overflow:hidden!important}@page{size:A4 portrait;margin:0}}
+</style>
+<script id="v738-template1-only-script">
+(function(){
+ function template1ReceiptHTML(r,i){
+  const c=r.customer||{},status=r.payment?.status||'unpaid',paid=v722PaidAmount(r),diff=paid-(Number(r.total)||0);
+  const notice=state.settings?.paymentNotice||'일요일 12시까지 입금 요망\n입금자명은 주문자명과 동일하게 부탁드립니다.';
+  const orderNo=String(r.date||'').replaceAll('-','')+'-'+String((i||0)+1).padStart(3,'0');
+  const items=Array.isArray(r.items)?r.items:[];
+  return `<article class="exact-receipt" data-key="${esc(r.key)}">
+   <div class="er-top"><div class="er-brand">땡라이브 × FIRST OMS</div><div class="er-title">정산서</div><div class="er-order"><div><b>주문일</b><span>${esc(r.date)}</span></div><div><b>주문번호</b><span>${esc(orderNo)}</span></div></div></div>
+   <div class="er-customer-title"><strong>${esc(r.nick)}님 정산서</strong><div><span class="payment-pill ${v722StatusClass(status)}">${v722StatusText(status)}</span> <span class="er-page-no">정산서 ${Number(i||0)+1}</span></div></div>
+   <dl class="er-info"><dt>고객명</dt><dd class="name">${esc(c.name||r.nick)}</dd><dt>배송지</dt><dd>${esc([c.postalCode,c.address,c.detailAddress].filter(Boolean).join(' ')||'주소 미등록')}</dd><dt>연락처</dt><dd>${esc(c.phone||'연락처 미등록')}</dd><dt>메모</dt><dd>${esc(c.memo||'')}</dd></dl>
+   <table class="er-items"><colgroup><col style="width:10%"><col style="width:44%"><col style="width:12%"><col style="width:17%"><col style="width:17%"></colgroup><thead><tr><th>번호</th><th>상품명</th><th>수량</th><th>단가</th><th>금액</th></tr></thead><tbody>${items.map((x,n)=>`<tr><td>${n+1}</td><td>${esc(x.item)}</td><td>${Number(x.qty)||0}</td><td>${money(x.unit)}</td><td>${money(x.amount)}</td></tr>`).join('')}</tbody></table>
+   <div class="er-sum"><div class="er-sum-row"><span>상품합계</span><b>${money(r.subtotal)}</b></div><div class="er-sum-row"><span>배송비</span><b>${money(r.fee)}</b></div>${status==='amount-mismatch'?`<div class="er-sum-row"><span>실제 입금액</span><b>${money(paid)}</b></div><div class="er-sum-row"><span>${diff<0?'부족금액':'초과입금'}</span><b>${money(Math.abs(diff))}</b></div>`:''}</div>
+   <div class="er-grand"><span>총 결제금액</span><b>${money(r.total)}</b></div>
+   <div class="er-notice">${esc(notice)}</div>
+   <div class="er-bank"><b>입금계좌</b><div><strong>${esc(state.settings?.bank||'은행 미설정')} ${esc(state.settings?.account||'계좌번호 미설정')}</strong><br>예금주 ${esc(state.settings?.holder||'미설정')}</div></div>
+   <div class="er-bottom"><div class="er-cs"><b>고객센터</b><br>${esc(state.settings?.contact||'문의는 거래처 고객센터로 부탁드립니다.')}<br><br>주문해 주셔서 감사합니다.</div><div class="er-qr">카카오채널<br>QR</div></div>
+   <div class="er-footer">땡라이브 · FIRST OMS</div>
+  </article>`;
+ }
+ window.v738Template1ReceiptHTML=template1ReceiptHTML;
+ window.receiptHTML=template1ReceiptHTML;
+ window.openReceiptDetail=async function(key){
+  const r=receiptByKey(key);if(!r)return alert('정산서를 찾을 수 없습니다.');
+  let modal=document.getElementById('receiptDetailModal');
+  if(!modal){modal=document.createElement('div');modal.id='receiptDetailModal';modal.className='receipt-detail-modal';modal.innerHTML='<div class="receipt-detail-box"><div class="receipt-detail-actions no-print"><button class="btn" id="detailNoticeBtn">입금안내 문구 수정</button><button class="btn warn" id="detailEditBtn">정산서 수정</button><button class="btn secondary" id="detailPrintBtn">인쇄</button><button class="btn bad" onclick="closeReceiptDetail()">닫기</button></div><div id="receiptDetailBody"></div></div>';document.body.appendChild(modal);modal.addEventListener('click',e=>{if(e.target===modal)closeReceiptDetail()});}
+  modal.classList.add('show');
+  document.getElementById('receiptDetailBody').innerHTML=template1ReceiptHTML(r,indexOfReceiptKey(key));
+  document.getElementById('detailEditBtn').onclick=()=>openReceiptEditByKey(key);
+  document.getElementById('detailPrintBtn').onclick=()=>window.print();
+  document.getElementById('detailNoticeBtn').onclick=()=>{const v=prompt('이 거래처 정산서에 표시할 입금 안내 문구를 입력하세요.',state.settings?.paymentNotice||'일요일 12시까지 입금 요망\n입금자명은 주문자명과 동일하게 부탁드립니다.');if(v===null)return;state.settings.paymentNotice=v;saveSilently();document.getElementById('receiptDetailBody').innerHTML=template1ReceiptHTML(r,indexOfReceiptKey(key));};
+ };
+ window.printOne=function(i){
+  const r=getReceipts()[i];if(!r)return;
+  const css1=document.getElementById('v722-exact-ui')?.outerHTML||'';
+  const css2=document.getElementById('v738-template1-only-style')?.outerHTML||'';
+  const w=window.open('','_blank');w.document.write('<!doctype html><html><head><meta charset="utf-8"><title>정산서</title>'+css1+css2+'</head><body>'+template1ReceiptHTML(r,i)+'<script>window.onload=()=>setTimeout(()=>window.print(),350)<\\/script></body></html>');w.document.close();
+ };
+ // 문자 전송 이미지는 화면과 같은 1번 정산서로 생성합니다.
+ window.receiptImageBase64=async function(r){
+  const host=document.createElement('div');host.style.cssText='position:fixed;left:-10000px;top:0;width:794px;background:#fff;z-index:-1';host.innerHTML=template1ReceiptHTML(r,indexOfReceiptKey(r.key));document.body.appendChild(host);
+  try{
+   const sheet=host.firstElementChild;await new Promise(res=>setTimeout(res,50));
+   const css=(document.getElementById('v722-exact-ui')?.textContent||'')+(document.getElementById('v738-template1-only-style')?.textContent||'');
+   const html=new XMLSerializer().serializeToString(sheet);
+   const svg=`<svg xmlns="http://www.w3.org/2000/svg" width="794" height="1123"><foreignObject width="100%" height="100%"><div xmlns="http://www.w3.org/1999/xhtml"><style>${css}</style>${html}</div></foreignObject></svg>`;
+   const blob=new Blob([svg],{type:'image/svg+xml;charset=utf-8'}),url=URL.createObjectURL(blob),img=new Image();
+   await new Promise((resolve,reject)=>{img.onload=resolve;img.onerror=reject;img.src=url});
+   const canvas=document.createElement('canvas');canvas.width=794;canvas.height=1123;const ctx=canvas.getContext('2d');ctx.fillStyle='#fff';ctx.fillRect(0,0,794,1123);ctx.drawImage(img,0,0,794,1123);URL.revokeObjectURL(url);
+   let q=.86,data=canvas.toDataURL('image/jpeg',q);while(data.length>290000&&q>.42){q-=.07;data=canvas.toDataURL('image/jpeg',q)}return data.split(',')[1];
+  }finally{host.remove()}
+ };
+})();
+</script>
+<!-- V738_ONLY_RECEIPT_TEMPLATE1_PATCH_END -->
 </body>
 </html>
