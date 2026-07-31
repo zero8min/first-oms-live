@@ -318,7 +318,7 @@ main{padding-top:18px}
       </div>
     </div>
     <div class="form-grid card">
-      <div><label>출력 대상</label><select id="shippingFilter" onchange="renderShipping()"><option value="paid">입금완료만</option><option value="all">전체 정산서</option></select></div>
+      <div><label>출력 대상</label><select id="shippingFilter" onchange="renderShipping()"><option value="paid">입금완료만</option><option value="unpaid">미입금자만</option><option value="amount-mismatch">금액불일치만</option><option value="all">전체 정산서</option></select></div>
       <div><label>합배송 기준</label><select id="bundleMode" onchange="renderShipping()"><option value="date">방송일자별 분리</option><option value="customer">고객별 합배송</option></select></div>
     </div>
     <div class="card no-print v723-courier-panel">
@@ -986,6 +986,83 @@ main{padding-top:18px}
 
 
 
+
+<script id="v740-print-only-safe-fix">
+(function(){
+  'use strict';
+  // 출력 관련 기능만 교체합니다. 대시보드·고객폼·문자 API·저장 로직은 변경하지 않습니다.
+  function esc740(v){return String(v??'').replace(/[&<>"']/g,s=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[s]));}
+  function money740(v){return (Number(v)||0).toLocaleString('ko-KR')+'원';}
+  function currentShippingRows740(){
+    const filter=document.getElementById('shippingFilter')?.value||'all';
+    const bundle=document.getElementById('bundleMode')?.value||'customer';
+    let rs=(typeof getReceipts==='function'?getReceipts():[]);
+    if(filter!=='all') rs=rs.filter(r=>(r.payment?.status||'unpaid')===filter);
+    const groups=new Map();
+    rs.forEach(r=>{
+      const key=bundle==='customer'?(r.customer?.id||r.nick):r.key;
+      if(!groups.has(key)) groups.set(key,{name:r.customer?.name||'',nick:r.nick||'',phone:r.customer?.phone||'',address:[r.customer?.postalCode,r.customer?.address,r.customer?.detailAddress].filter(Boolean).join(' '),memo:r.customer?.memo||'',dates:new Set(),items:[],subtotal:0,fee:0,total:0,status:r.payment?.status||'unpaid'});
+      const g=groups.get(key);g.dates.add(r.date);g.items.push(...(r.items||[]));g.subtotal+=Number(r.subtotal)||0;g.fee+=Number(r.fee)||0;g.total+=Number(r.total)||0;
+    });
+    return [...groups.values()].map(g=>({...g,code:typeof shippingCodeFor==='function'?shippingCodeFor(g):''}));
+  }
+  window.renderShipping=(function(original){return function(){
+    const sel=document.getElementById('shippingFilter');
+    if(sel && !sel.querySelector('option[value="unpaid"]')){
+      sel.insertAdjacentHTML('beforeend','<option value="unpaid">미입금자만</option><option value="amount-mismatch">금액불일치만</option>');
+    }
+    if(typeof original==='function') original();
+    window.currentShipping=currentShippingRows740();
+  }})(window.renderShipping);
+
+  window.printShipping=function(){
+    const arr=currentShippingRows740();
+    if(!arr.length){alert('선택한 조건에 출력할 택배 대상이 없습니다.');return;}
+    const pages=arr.map((g,i)=>{
+      const tracking=(window.state?.shippingScans?.[g.code]?.trackingNumber)||'';
+      return `<section class="ship-page"><header><div class="identity"><div class="brand">땡라이브 × FIRST OMS</div><h1>${esc740(g.nick||'닉네임 미등록')}</h1><h2>${esc740(g.name||'이름 미등록')}</h2></div><div id="shipqr-${i}" class="qr"></div></header>
+      <div class="info"><div><b>연락처</b><span>${esc740(g.phone||'-')}</span></div><div><b>방송일</b><span>${esc740([...g.dates].join(', '))}</span></div><div class="wide"><b>배송지</b><span>${esc740(g.address||'-')}</span></div><div class="wide"><b>배송메모</b><span>${esc740(g.memo||'-')}</span></div><div><b>송장번호</b><span>${esc740(tracking||'')}</span></div><div><b>택배코드</b><span>${esc740(g.code||'')}</span></div></div>
+      <table><thead><tr><th>번호</th><th>상품명</th><th>수량</th><th>단가</th><th>금액</th><th>확인</th></tr></thead><tbody>${g.items.map((x,j)=>`<tr><td>${esc740(x.number||j+1)}</td><td>${esc740(x.item||'')}</td><td>${Number(x.qty)||0}</td><td>${money740(x.unit)}</td><td>${money740(x.amount)}</td><td>□</td></tr>`).join('')}</tbody></table>
+      <div class="totals"><div><span>상품합계</span><b>${money740(g.subtotal)}</b></div><div><span>택배비</span><b>${money740(g.fee)}</b></div><div class="grand"><span>총 결제금액</span><b>${money740(g.total)}</b></div></div>
+      <footer>QR을 휴대폰 기본 카메라로 촬영하면 고객별 포장리스트가 열립니다.</footer></section>`;
+    }).join('');
+    const qrData=JSON.stringify(arr.map(g=>({url:location.origin+'/packing.html?code='+encodeURIComponent(g.code)})));
+    const w=window.open('','_blank'); if(!w){alert('팝업이 차단되었습니다. 팝업 허용 후 다시 눌러주세요.');return;}
+    w.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>택배리스트 전체 출력</title><script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"><\/script><style>
+    *{box-sizing:border-box}body{margin:0;font-family:Arial,'Noto Sans KR',sans-serif;color:#111;background:#fff}.ship-page{width:210mm;min-height:297mm;padding:12mm 13mm;page-break-after:always;position:relative}.ship-page:last-child{page-break-after:auto}header{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:3px solid #111;padding-bottom:10px}.brand{font-weight:900;font-size:15px}.identity h1{font-size:34px;margin:12px 0 2px;line-height:1}.identity h2{font-size:25px;margin:5px 0}.qr img,.qr canvas{width:115px!important;height:115px!important}.info{display:grid;grid-template-columns:1fr 1fr;border:1px solid #555;margin:14px 0}.info>div{display:grid;grid-template-columns:92px 1fr;border-bottom:1px solid #888}.info>div:nth-last-child(-n+2){border-bottom:0}.info .wide{grid-column:1/-1}.info b,.info span{padding:9px;border-right:1px solid #888}.info span{border-right:0;word-break:break-all}table{width:100%;border-collapse:collapse;table-layout:fixed}th,td{border:1px solid #666;padding:8px 6px;text-align:center;font-size:13px}th{background:#eee;-webkit-print-color-adjust:exact;print-color-adjust:exact}th:nth-child(2),td:nth-child(2){text-align:left;width:39%}.totals{width:360px;margin:15px 0 0 auto;border:2px solid #111}.totals>div{display:flex;justify-content:space-between;padding:8px 12px;border-bottom:1px solid #777}.totals>div:last-child{border-bottom:0}.grand{font-size:21px}footer{position:absolute;bottom:9mm;left:13mm;right:13mm;text-align:center;font-size:12px;color:#555}@page{size:A4 portrait;margin:0}@media print{body{background:#fff}}
+    </style></head><body>${pages}<script>const data=${qrData};window.onload=()=>{data.forEach((x,i)=>{if(window.QRCode)new QRCode(document.getElementById('shipqr-'+i),{text:x.url,width:180,height:180});});setTimeout(()=>window.print(),900)};<\/script></body></html>`);w.document.close();
+  };
+
+  window.printAllReceiptsExact=function(mode='all'){
+    let rs=(typeof filteredReceipts==='function'?filteredReceipts():(typeof getReceipts==='function'?getReceipts():[]));
+    if(mode==='unpaid') rs=rs.filter(r=>(r.payment?.status||'unpaid')==='unpaid');
+    if(!rs.length){alert('출력할 정산서가 없습니다.');return;}
+    const parts=[];
+    rs.forEach(r=>{
+      const chunks=[]; const items=r.items||[]; for(let i=0;i<items.length;i+=10) chunks.push(items.slice(i,i+10)); if(!chunks.length)chunks.push([]);
+      chunks.forEach((items,pageIndex)=>{
+        const copy={...r,items,subtotal:items.reduce((a,x)=>a+(Number(x.amount)||0),0),fee:pageIndex===chunks.length-1?r.fee:0,total:pageIndex===chunks.length-1?r.total:items.reduce((a,x)=>a+(Number(x.amount)||0),0)};
+        let html=typeof receiptHTML==='function'?receiptHTML(copy,indexOfReceiptKey(r.key)):'';
+        html=html.replace(new RegExp(esc740(r.nick)+'님 정산서','g'),esc740(r.nick)+'님 정산서 '+(pageIndex+1));
+        html=html.replace(/정산서\s+\d+(?=<\/|<|\s)/g,'정산서 '+(pageIndex+1));
+        parts.push(`<div class="receipt-print-page">${html}</div>`);
+      });
+    });
+    const styles=[...document.querySelectorAll('head style')].map(s=>s.outerHTML).join('');
+    const w=window.open('','_blank'); if(!w){alert('팝업이 차단되었습니다.');return;}
+    w.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>정산서 전체 출력</title>${styles}<style>body{background:#fff!important;margin:0!important}.receipt-print-page{width:210mm;min-height:297mm;page-break-after:always;background:#fff}.receipt-print-page:last-child{page-break-after:auto}.no-print,.receipt-detail-actions,button{display:none!important}.exact-receipt{margin:0!important;box-shadow:none!important}@page{size:A4 portrait;margin:0}</style></head><body>${parts.join('')}<script>window.onload=()=>setTimeout(()=>window.print(),500)<\/script></body></html>`);w.document.close();
+  };
+  document.addEventListener('DOMContentLoaded',()=>{
+    const allBtn=[...document.querySelectorAll('#receipts button')].find(b=>b.textContent.includes('전체 정산서 인쇄'));
+    if(allBtn) allBtn.onclick=()=>window.printAllReceiptsExact('all');
+    const actions=document.querySelector('#payments .section-title .actions');
+    if(actions && !document.getElementById('printUnpaidReceiptsBtn')){
+      const b=document.createElement('button');b.id='printUnpaidReceiptsBtn';b.className='btn secondary';b.textContent='미입금자 정산서 전체 출력';b.onclick=()=>window.printAllReceiptsExact('unpaid');actions.appendChild(b);
+    }
+  });
+})();
+</script>
+
 </body></html>`);w.document.close();w.print();
 }
 const paymentAliases={payer:['입금자','입금자명','보낸분','거래내용','내용','적요','성명'],amount:['입금액','금액','거래금액','입금'],date:['거래일시','거래일','날짜','시간']};
@@ -1157,6 +1234,83 @@ function printShipping(){renderShipping();const arr=window.currentShipping||[];i
 }
 </style>
 
+
+
+<script id="v740-print-only-safe-fix">
+(function(){
+  'use strict';
+  // 출력 관련 기능만 교체합니다. 대시보드·고객폼·문자 API·저장 로직은 변경하지 않습니다.
+  function esc740(v){return String(v??'').replace(/[&<>"']/g,s=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[s]));}
+  function money740(v){return (Number(v)||0).toLocaleString('ko-KR')+'원';}
+  function currentShippingRows740(){
+    const filter=document.getElementById('shippingFilter')?.value||'all';
+    const bundle=document.getElementById('bundleMode')?.value||'customer';
+    let rs=(typeof getReceipts==='function'?getReceipts():[]);
+    if(filter!=='all') rs=rs.filter(r=>(r.payment?.status||'unpaid')===filter);
+    const groups=new Map();
+    rs.forEach(r=>{
+      const key=bundle==='customer'?(r.customer?.id||r.nick):r.key;
+      if(!groups.has(key)) groups.set(key,{name:r.customer?.name||'',nick:r.nick||'',phone:r.customer?.phone||'',address:[r.customer?.postalCode,r.customer?.address,r.customer?.detailAddress].filter(Boolean).join(' '),memo:r.customer?.memo||'',dates:new Set(),items:[],subtotal:0,fee:0,total:0,status:r.payment?.status||'unpaid'});
+      const g=groups.get(key);g.dates.add(r.date);g.items.push(...(r.items||[]));g.subtotal+=Number(r.subtotal)||0;g.fee+=Number(r.fee)||0;g.total+=Number(r.total)||0;
+    });
+    return [...groups.values()].map(g=>({...g,code:typeof shippingCodeFor==='function'?shippingCodeFor(g):''}));
+  }
+  window.renderShipping=(function(original){return function(){
+    const sel=document.getElementById('shippingFilter');
+    if(sel && !sel.querySelector('option[value="unpaid"]')){
+      sel.insertAdjacentHTML('beforeend','<option value="unpaid">미입금자만</option><option value="amount-mismatch">금액불일치만</option>');
+    }
+    if(typeof original==='function') original();
+    window.currentShipping=currentShippingRows740();
+  }})(window.renderShipping);
+
+  window.printShipping=function(){
+    const arr=currentShippingRows740();
+    if(!arr.length){alert('선택한 조건에 출력할 택배 대상이 없습니다.');return;}
+    const pages=arr.map((g,i)=>{
+      const tracking=(window.state?.shippingScans?.[g.code]?.trackingNumber)||'';
+      return `<section class="ship-page"><header><div class="identity"><div class="brand">땡라이브 × FIRST OMS</div><h1>${esc740(g.nick||'닉네임 미등록')}</h1><h2>${esc740(g.name||'이름 미등록')}</h2></div><div id="shipqr-${i}" class="qr"></div></header>
+      <div class="info"><div><b>연락처</b><span>${esc740(g.phone||'-')}</span></div><div><b>방송일</b><span>${esc740([...g.dates].join(', '))}</span></div><div class="wide"><b>배송지</b><span>${esc740(g.address||'-')}</span></div><div class="wide"><b>배송메모</b><span>${esc740(g.memo||'-')}</span></div><div><b>송장번호</b><span>${esc740(tracking||'')}</span></div><div><b>택배코드</b><span>${esc740(g.code||'')}</span></div></div>
+      <table><thead><tr><th>번호</th><th>상품명</th><th>수량</th><th>단가</th><th>금액</th><th>확인</th></tr></thead><tbody>${g.items.map((x,j)=>`<tr><td>${esc740(x.number||j+1)}</td><td>${esc740(x.item||'')}</td><td>${Number(x.qty)||0}</td><td>${money740(x.unit)}</td><td>${money740(x.amount)}</td><td>□</td></tr>`).join('')}</tbody></table>
+      <div class="totals"><div><span>상품합계</span><b>${money740(g.subtotal)}</b></div><div><span>택배비</span><b>${money740(g.fee)}</b></div><div class="grand"><span>총 결제금액</span><b>${money740(g.total)}</b></div></div>
+      <footer>QR을 휴대폰 기본 카메라로 촬영하면 고객별 포장리스트가 열립니다.</footer></section>`;
+    }).join('');
+    const qrData=JSON.stringify(arr.map(g=>({url:location.origin+'/packing.html?code='+encodeURIComponent(g.code)})));
+    const w=window.open('','_blank'); if(!w){alert('팝업이 차단되었습니다. 팝업 허용 후 다시 눌러주세요.');return;}
+    w.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>택배리스트 전체 출력</title><script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"><\/script><style>
+    *{box-sizing:border-box}body{margin:0;font-family:Arial,'Noto Sans KR',sans-serif;color:#111;background:#fff}.ship-page{width:210mm;min-height:297mm;padding:12mm 13mm;page-break-after:always;position:relative}.ship-page:last-child{page-break-after:auto}header{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:3px solid #111;padding-bottom:10px}.brand{font-weight:900;font-size:15px}.identity h1{font-size:34px;margin:12px 0 2px;line-height:1}.identity h2{font-size:25px;margin:5px 0}.qr img,.qr canvas{width:115px!important;height:115px!important}.info{display:grid;grid-template-columns:1fr 1fr;border:1px solid #555;margin:14px 0}.info>div{display:grid;grid-template-columns:92px 1fr;border-bottom:1px solid #888}.info>div:nth-last-child(-n+2){border-bottom:0}.info .wide{grid-column:1/-1}.info b,.info span{padding:9px;border-right:1px solid #888}.info span{border-right:0;word-break:break-all}table{width:100%;border-collapse:collapse;table-layout:fixed}th,td{border:1px solid #666;padding:8px 6px;text-align:center;font-size:13px}th{background:#eee;-webkit-print-color-adjust:exact;print-color-adjust:exact}th:nth-child(2),td:nth-child(2){text-align:left;width:39%}.totals{width:360px;margin:15px 0 0 auto;border:2px solid #111}.totals>div{display:flex;justify-content:space-between;padding:8px 12px;border-bottom:1px solid #777}.totals>div:last-child{border-bottom:0}.grand{font-size:21px}footer{position:absolute;bottom:9mm;left:13mm;right:13mm;text-align:center;font-size:12px;color:#555}@page{size:A4 portrait;margin:0}@media print{body{background:#fff}}
+    </style></head><body>${pages}<script>const data=${qrData};window.onload=()=>{data.forEach((x,i)=>{if(window.QRCode)new QRCode(document.getElementById('shipqr-'+i),{text:x.url,width:180,height:180});});setTimeout(()=>window.print(),900)};<\/script></body></html>`);w.document.close();
+  };
+
+  window.printAllReceiptsExact=function(mode='all'){
+    let rs=(typeof filteredReceipts==='function'?filteredReceipts():(typeof getReceipts==='function'?getReceipts():[]));
+    if(mode==='unpaid') rs=rs.filter(r=>(r.payment?.status||'unpaid')==='unpaid');
+    if(!rs.length){alert('출력할 정산서가 없습니다.');return;}
+    const parts=[];
+    rs.forEach(r=>{
+      const chunks=[]; const items=r.items||[]; for(let i=0;i<items.length;i+=10) chunks.push(items.slice(i,i+10)); if(!chunks.length)chunks.push([]);
+      chunks.forEach((items,pageIndex)=>{
+        const copy={...r,items,subtotal:items.reduce((a,x)=>a+(Number(x.amount)||0),0),fee:pageIndex===chunks.length-1?r.fee:0,total:pageIndex===chunks.length-1?r.total:items.reduce((a,x)=>a+(Number(x.amount)||0),0)};
+        let html=typeof receiptHTML==='function'?receiptHTML(copy,indexOfReceiptKey(r.key)):'';
+        html=html.replace(new RegExp(esc740(r.nick)+'님 정산서','g'),esc740(r.nick)+'님 정산서 '+(pageIndex+1));
+        html=html.replace(/정산서\s+\d+(?=<\/|<|\s)/g,'정산서 '+(pageIndex+1));
+        parts.push(`<div class="receipt-print-page">${html}</div>`);
+      });
+    });
+    const styles=[...document.querySelectorAll('head style')].map(s=>s.outerHTML).join('');
+    const w=window.open('','_blank'); if(!w){alert('팝업이 차단되었습니다.');return;}
+    w.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>정산서 전체 출력</title>${styles}<style>body{background:#fff!important;margin:0!important}.receipt-print-page{width:210mm;min-height:297mm;page-break-after:always;background:#fff}.receipt-print-page:last-child{page-break-after:auto}.no-print,.receipt-detail-actions,button{display:none!important}.exact-receipt{margin:0!important;box-shadow:none!important}@page{size:A4 portrait;margin:0}</style></head><body>${parts.join('')}<script>window.onload=()=>setTimeout(()=>window.print(),500)<\/script></body></html>`);w.document.close();
+  };
+  document.addEventListener('DOMContentLoaded',()=>{
+    const allBtn=[...document.querySelectorAll('#receipts button')].find(b=>b.textContent.includes('전체 정산서 인쇄'));
+    if(allBtn) allBtn.onclick=()=>window.printAllReceiptsExact('all');
+    const actions=document.querySelector('#payments .section-title .actions');
+    if(actions && !document.getElementById('printUnpaidReceiptsBtn')){
+      const b=document.createElement('button');b.id='printUnpaidReceiptsBtn';b.className='btn secondary';b.textContent='미입금자 정산서 전체 출력';b.onclick=()=>window.printAllReceiptsExact('unpaid');actions.appendChild(b);
+    }
+  });
+})();
+</script>
 
 </body></html>`);w.document.close()}
 function downloadReceiptList(){
@@ -1530,6 +1684,83 @@ tr:hover td{background:#f6f7f9!important;color:inherit!important}.exact-receipt 
 </style>
 
 
+
+<script id="v740-print-only-safe-fix">
+(function(){
+  'use strict';
+  // 출력 관련 기능만 교체합니다. 대시보드·고객폼·문자 API·저장 로직은 변경하지 않습니다.
+  function esc740(v){return String(v??'').replace(/[&<>"']/g,s=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[s]));}
+  function money740(v){return (Number(v)||0).toLocaleString('ko-KR')+'원';}
+  function currentShippingRows740(){
+    const filter=document.getElementById('shippingFilter')?.value||'all';
+    const bundle=document.getElementById('bundleMode')?.value||'customer';
+    let rs=(typeof getReceipts==='function'?getReceipts():[]);
+    if(filter!=='all') rs=rs.filter(r=>(r.payment?.status||'unpaid')===filter);
+    const groups=new Map();
+    rs.forEach(r=>{
+      const key=bundle==='customer'?(r.customer?.id||r.nick):r.key;
+      if(!groups.has(key)) groups.set(key,{name:r.customer?.name||'',nick:r.nick||'',phone:r.customer?.phone||'',address:[r.customer?.postalCode,r.customer?.address,r.customer?.detailAddress].filter(Boolean).join(' '),memo:r.customer?.memo||'',dates:new Set(),items:[],subtotal:0,fee:0,total:0,status:r.payment?.status||'unpaid'});
+      const g=groups.get(key);g.dates.add(r.date);g.items.push(...(r.items||[]));g.subtotal+=Number(r.subtotal)||0;g.fee+=Number(r.fee)||0;g.total+=Number(r.total)||0;
+    });
+    return [...groups.values()].map(g=>({...g,code:typeof shippingCodeFor==='function'?shippingCodeFor(g):''}));
+  }
+  window.renderShipping=(function(original){return function(){
+    const sel=document.getElementById('shippingFilter');
+    if(sel && !sel.querySelector('option[value="unpaid"]')){
+      sel.insertAdjacentHTML('beforeend','<option value="unpaid">미입금자만</option><option value="amount-mismatch">금액불일치만</option>');
+    }
+    if(typeof original==='function') original();
+    window.currentShipping=currentShippingRows740();
+  }})(window.renderShipping);
+
+  window.printShipping=function(){
+    const arr=currentShippingRows740();
+    if(!arr.length){alert('선택한 조건에 출력할 택배 대상이 없습니다.');return;}
+    const pages=arr.map((g,i)=>{
+      const tracking=(window.state?.shippingScans?.[g.code]?.trackingNumber)||'';
+      return `<section class="ship-page"><header><div class="identity"><div class="brand">땡라이브 × FIRST OMS</div><h1>${esc740(g.nick||'닉네임 미등록')}</h1><h2>${esc740(g.name||'이름 미등록')}</h2></div><div id="shipqr-${i}" class="qr"></div></header>
+      <div class="info"><div><b>연락처</b><span>${esc740(g.phone||'-')}</span></div><div><b>방송일</b><span>${esc740([...g.dates].join(', '))}</span></div><div class="wide"><b>배송지</b><span>${esc740(g.address||'-')}</span></div><div class="wide"><b>배송메모</b><span>${esc740(g.memo||'-')}</span></div><div><b>송장번호</b><span>${esc740(tracking||'')}</span></div><div><b>택배코드</b><span>${esc740(g.code||'')}</span></div></div>
+      <table><thead><tr><th>번호</th><th>상품명</th><th>수량</th><th>단가</th><th>금액</th><th>확인</th></tr></thead><tbody>${g.items.map((x,j)=>`<tr><td>${esc740(x.number||j+1)}</td><td>${esc740(x.item||'')}</td><td>${Number(x.qty)||0}</td><td>${money740(x.unit)}</td><td>${money740(x.amount)}</td><td>□</td></tr>`).join('')}</tbody></table>
+      <div class="totals"><div><span>상품합계</span><b>${money740(g.subtotal)}</b></div><div><span>택배비</span><b>${money740(g.fee)}</b></div><div class="grand"><span>총 결제금액</span><b>${money740(g.total)}</b></div></div>
+      <footer>QR을 휴대폰 기본 카메라로 촬영하면 고객별 포장리스트가 열립니다.</footer></section>`;
+    }).join('');
+    const qrData=JSON.stringify(arr.map(g=>({url:location.origin+'/packing.html?code='+encodeURIComponent(g.code)})));
+    const w=window.open('','_blank'); if(!w){alert('팝업이 차단되었습니다. 팝업 허용 후 다시 눌러주세요.');return;}
+    w.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>택배리스트 전체 출력</title><script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"><\/script><style>
+    *{box-sizing:border-box}body{margin:0;font-family:Arial,'Noto Sans KR',sans-serif;color:#111;background:#fff}.ship-page{width:210mm;min-height:297mm;padding:12mm 13mm;page-break-after:always;position:relative}.ship-page:last-child{page-break-after:auto}header{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:3px solid #111;padding-bottom:10px}.brand{font-weight:900;font-size:15px}.identity h1{font-size:34px;margin:12px 0 2px;line-height:1}.identity h2{font-size:25px;margin:5px 0}.qr img,.qr canvas{width:115px!important;height:115px!important}.info{display:grid;grid-template-columns:1fr 1fr;border:1px solid #555;margin:14px 0}.info>div{display:grid;grid-template-columns:92px 1fr;border-bottom:1px solid #888}.info>div:nth-last-child(-n+2){border-bottom:0}.info .wide{grid-column:1/-1}.info b,.info span{padding:9px;border-right:1px solid #888}.info span{border-right:0;word-break:break-all}table{width:100%;border-collapse:collapse;table-layout:fixed}th,td{border:1px solid #666;padding:8px 6px;text-align:center;font-size:13px}th{background:#eee;-webkit-print-color-adjust:exact;print-color-adjust:exact}th:nth-child(2),td:nth-child(2){text-align:left;width:39%}.totals{width:360px;margin:15px 0 0 auto;border:2px solid #111}.totals>div{display:flex;justify-content:space-between;padding:8px 12px;border-bottom:1px solid #777}.totals>div:last-child{border-bottom:0}.grand{font-size:21px}footer{position:absolute;bottom:9mm;left:13mm;right:13mm;text-align:center;font-size:12px;color:#555}@page{size:A4 portrait;margin:0}@media print{body{background:#fff}}
+    </style></head><body>${pages}<script>const data=${qrData};window.onload=()=>{data.forEach((x,i)=>{if(window.QRCode)new QRCode(document.getElementById('shipqr-'+i),{text:x.url,width:180,height:180});});setTimeout(()=>window.print(),900)};<\/script></body></html>`);w.document.close();
+  };
+
+  window.printAllReceiptsExact=function(mode='all'){
+    let rs=(typeof filteredReceipts==='function'?filteredReceipts():(typeof getReceipts==='function'?getReceipts():[]));
+    if(mode==='unpaid') rs=rs.filter(r=>(r.payment?.status||'unpaid')==='unpaid');
+    if(!rs.length){alert('출력할 정산서가 없습니다.');return;}
+    const parts=[];
+    rs.forEach(r=>{
+      const chunks=[]; const items=r.items||[]; for(let i=0;i<items.length;i+=10) chunks.push(items.slice(i,i+10)); if(!chunks.length)chunks.push([]);
+      chunks.forEach((items,pageIndex)=>{
+        const copy={...r,items,subtotal:items.reduce((a,x)=>a+(Number(x.amount)||0),0),fee:pageIndex===chunks.length-1?r.fee:0,total:pageIndex===chunks.length-1?r.total:items.reduce((a,x)=>a+(Number(x.amount)||0),0)};
+        let html=typeof receiptHTML==='function'?receiptHTML(copy,indexOfReceiptKey(r.key)):'';
+        html=html.replace(new RegExp(esc740(r.nick)+'님 정산서','g'),esc740(r.nick)+'님 정산서 '+(pageIndex+1));
+        html=html.replace(/정산서\s+\d+(?=<\/|<|\s)/g,'정산서 '+(pageIndex+1));
+        parts.push(`<div class="receipt-print-page">${html}</div>`);
+      });
+    });
+    const styles=[...document.querySelectorAll('head style')].map(s=>s.outerHTML).join('');
+    const w=window.open('','_blank'); if(!w){alert('팝업이 차단되었습니다.');return;}
+    w.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>정산서 전체 출력</title>${styles}<style>body{background:#fff!important;margin:0!important}.receipt-print-page{width:210mm;min-height:297mm;page-break-after:always;background:#fff}.receipt-print-page:last-child{page-break-after:auto}.no-print,.receipt-detail-actions,button{display:none!important}.exact-receipt{margin:0!important;box-shadow:none!important}@page{size:A4 portrait;margin:0}</style></head><body>${parts.join('')}<script>window.onload=()=>setTimeout(()=>window.print(),500)<\/script></body></html>`);w.document.close();
+  };
+  document.addEventListener('DOMContentLoaded',()=>{
+    const allBtn=[...document.querySelectorAll('#receipts button')].find(b=>b.textContent.includes('전체 정산서 인쇄'));
+    if(allBtn) allBtn.onclick=()=>window.printAllReceiptsExact('all');
+    const actions=document.querySelector('#payments .section-title .actions');
+    if(actions && !document.getElementById('printUnpaidReceiptsBtn')){
+      const b=document.createElement('button');b.id='printUnpaidReceiptsBtn';b.className='btn secondary';b.textContent='미입금자 정산서 전체 출력';b.onclick=()=>window.printAllReceiptsExact('unpaid');actions.appendChild(b);
+    }
+  });
+})();
+</script>
+
 </body></html>`);w.document.close();
  };
 })();
@@ -1668,7 +1899,84 @@ tr:hover td{background:#f6f7f9!important;color:inherit!important}.exact-receipt 
   if(!modal){modal=document.createElement('div');modal.id='receiptDetailModal';modal.className='receipt-detail-modal';modal.innerHTML='<div class="receipt-detail-box" style="max-width:960px"><div class="receipt-detail-actions no-print"><button class="btn warn" id="detailEditBtn">수정</button><button class="btn secondary" id="detailPrintBtn">인쇄</button><button class="btn bad" onclick="closeReceiptDetail()">닫기</button></div><div id="receiptDetailBody"></div></div>';document.body.appendChild(modal)}
   modal.classList.add('show');document.getElementById('detailEditBtn').onclick=()=>openReceiptEditByKey(key);document.getElementById('detailPrintBtn').onclick=()=>window.print();document.getElementById('receiptDetailBody').innerHTML=window.v736ReceiptHTML(r,indexOfReceiptKey(key));
  };
- window.printOne=function(i){const r=getReceipts()[i];if(!r)return;const css=document.getElementById('v736-receipt-design').outerHTML;const w=window.open('','_blank');w.document.write('<!doctype html><html><head><meta charset="utf-8"><title>정산서</title>'+css+'</head><body>'+window.v736ReceiptHTML(r,i)+'<script>window.onload=()=>setTimeout(()=>window.print(),350)<\\/script></body></html>');w.document.close()};
+ window.printOne=function(i){const r=getReceipts()[i];if(!r)return;const css=document.getElementById('v736-receipt-design').outerHTML;const w=window.open('','_blank');w.document.write('<!doctype html><html><head><meta charset="utf-8"><title>정산서</title>'+css+'</head><body>'+window.v736ReceiptHTML(r,i)+'<script>window.onload=()=>setTimeout(()=>window.print(),350)<\\/script>
+<script id="v740-print-only-safe-fix">
+(function(){
+  'use strict';
+  // 출력 관련 기능만 교체합니다. 대시보드·고객폼·문자 API·저장 로직은 변경하지 않습니다.
+  function esc740(v){return String(v??'').replace(/[&<>"']/g,s=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[s]));}
+  function money740(v){return (Number(v)||0).toLocaleString('ko-KR')+'원';}
+  function currentShippingRows740(){
+    const filter=document.getElementById('shippingFilter')?.value||'all';
+    const bundle=document.getElementById('bundleMode')?.value||'customer';
+    let rs=(typeof getReceipts==='function'?getReceipts():[]);
+    if(filter!=='all') rs=rs.filter(r=>(r.payment?.status||'unpaid')===filter);
+    const groups=new Map();
+    rs.forEach(r=>{
+      const key=bundle==='customer'?(r.customer?.id||r.nick):r.key;
+      if(!groups.has(key)) groups.set(key,{name:r.customer?.name||'',nick:r.nick||'',phone:r.customer?.phone||'',address:[r.customer?.postalCode,r.customer?.address,r.customer?.detailAddress].filter(Boolean).join(' '),memo:r.customer?.memo||'',dates:new Set(),items:[],subtotal:0,fee:0,total:0,status:r.payment?.status||'unpaid'});
+      const g=groups.get(key);g.dates.add(r.date);g.items.push(...(r.items||[]));g.subtotal+=Number(r.subtotal)||0;g.fee+=Number(r.fee)||0;g.total+=Number(r.total)||0;
+    });
+    return [...groups.values()].map(g=>({...g,code:typeof shippingCodeFor==='function'?shippingCodeFor(g):''}));
+  }
+  window.renderShipping=(function(original){return function(){
+    const sel=document.getElementById('shippingFilter');
+    if(sel && !sel.querySelector('option[value="unpaid"]')){
+      sel.insertAdjacentHTML('beforeend','<option value="unpaid">미입금자만</option><option value="amount-mismatch">금액불일치만</option>');
+    }
+    if(typeof original==='function') original();
+    window.currentShipping=currentShippingRows740();
+  }})(window.renderShipping);
+
+  window.printShipping=function(){
+    const arr=currentShippingRows740();
+    if(!arr.length){alert('선택한 조건에 출력할 택배 대상이 없습니다.');return;}
+    const pages=arr.map((g,i)=>{
+      const tracking=(window.state?.shippingScans?.[g.code]?.trackingNumber)||'';
+      return `<section class="ship-page"><header><div class="identity"><div class="brand">땡라이브 × FIRST OMS</div><h1>${esc740(g.nick||'닉네임 미등록')}</h1><h2>${esc740(g.name||'이름 미등록')}</h2></div><div id="shipqr-${i}" class="qr"></div></header>
+      <div class="info"><div><b>연락처</b><span>${esc740(g.phone||'-')}</span></div><div><b>방송일</b><span>${esc740([...g.dates].join(', '))}</span></div><div class="wide"><b>배송지</b><span>${esc740(g.address||'-')}</span></div><div class="wide"><b>배송메모</b><span>${esc740(g.memo||'-')}</span></div><div><b>송장번호</b><span>${esc740(tracking||'')}</span></div><div><b>택배코드</b><span>${esc740(g.code||'')}</span></div></div>
+      <table><thead><tr><th>번호</th><th>상품명</th><th>수량</th><th>단가</th><th>금액</th><th>확인</th></tr></thead><tbody>${g.items.map((x,j)=>`<tr><td>${esc740(x.number||j+1)}</td><td>${esc740(x.item||'')}</td><td>${Number(x.qty)||0}</td><td>${money740(x.unit)}</td><td>${money740(x.amount)}</td><td>□</td></tr>`).join('')}</tbody></table>
+      <div class="totals"><div><span>상품합계</span><b>${money740(g.subtotal)}</b></div><div><span>택배비</span><b>${money740(g.fee)}</b></div><div class="grand"><span>총 결제금액</span><b>${money740(g.total)}</b></div></div>
+      <footer>QR을 휴대폰 기본 카메라로 촬영하면 고객별 포장리스트가 열립니다.</footer></section>`;
+    }).join('');
+    const qrData=JSON.stringify(arr.map(g=>({url:location.origin+'/packing.html?code='+encodeURIComponent(g.code)})));
+    const w=window.open('','_blank'); if(!w){alert('팝업이 차단되었습니다. 팝업 허용 후 다시 눌러주세요.');return;}
+    w.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>택배리스트 전체 출력</title><script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"><\/script><style>
+    *{box-sizing:border-box}body{margin:0;font-family:Arial,'Noto Sans KR',sans-serif;color:#111;background:#fff}.ship-page{width:210mm;min-height:297mm;padding:12mm 13mm;page-break-after:always;position:relative}.ship-page:last-child{page-break-after:auto}header{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:3px solid #111;padding-bottom:10px}.brand{font-weight:900;font-size:15px}.identity h1{font-size:34px;margin:12px 0 2px;line-height:1}.identity h2{font-size:25px;margin:5px 0}.qr img,.qr canvas{width:115px!important;height:115px!important}.info{display:grid;grid-template-columns:1fr 1fr;border:1px solid #555;margin:14px 0}.info>div{display:grid;grid-template-columns:92px 1fr;border-bottom:1px solid #888}.info>div:nth-last-child(-n+2){border-bottom:0}.info .wide{grid-column:1/-1}.info b,.info span{padding:9px;border-right:1px solid #888}.info span{border-right:0;word-break:break-all}table{width:100%;border-collapse:collapse;table-layout:fixed}th,td{border:1px solid #666;padding:8px 6px;text-align:center;font-size:13px}th{background:#eee;-webkit-print-color-adjust:exact;print-color-adjust:exact}th:nth-child(2),td:nth-child(2){text-align:left;width:39%}.totals{width:360px;margin:15px 0 0 auto;border:2px solid #111}.totals>div{display:flex;justify-content:space-between;padding:8px 12px;border-bottom:1px solid #777}.totals>div:last-child{border-bottom:0}.grand{font-size:21px}footer{position:absolute;bottom:9mm;left:13mm;right:13mm;text-align:center;font-size:12px;color:#555}@page{size:A4 portrait;margin:0}@media print{body{background:#fff}}
+    </style></head><body>${pages}<script>const data=${qrData};window.onload=()=>{data.forEach((x,i)=>{if(window.QRCode)new QRCode(document.getElementById('shipqr-'+i),{text:x.url,width:180,height:180});});setTimeout(()=>window.print(),900)};<\/script></body></html>`);w.document.close();
+  };
+
+  window.printAllReceiptsExact=function(mode='all'){
+    let rs=(typeof filteredReceipts==='function'?filteredReceipts():(typeof getReceipts==='function'?getReceipts():[]));
+    if(mode==='unpaid') rs=rs.filter(r=>(r.payment?.status||'unpaid')==='unpaid');
+    if(!rs.length){alert('출력할 정산서가 없습니다.');return;}
+    const parts=[];
+    rs.forEach(r=>{
+      const chunks=[]; const items=r.items||[]; for(let i=0;i<items.length;i+=10) chunks.push(items.slice(i,i+10)); if(!chunks.length)chunks.push([]);
+      chunks.forEach((items,pageIndex)=>{
+        const copy={...r,items,subtotal:items.reduce((a,x)=>a+(Number(x.amount)||0),0),fee:pageIndex===chunks.length-1?r.fee:0,total:pageIndex===chunks.length-1?r.total:items.reduce((a,x)=>a+(Number(x.amount)||0),0)};
+        let html=typeof receiptHTML==='function'?receiptHTML(copy,indexOfReceiptKey(r.key)):'';
+        html=html.replace(new RegExp(esc740(r.nick)+'님 정산서','g'),esc740(r.nick)+'님 정산서 '+(pageIndex+1));
+        html=html.replace(/정산서\s+\d+(?=<\/|<|\s)/g,'정산서 '+(pageIndex+1));
+        parts.push(`<div class="receipt-print-page">${html}</div>`);
+      });
+    });
+    const styles=[...document.querySelectorAll('head style')].map(s=>s.outerHTML).join('');
+    const w=window.open('','_blank'); if(!w){alert('팝업이 차단되었습니다.');return;}
+    w.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>정산서 전체 출력</title>${styles}<style>body{background:#fff!important;margin:0!important}.receipt-print-page{width:210mm;min-height:297mm;page-break-after:always;background:#fff}.receipt-print-page:last-child{page-break-after:auto}.no-print,.receipt-detail-actions,button{display:none!important}.exact-receipt{margin:0!important;box-shadow:none!important}@page{size:A4 portrait;margin:0}</style></head><body>${parts.join('')}<script>window.onload=()=>setTimeout(()=>window.print(),500)<\/script></body></html>`);w.document.close();
+  };
+  document.addEventListener('DOMContentLoaded',()=>{
+    const allBtn=[...document.querySelectorAll('#receipts button')].find(b=>b.textContent.includes('전체 정산서 인쇄'));
+    if(allBtn) allBtn.onclick=()=>window.printAllReceiptsExact('all');
+    const actions=document.querySelector('#payments .section-title .actions');
+    if(actions && !document.getElementById('printUnpaidReceiptsBtn')){
+      const b=document.createElement('button');b.id='printUnpaidReceiptsBtn';b.className='btn secondary';b.textContent='미입금자 정산서 전체 출력';b.onclick=()=>window.printAllReceiptsExact('unpaid');actions.appendChild(b);
+    }
+  });
+})();
+</script>
+
+</body></html>');w.document.close()};
  // 문자 이미지도 화면/출력과 같은 HTML 디자인을 그대로 렌더링합니다.
  window.receiptImageBase64=async function(r){
   const host=document.createElement('div');host.style.cssText='position:fixed;left:-10000px;top:0;width:794px;background:#fff;z-index:-1';host.innerHTML=window.v736ReceiptHTML(r,indexOfReceiptKey(r.key));document.body.appendChild(host);
@@ -1730,7 +2038,84 @@ tr:hover td{background:#f6f7f9!important;color:inherit!important}.exact-receipt 
   const r=getReceipts()[i];if(!r)return;
   const css1=document.getElementById('v722-exact-ui')?.outerHTML||'';
   const css2=document.getElementById('v738-template1-only-style')?.outerHTML||'';
-  const w=window.open('','_blank');w.document.write('<!doctype html><html><head><meta charset="utf-8"><title>정산서</title>'+css1+css2+'</head><body>'+template1ReceiptHTML(r,i)+'<script>window.onload=()=>setTimeout(()=>window.print(),350)<\\/script></body></html>');w.document.close();
+  const w=window.open('','_blank');w.document.write('<!doctype html><html><head><meta charset="utf-8"><title>정산서</title>'+css1+css2+'</head><body>'+template1ReceiptHTML(r,i)+'<script>window.onload=()=>setTimeout(()=>window.print(),350)<\\/script>
+<script id="v740-print-only-safe-fix">
+(function(){
+  'use strict';
+  // 출력 관련 기능만 교체합니다. 대시보드·고객폼·문자 API·저장 로직은 변경하지 않습니다.
+  function esc740(v){return String(v??'').replace(/[&<>"']/g,s=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[s]));}
+  function money740(v){return (Number(v)||0).toLocaleString('ko-KR')+'원';}
+  function currentShippingRows740(){
+    const filter=document.getElementById('shippingFilter')?.value||'all';
+    const bundle=document.getElementById('bundleMode')?.value||'customer';
+    let rs=(typeof getReceipts==='function'?getReceipts():[]);
+    if(filter!=='all') rs=rs.filter(r=>(r.payment?.status||'unpaid')===filter);
+    const groups=new Map();
+    rs.forEach(r=>{
+      const key=bundle==='customer'?(r.customer?.id||r.nick):r.key;
+      if(!groups.has(key)) groups.set(key,{name:r.customer?.name||'',nick:r.nick||'',phone:r.customer?.phone||'',address:[r.customer?.postalCode,r.customer?.address,r.customer?.detailAddress].filter(Boolean).join(' '),memo:r.customer?.memo||'',dates:new Set(),items:[],subtotal:0,fee:0,total:0,status:r.payment?.status||'unpaid'});
+      const g=groups.get(key);g.dates.add(r.date);g.items.push(...(r.items||[]));g.subtotal+=Number(r.subtotal)||0;g.fee+=Number(r.fee)||0;g.total+=Number(r.total)||0;
+    });
+    return [...groups.values()].map(g=>({...g,code:typeof shippingCodeFor==='function'?shippingCodeFor(g):''}));
+  }
+  window.renderShipping=(function(original){return function(){
+    const sel=document.getElementById('shippingFilter');
+    if(sel && !sel.querySelector('option[value="unpaid"]')){
+      sel.insertAdjacentHTML('beforeend','<option value="unpaid">미입금자만</option><option value="amount-mismatch">금액불일치만</option>');
+    }
+    if(typeof original==='function') original();
+    window.currentShipping=currentShippingRows740();
+  }})(window.renderShipping);
+
+  window.printShipping=function(){
+    const arr=currentShippingRows740();
+    if(!arr.length){alert('선택한 조건에 출력할 택배 대상이 없습니다.');return;}
+    const pages=arr.map((g,i)=>{
+      const tracking=(window.state?.shippingScans?.[g.code]?.trackingNumber)||'';
+      return `<section class="ship-page"><header><div class="identity"><div class="brand">땡라이브 × FIRST OMS</div><h1>${esc740(g.nick||'닉네임 미등록')}</h1><h2>${esc740(g.name||'이름 미등록')}</h2></div><div id="shipqr-${i}" class="qr"></div></header>
+      <div class="info"><div><b>연락처</b><span>${esc740(g.phone||'-')}</span></div><div><b>방송일</b><span>${esc740([...g.dates].join(', '))}</span></div><div class="wide"><b>배송지</b><span>${esc740(g.address||'-')}</span></div><div class="wide"><b>배송메모</b><span>${esc740(g.memo||'-')}</span></div><div><b>송장번호</b><span>${esc740(tracking||'')}</span></div><div><b>택배코드</b><span>${esc740(g.code||'')}</span></div></div>
+      <table><thead><tr><th>번호</th><th>상품명</th><th>수량</th><th>단가</th><th>금액</th><th>확인</th></tr></thead><tbody>${g.items.map((x,j)=>`<tr><td>${esc740(x.number||j+1)}</td><td>${esc740(x.item||'')}</td><td>${Number(x.qty)||0}</td><td>${money740(x.unit)}</td><td>${money740(x.amount)}</td><td>□</td></tr>`).join('')}</tbody></table>
+      <div class="totals"><div><span>상품합계</span><b>${money740(g.subtotal)}</b></div><div><span>택배비</span><b>${money740(g.fee)}</b></div><div class="grand"><span>총 결제금액</span><b>${money740(g.total)}</b></div></div>
+      <footer>QR을 휴대폰 기본 카메라로 촬영하면 고객별 포장리스트가 열립니다.</footer></section>`;
+    }).join('');
+    const qrData=JSON.stringify(arr.map(g=>({url:location.origin+'/packing.html?code='+encodeURIComponent(g.code)})));
+    const w=window.open('','_blank'); if(!w){alert('팝업이 차단되었습니다. 팝업 허용 후 다시 눌러주세요.');return;}
+    w.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>택배리스트 전체 출력</title><script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"><\/script><style>
+    *{box-sizing:border-box}body{margin:0;font-family:Arial,'Noto Sans KR',sans-serif;color:#111;background:#fff}.ship-page{width:210mm;min-height:297mm;padding:12mm 13mm;page-break-after:always;position:relative}.ship-page:last-child{page-break-after:auto}header{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:3px solid #111;padding-bottom:10px}.brand{font-weight:900;font-size:15px}.identity h1{font-size:34px;margin:12px 0 2px;line-height:1}.identity h2{font-size:25px;margin:5px 0}.qr img,.qr canvas{width:115px!important;height:115px!important}.info{display:grid;grid-template-columns:1fr 1fr;border:1px solid #555;margin:14px 0}.info>div{display:grid;grid-template-columns:92px 1fr;border-bottom:1px solid #888}.info>div:nth-last-child(-n+2){border-bottom:0}.info .wide{grid-column:1/-1}.info b,.info span{padding:9px;border-right:1px solid #888}.info span{border-right:0;word-break:break-all}table{width:100%;border-collapse:collapse;table-layout:fixed}th,td{border:1px solid #666;padding:8px 6px;text-align:center;font-size:13px}th{background:#eee;-webkit-print-color-adjust:exact;print-color-adjust:exact}th:nth-child(2),td:nth-child(2){text-align:left;width:39%}.totals{width:360px;margin:15px 0 0 auto;border:2px solid #111}.totals>div{display:flex;justify-content:space-between;padding:8px 12px;border-bottom:1px solid #777}.totals>div:last-child{border-bottom:0}.grand{font-size:21px}footer{position:absolute;bottom:9mm;left:13mm;right:13mm;text-align:center;font-size:12px;color:#555}@page{size:A4 portrait;margin:0}@media print{body{background:#fff}}
+    </style></head><body>${pages}<script>const data=${qrData};window.onload=()=>{data.forEach((x,i)=>{if(window.QRCode)new QRCode(document.getElementById('shipqr-'+i),{text:x.url,width:180,height:180});});setTimeout(()=>window.print(),900)};<\/script></body></html>`);w.document.close();
+  };
+
+  window.printAllReceiptsExact=function(mode='all'){
+    let rs=(typeof filteredReceipts==='function'?filteredReceipts():(typeof getReceipts==='function'?getReceipts():[]));
+    if(mode==='unpaid') rs=rs.filter(r=>(r.payment?.status||'unpaid')==='unpaid');
+    if(!rs.length){alert('출력할 정산서가 없습니다.');return;}
+    const parts=[];
+    rs.forEach(r=>{
+      const chunks=[]; const items=r.items||[]; for(let i=0;i<items.length;i+=10) chunks.push(items.slice(i,i+10)); if(!chunks.length)chunks.push([]);
+      chunks.forEach((items,pageIndex)=>{
+        const copy={...r,items,subtotal:items.reduce((a,x)=>a+(Number(x.amount)||0),0),fee:pageIndex===chunks.length-1?r.fee:0,total:pageIndex===chunks.length-1?r.total:items.reduce((a,x)=>a+(Number(x.amount)||0),0)};
+        let html=typeof receiptHTML==='function'?receiptHTML(copy,indexOfReceiptKey(r.key)):'';
+        html=html.replace(new RegExp(esc740(r.nick)+'님 정산서','g'),esc740(r.nick)+'님 정산서 '+(pageIndex+1));
+        html=html.replace(/정산서\s+\d+(?=<\/|<|\s)/g,'정산서 '+(pageIndex+1));
+        parts.push(`<div class="receipt-print-page">${html}</div>`);
+      });
+    });
+    const styles=[...document.querySelectorAll('head style')].map(s=>s.outerHTML).join('');
+    const w=window.open('','_blank'); if(!w){alert('팝업이 차단되었습니다.');return;}
+    w.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>정산서 전체 출력</title>${styles}<style>body{background:#fff!important;margin:0!important}.receipt-print-page{width:210mm;min-height:297mm;page-break-after:always;background:#fff}.receipt-print-page:last-child{page-break-after:auto}.no-print,.receipt-detail-actions,button{display:none!important}.exact-receipt{margin:0!important;box-shadow:none!important}@page{size:A4 portrait;margin:0}</style></head><body>${parts.join('')}<script>window.onload=()=>setTimeout(()=>window.print(),500)<\/script></body></html>`);w.document.close();
+  };
+  document.addEventListener('DOMContentLoaded',()=>{
+    const allBtn=[...document.querySelectorAll('#receipts button')].find(b=>b.textContent.includes('전체 정산서 인쇄'));
+    if(allBtn) allBtn.onclick=()=>window.printAllReceiptsExact('all');
+    const actions=document.querySelector('#payments .section-title .actions');
+    if(actions && !document.getElementById('printUnpaidReceiptsBtn')){
+      const b=document.createElement('button');b.id='printUnpaidReceiptsBtn';b.className='btn secondary';b.textContent='미입금자 정산서 전체 출력';b.onclick=()=>window.printAllReceiptsExact('unpaid');actions.appendChild(b);
+    }
+  });
+})();
+</script>
+
+</body></html>');w.document.close();
  };
  // 문자 전송 이미지는 화면과 같은 1번 정산서로 생성합니다.
  window.receiptImageBase64=async function(r){
@@ -1749,5 +2134,82 @@ tr:hover td{background:#f6f7f9!important;color:inherit!important}.exact-receipt 
 })();
 </script>
 <!-- V738_ONLY_RECEIPT_TEMPLATE1_PATCH_END -->
+
+<script id="v740-print-only-safe-fix">
+(function(){
+  'use strict';
+  // 출력 관련 기능만 교체합니다. 대시보드·고객폼·문자 API·저장 로직은 변경하지 않습니다.
+  function esc740(v){return String(v??'').replace(/[&<>"']/g,s=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[s]));}
+  function money740(v){return (Number(v)||0).toLocaleString('ko-KR')+'원';}
+  function currentShippingRows740(){
+    const filter=document.getElementById('shippingFilter')?.value||'all';
+    const bundle=document.getElementById('bundleMode')?.value||'customer';
+    let rs=(typeof getReceipts==='function'?getReceipts():[]);
+    if(filter!=='all') rs=rs.filter(r=>(r.payment?.status||'unpaid')===filter);
+    const groups=new Map();
+    rs.forEach(r=>{
+      const key=bundle==='customer'?(r.customer?.id||r.nick):r.key;
+      if(!groups.has(key)) groups.set(key,{name:r.customer?.name||'',nick:r.nick||'',phone:r.customer?.phone||'',address:[r.customer?.postalCode,r.customer?.address,r.customer?.detailAddress].filter(Boolean).join(' '),memo:r.customer?.memo||'',dates:new Set(),items:[],subtotal:0,fee:0,total:0,status:r.payment?.status||'unpaid'});
+      const g=groups.get(key);g.dates.add(r.date);g.items.push(...(r.items||[]));g.subtotal+=Number(r.subtotal)||0;g.fee+=Number(r.fee)||0;g.total+=Number(r.total)||0;
+    });
+    return [...groups.values()].map(g=>({...g,code:typeof shippingCodeFor==='function'?shippingCodeFor(g):''}));
+  }
+  window.renderShipping=(function(original){return function(){
+    const sel=document.getElementById('shippingFilter');
+    if(sel && !sel.querySelector('option[value="unpaid"]')){
+      sel.insertAdjacentHTML('beforeend','<option value="unpaid">미입금자만</option><option value="amount-mismatch">금액불일치만</option>');
+    }
+    if(typeof original==='function') original();
+    window.currentShipping=currentShippingRows740();
+  }})(window.renderShipping);
+
+  window.printShipping=function(){
+    const arr=currentShippingRows740();
+    if(!arr.length){alert('선택한 조건에 출력할 택배 대상이 없습니다.');return;}
+    const pages=arr.map((g,i)=>{
+      const tracking=(window.state?.shippingScans?.[g.code]?.trackingNumber)||'';
+      return `<section class="ship-page"><header><div class="identity"><div class="brand">땡라이브 × FIRST OMS</div><h1>${esc740(g.nick||'닉네임 미등록')}</h1><h2>${esc740(g.name||'이름 미등록')}</h2></div><div id="shipqr-${i}" class="qr"></div></header>
+      <div class="info"><div><b>연락처</b><span>${esc740(g.phone||'-')}</span></div><div><b>방송일</b><span>${esc740([...g.dates].join(', '))}</span></div><div class="wide"><b>배송지</b><span>${esc740(g.address||'-')}</span></div><div class="wide"><b>배송메모</b><span>${esc740(g.memo||'-')}</span></div><div><b>송장번호</b><span>${esc740(tracking||'')}</span></div><div><b>택배코드</b><span>${esc740(g.code||'')}</span></div></div>
+      <table><thead><tr><th>번호</th><th>상품명</th><th>수량</th><th>단가</th><th>금액</th><th>확인</th></tr></thead><tbody>${g.items.map((x,j)=>`<tr><td>${esc740(x.number||j+1)}</td><td>${esc740(x.item||'')}</td><td>${Number(x.qty)||0}</td><td>${money740(x.unit)}</td><td>${money740(x.amount)}</td><td>□</td></tr>`).join('')}</tbody></table>
+      <div class="totals"><div><span>상품합계</span><b>${money740(g.subtotal)}</b></div><div><span>택배비</span><b>${money740(g.fee)}</b></div><div class="grand"><span>총 결제금액</span><b>${money740(g.total)}</b></div></div>
+      <footer>QR을 휴대폰 기본 카메라로 촬영하면 고객별 포장리스트가 열립니다.</footer></section>`;
+    }).join('');
+    const qrData=JSON.stringify(arr.map(g=>({url:location.origin+'/packing.html?code='+encodeURIComponent(g.code)})));
+    const w=window.open('','_blank'); if(!w){alert('팝업이 차단되었습니다. 팝업 허용 후 다시 눌러주세요.');return;}
+    w.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>택배리스트 전체 출력</title><script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"><\/script><style>
+    *{box-sizing:border-box}body{margin:0;font-family:Arial,'Noto Sans KR',sans-serif;color:#111;background:#fff}.ship-page{width:210mm;min-height:297mm;padding:12mm 13mm;page-break-after:always;position:relative}.ship-page:last-child{page-break-after:auto}header{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:3px solid #111;padding-bottom:10px}.brand{font-weight:900;font-size:15px}.identity h1{font-size:34px;margin:12px 0 2px;line-height:1}.identity h2{font-size:25px;margin:5px 0}.qr img,.qr canvas{width:115px!important;height:115px!important}.info{display:grid;grid-template-columns:1fr 1fr;border:1px solid #555;margin:14px 0}.info>div{display:grid;grid-template-columns:92px 1fr;border-bottom:1px solid #888}.info>div:nth-last-child(-n+2){border-bottom:0}.info .wide{grid-column:1/-1}.info b,.info span{padding:9px;border-right:1px solid #888}.info span{border-right:0;word-break:break-all}table{width:100%;border-collapse:collapse;table-layout:fixed}th,td{border:1px solid #666;padding:8px 6px;text-align:center;font-size:13px}th{background:#eee;-webkit-print-color-adjust:exact;print-color-adjust:exact}th:nth-child(2),td:nth-child(2){text-align:left;width:39%}.totals{width:360px;margin:15px 0 0 auto;border:2px solid #111}.totals>div{display:flex;justify-content:space-between;padding:8px 12px;border-bottom:1px solid #777}.totals>div:last-child{border-bottom:0}.grand{font-size:21px}footer{position:absolute;bottom:9mm;left:13mm;right:13mm;text-align:center;font-size:12px;color:#555}@page{size:A4 portrait;margin:0}@media print{body{background:#fff}}
+    </style></head><body>${pages}<script>const data=${qrData};window.onload=()=>{data.forEach((x,i)=>{if(window.QRCode)new QRCode(document.getElementById('shipqr-'+i),{text:x.url,width:180,height:180});});setTimeout(()=>window.print(),900)};<\/script></body></html>`);w.document.close();
+  };
+
+  window.printAllReceiptsExact=function(mode='all'){
+    let rs=(typeof filteredReceipts==='function'?filteredReceipts():(typeof getReceipts==='function'?getReceipts():[]));
+    if(mode==='unpaid') rs=rs.filter(r=>(r.payment?.status||'unpaid')==='unpaid');
+    if(!rs.length){alert('출력할 정산서가 없습니다.');return;}
+    const parts=[];
+    rs.forEach(r=>{
+      const chunks=[]; const items=r.items||[]; for(let i=0;i<items.length;i+=10) chunks.push(items.slice(i,i+10)); if(!chunks.length)chunks.push([]);
+      chunks.forEach((items,pageIndex)=>{
+        const copy={...r,items,subtotal:items.reduce((a,x)=>a+(Number(x.amount)||0),0),fee:pageIndex===chunks.length-1?r.fee:0,total:pageIndex===chunks.length-1?r.total:items.reduce((a,x)=>a+(Number(x.amount)||0),0)};
+        let html=typeof receiptHTML==='function'?receiptHTML(copy,indexOfReceiptKey(r.key)):'';
+        html=html.replace(new RegExp(esc740(r.nick)+'님 정산서','g'),esc740(r.nick)+'님 정산서 '+(pageIndex+1));
+        html=html.replace(/정산서\s+\d+(?=<\/|<|\s)/g,'정산서 '+(pageIndex+1));
+        parts.push(`<div class="receipt-print-page">${html}</div>`);
+      });
+    });
+    const styles=[...document.querySelectorAll('head style')].map(s=>s.outerHTML).join('');
+    const w=window.open('','_blank'); if(!w){alert('팝업이 차단되었습니다.');return;}
+    w.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>정산서 전체 출력</title>${styles}<style>body{background:#fff!important;margin:0!important}.receipt-print-page{width:210mm;min-height:297mm;page-break-after:always;background:#fff}.receipt-print-page:last-child{page-break-after:auto}.no-print,.receipt-detail-actions,button{display:none!important}.exact-receipt{margin:0!important;box-shadow:none!important}@page{size:A4 portrait;margin:0}</style></head><body>${parts.join('')}<script>window.onload=()=>setTimeout(()=>window.print(),500)<\/script></body></html>`);w.document.close();
+  };
+  document.addEventListener('DOMContentLoaded',()=>{
+    const allBtn=[...document.querySelectorAll('#receipts button')].find(b=>b.textContent.includes('전체 정산서 인쇄'));
+    if(allBtn) allBtn.onclick=()=>window.printAllReceiptsExact('all');
+    const actions=document.querySelector('#payments .section-title .actions');
+    if(actions && !document.getElementById('printUnpaidReceiptsBtn')){
+      const b=document.createElement('button');b.id='printUnpaidReceiptsBtn';b.className='btn secondary';b.textContent='미입금자 정산서 전체 출력';b.onclick=()=>window.printAllReceiptsExact('unpaid');actions.appendChild(b);
+    }
+  });
+})();
+</script>
+
 </body>
 </html>
