@@ -1723,7 +1723,7 @@ tr:hover td{background:#f6f7f9!important;color:inherit!important}.exact-receipt 
   modal.classList.add('show');
   document.getElementById('receiptDetailBody').innerHTML=template1ReceiptHTML(r,indexOfReceiptKey(key));
   document.getElementById('detailEditBtn').onclick=()=>openReceiptEditByKey(key);
-  document.getElementById('detailPrintBtn').onclick=()=>window.print();
+  document.getElementById('detailPrintBtn').onclick=()=>window.printOne(indexOfReceiptKey(key));
   document.getElementById('detailNoticeBtn').onclick=()=>{const v=prompt('이 거래처 정산서에 표시할 입금 안내 문구를 입력하세요.',state.settings?.paymentNotice||'일요일 12시까지 입금 요망\n입금자명은 주문자명과 동일하게 부탁드립니다.');if(v===null)return;state.settings.paymentNotice=v;saveSilently();document.getElementById('receiptDetailBody').innerHTML=template1ReceiptHTML(r,indexOfReceiptKey(key));};
  };
  window.printOne=function(i){
