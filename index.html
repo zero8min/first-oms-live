@@ -1824,5 +1824,60 @@ tr:hover td{background:#f6f7f9!important;color:inherit!important}.exact-receipt 
   });
 })();
 </script>
+
+<!-- V745_MMS_ONLY_PATCH -->
+<script id="v745-mms-only-patch">
+(function(){
+'use strict';
+const PAGE_ITEMS=12;
+function v745Money(v){return (Number(v)||0).toLocaleString('ko-KR')+'원'}
+function v745Chunks(arr,n){const out=[];for(let i=0;i<(arr||[]).length;i+=n)out.push(arr.slice(i,i+n));return out.length?out:[[]]}
+function v745Text(r){
+ const who=(r.nick||r.customer?.name||'고객');
+ return `${who}님 정산서입니다.\n총 ${v745Money(r.total)}\n3333-06-9851290 카카오뱅크 김미숙\n일요일 12시까지 입금 부탁드립니다.`;
+}
+function v745CanvasPage(r,items,pageNo,pageCount){
+ const W=794,H=1123,c=document.createElement('canvas');c.width=W;c.height=H;const x=c.getContext('2d');
+ const L=38,R=W-38,WW=R-L;let y=34;
+ x.fillStyle='#fff';x.fillRect(0,0,W,H);x.textBaseline='middle';
+ const line=(x1,y1,x2,y2,w=1,col='#444')=>{x.strokeStyle=col;x.lineWidth=w;x.beginPath();x.moveTo(x1,y1);x.lineTo(x2,y2);x.stroke()};
+ const box=(a,b,w,h,fill='#fff',stroke='#777',lw=1)=>{x.fillStyle=fill;x.fillRect(a,b,w,h);x.strokeStyle=stroke;x.lineWidth=lw;x.strokeRect(a,b,w,h)};
+ const txt=(t,a,b,font='14px sans-serif',align='left',col='#111')=>{x.font=font;x.textAlign=align;x.fillStyle=col;x.fillText(String(t??''),a,b)};
+ const fit=(t,max,size=14,bold=false)=>{let s=size;while(s>9){x.font=`${bold?'bold ':''}${s}px sans-serif`;if(x.measureText(String(t||'')).width<=max)break;s--}return `${bold?'bold ':''}${s}px sans-serif`};
+ txt('FIRST OMS',L,y+8,'bold 13px sans-serif');txt('정산서',W/2,y+22,'bold 38px sans-serif','center');
+ const orderNo=String(r.date||'').replaceAll('-','')+'-'+String((typeof indexOfReceiptKey==='function'?indexOfReceiptKey(r.key):0)+1).padStart(3,'0');
+ const ox=R-200,oy=y-5,ow=200,rh=29;box(ox,oy,ow,rh*2);box(ox,oy,68,rh,'#f2f2f2');box(ox,oy+rh,68,rh,'#f2f2f2');line(ox+68,oy,ox+68,oy+rh*2);line(ox,oy+rh,ox+ow,oy+rh);txt('주문일',ox+34,oy+rh/2,'bold 12px sans-serif','center');txt(r.date||'',ox+78,oy+rh/2,'12px sans-serif');txt('주문번호',ox+34,oy+rh+rh/2,'bold 12px sans-serif','center');txt(orderNo,ox+78,oy+rh+rh/2,'12px sans-serif');
+ y=108;line(L,y,R,y,3,'#111');y+=34;txt(`${r.nick||r.customer?.name||'고객'}님 정산서`,L,y,'bold 25px sans-serif');txt(`정산서 ${pageNo}${pageCount>1?' / '+pageCount:''}`,R,y,'bold 14px sans-serif','right');y+=27;
+ const cst=r.customer||{};const info=[['고객명',cst.name||r.nick||''],['배송지',[cst.postalCode,cst.address,cst.detailAddress].filter(Boolean).join(' ')],['연락처',cst.phone||''],['메모',cst.memo||''],['송장번호',(window.state?.shippingScans?.[(typeof shippingCodeFor==='function'?shippingCodeFor({key:r.key,name:cst.name||'',nick:r.nick||'',phone:cst.phone||'',address:[cst.postalCode,cst.address,cst.detailAddress].filter(Boolean).join(' '),dates:new Set([r.date]),items:r.items,subtotal:r.subtotal,fee:r.fee,total:r.total,status:r.payment?.status||'unpaid'}):'')]?.trackingNumber)||'']];
+ for(const [lab,val] of info){const h=38;box(L,y,92,h,'#f3f3f3');box(L+92,y,WW-92,h);txt(lab,L+46,y+h/2,'bold 13px sans-serif','center');txt(val,L+104,y+h/2,fit(val,WW-118,lab==='고객명'?17:13,lab==='고객명'));y+=h}
+ y+=14;const cols=[56,330,76,110,110],heads=['번호','상품명','수량','단가','금액'];let cx=L;for(let i=0;i<cols.length;i++){box(cx,y,cols[i],35,'#171717','#171717');txt(heads[i],cx+cols[i]/2,y+17.5,'bold 13px sans-serif','center','#fff');cx+=cols[i]}y+=35;
+ items.forEach((it,i)=>{const h=38;cx=L;const vals=[it.number||((pageNo-1)*PAGE_ITEMS+i+1),it.item||'',it.qty||0,v745Money(it.unit),v745Money(it.amount)];for(let j=0;j<cols.length;j++){box(cx,y,cols[j],h);txt(vals[j],j===1?cx+8:cx+cols[j]/2,y+h/2,fit(vals[j],cols[j]-12,j===1?13:12),j===1?'left':'center');cx+=cols[j]}y+=h});
+ while(y<760){cx=L;for(let j=0;j<cols.length;j++){box(cx,y,cols[j],32,'#fff','#bbb');cx+=cols[j]}y+=32}
+ const pageSubtotal=items.reduce((s,it)=>s+(Number(it.amount)||0),0);y+=12;for(const [lab,val] of [['상품합계',v745Money(pageCount===1?r.subtotal:pageSubtotal)],['배송비',v745Money(pageNo===pageCount?r.fee:0)]]){box(L,y,WW-180,34,'#f5f5f5');box(R-180,y,180,34);txt(lab,R-195,y+17,'13px sans-serif','right');txt(val,R-12,y+17,'bold 14px sans-serif','right');y+=34}
+ y+=10;box(L,y,WW-230,58,'#fff','#111',3);box(R-230,y,230,58,'#fff','#111',3);txt('총 결제금액',L+16,y+29,'bold 19px sans-serif');txt(v745Money(pageNo===pageCount?r.total:pageSubtotal),R-14,y+29,'bold 28px sans-serif','right');y+=72;
+ const notice='일요일 12시까지 입금 부탁드립니다.';box(L,y,WW,48,'#fff8f8','#d33',2);txt(notice,W/2,y+24,'bold 16px sans-serif','center','#c00');y+=60;
+ box(L,y,130,62,'#fff3a6','#b79a00');box(L+130,y,WW-130,62,'#fff3a6','#b79a00');txt('입금계좌',L+65,y+31,'bold 15px sans-serif','center');txt('카카오뱅크 3333-06-9851290  예금주 김미숙',L+145,y+31,fit('카카오뱅크 3333-06-9851290  예금주 김미숙',WW-155,16,true));
+ txt('FIRST OMS',W/2,H-22,'12px sans-serif','center','#666');
+ let q=.82,data=c.toDataURL('image/jpeg',q);while(data.length>245000&&q>.38){q-=.06;data=c.toDataURL('image/jpeg',q)}return data.split(',')[1];
+}
+window.receiptImageBase64Pages=async function(r){const pages=v745Chunks(r.items||[],PAGE_ITEMS);return pages.map((items,i)=>v745CanvasPage(r,items,i+1,pages.length))};
+window.receiptImageBase64=async function(r){return (await window.receiptImageBase64Pages(r))[0]};
+window.sendMmsByKey=async function(key,button,skipConfirm=false){
+ const r=receiptByKey(key),c=r?.customer;if(!r||!c?.phone)throw new Error('고객 전화번호가 없습니다.');
+ if(!skipConfirm&&!confirm(`${r.nick}님 (${c.phone})에게 정산서 이미지를 MMS로 전송할까요?`))return false;
+ const old=button?.textContent||'정산서 이미지 전송';if(button){button.disabled=true;button.textContent='이미지 만드는 중...'}
+ try{
+  const images=await window.receiptImageBase64Pages(r);if(button)button.textContent='전송 중...';
+  for(let i=0;i<images.length;i++){
+   const main=v745Text(r);const text=i===0?main:`${r.nick||c.name||'고객'}님 정산서 ${i+1}/${images.length}입니다.\n총 ${v745Money(r.total)}\n3333-06-9851290 카카오뱅크 김미숙`;
+   const response=await fetch('/api/mms/send',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({to:c.phone,imageBase64:images[i],subject:`땡라이브 정산서 ${i+1}/${images.length}`,text,date:r.date,nickname:r.nick,name:c.name||'',total:r.total})});
+   const data=await response.json().catch(()=>({}));if(!response.ok||!data.ok)throw new Error(data.error||`MMS API 오류 ${response.status}`);
+  }
+  if(!skipConfirm)alert(`${r.nick}님에게 정산서 이미지 ${images.length}장을 전송했습니다.`);return true;
+ }catch(e){if(!skipConfirm)alert('정산서 이미지 전송 실패: '+e.message);throw e}finally{if(button){button.disabled=false;button.textContent=old}}
+};
+})();
+
+</script>
 </body>
 </html>
