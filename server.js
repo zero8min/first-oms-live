@@ -1,8 +1,11 @@
 const http=require('http'),fs=require('fs'),path=require('path'),url=require('url'),crypto=require('crypto'),XLSX=require('xlsx');
-const sseClients=new Set();
-function broadcastCustomers(list){
+const sseClients=new Map();
+function broadcastCustomers(list,tenantCode){
  const payload=`event: customers\ndata: ${JSON.stringify(list)}\n\n`;
- for(const res of [...sseClients]){try{res.write(payload)}catch(e){sseClients.delete(res)}}
+ for(const [res,code] of [...sseClients.entries()]){
+  if(tenantCode&&code!==tenantCode)continue;
+  try{res.write(payload)}catch(e){sseClients.delete(res)}
+ }
 }
 const ROOT=__dirname;
 // Render Persistent Disk mount path. DATA_DIR can be overridden for local tests.
@@ -220,6 +223,23 @@ function ensureDdaengTenantAccount(){
  return tenant;
 }
 ensureDdaengTenantAccount();
+// v7.34: 두 번째 거래처 MD유통. 기존 계정/비밀번호/데이터가 있으면 절대 덮어쓰지 않는다.
+const MD_TENANT_CODE=process.env.MD_TENANT_CODE||'MD-0002';
+function ensureMdTenantAccount(){
+ let list=readAccounts(),changed=false,tenant=list.find(a=>a.code===MD_TENANT_CODE||String(a.company||'').trim()==='MD유통');
+ if(!tenant){
+  tenant={id:crypto.randomUUID(),code:MD_TENANT_CODE,username:process.env.MD_TENANT_USERNAME||'md0002',passwordHash:passwordHash(process.env.MD_TENANT_PASSWORD||'MD@0002!'),company:'MD유통',ownerName:'MD유통',phone:'',role:'tenant',status:'active',mustChangePassword:true,createdAt:new Date().toISOString(),bootstrapVersion:'7.34'};
+  list.push(tenant);changed=true;
+ }else{
+  if(!tenant.code){tenant.code=MD_TENANT_CODE;changed=true}
+  if(!tenant.company){tenant.company='MD유통';changed=true}
+  if(tenant.role!=='tenant'){tenant.role='tenant';changed=true}
+  if(!tenant.status){tenant.status='active';changed=true}
+ }
+ if(changed)saveAccounts(list);else ensureTenantStorage(tenant);
+ return tenant;
+}
+ensureMdTenantAccount();
 function tenantFile(code,name){ensureTenantStorage({code});return path.join(tenantDir(code),name)}
 function tenantBackupDir(code,name){const d=path.join(tenantDir(code),name);fs.mkdirSync(d,{recursive:true});return d}
 function readJsonObject(file,fallback){try{const v=JSON.parse(fs.readFileSync(file,'utf8'));return v&&typeof v==='object'?v:fallback}catch(e){return fallback}}
@@ -231,9 +251,9 @@ function selectedTenantCode(req){
 }
 function assertTenantAccess(req,requested){const user=currentUser(req);if(!user)throw new Error('로그인이 필요합니다.');const code=String(requested||selectedTenantCode(req)||'');if(user.role!=='superadmin'&&code!==user.code)throw new Error('다른 거래처 데이터에는 접근할 수 없습니다.');return code}
 function tenantReadCustomers(code){return readJsonObject(tenantFile(code,'customers.json'),[])}
-function tenantReadState(code){return readJsonObject(tenantFile(code,'server-state.json'),{orders:[],customers:tenantReadCustomers(code),payments:[],settings:{},csRecords:[],shippingRecords:[]})}
-function tenantWriteCustomers(code,list){if(!Array.isArray(list))throw new Error('고객 데이터 형식 오류');const file=tenantFile(code,'customers.json'),backup=tenantFile(code,'customers-backup.json'),dir=tenantBackupDir(code,'backups');const old=tenantReadCustomers(code),stamp=new Date().toISOString().replace(/[:.]/g,'-');atomicWrite(backup,JSON.stringify(old,null,2));atomicWrite(path.join(dir,`customers-${stamp}.json`),JSON.stringify(old,null,2));atomicWrite(file,JSON.stringify(list,null,2));}
-function tenantWriteState(code,patch){const old=tenantReadState(code),next={...old,...patch,customers:Array.isArray(patch.customers)?patch.customers:tenantReadCustomers(code),updatedAt:new Date().toISOString()};const backup=tenantFile(code,'server-state-backup.json'),dir=tenantBackupDir(code,'state-backups');atomicWrite(backup,JSON.stringify(old,null,2));atomicWrite(path.join(dir,`state-${new Date().toISOString().replace(/[:.]/g,'-')}.json`),JSON.stringify(old,null,2));atomicWrite(tenantFile(code,'server-state.json'),JSON.stringify(next,null,2));if(Array.isArray(next.customers))tenantWriteCustomers(code,next.customers);return next}
+function tenantReadState(code){const st=readJsonObject(tenantFile(code,'server-state.json'),{orders:[],customers:[],payments:[],settings:{},csRecords:[],shippingRecords:[]});st.customers=tenantReadCustomers(code);return st}
+function tenantWriteCustomers(code,list){if(!Array.isArray(list))throw new Error('고객 데이터 형식 오류');const file=tenantFile(code,'customers.json'),backup=tenantFile(code,'customers-backup.json'),dir=tenantBackupDir(code,'backups');const old=tenantReadCustomers(code),stamp=new Date().toISOString().replace(/[:.]/g,'-');atomicWrite(backup,JSON.stringify(old,null,2));atomicWrite(path.join(dir,`customers-${stamp}.json`),JSON.stringify(old,null,2));atomicWrite(file,JSON.stringify(list,null,2));broadcastCustomers(list,code);}
+function tenantWriteState(code,patch){const old=tenantReadState(code),authoritativeCustomers=tenantReadCustomers(code),safePatch={...(patch||{})};delete safePatch.customers;const next={...old,...safePatch,customers:authoritativeCustomers,updatedAt:new Date().toISOString()};const backup=tenantFile(code,'server-state-backup.json'),dir=tenantBackupDir(code,'state-backups');atomicWrite(backup,JSON.stringify(old,null,2));atomicWrite(path.join(dir,`state-${new Date().toISOString().replace(/[:.]/g,'-')}.json`),JSON.stringify(old,null,2));atomicWrite(tenantFile(code,'server-state.json'),JSON.stringify(next,null,2));return next}
 function tenantReadIntegrations(code){return readJsonObject(tenantFile(code,'solapi-settings.json'),{})}
 function tenantSaveIntegrations(code,v){atomicWrite(tenantFile(code,'solapi-settings.json'),JSON.stringify(v,null,2))}
 function tenantReadSendHistory(code){return readJsonObject(tenantFile(code,'message-history.json'),[])}
@@ -271,15 +291,29 @@ function restoreDdaengCustomersAndSeparateSolapiOnce(){
   if(current.length===0)tenantWriteCustomers(tenant.code,sourceCustomers);
   const st=tenantReadState(tenant.code);if(!Array.isArray(st.customers)||st.customers.length===0){st.customers=sourceCustomers;tenantWriteState(tenant.code,st)}
  }
- // 과거 버전에서 주인님 솔라피가 땡라이브로 복사됐을 수 있으므로 1회 백업 후 빈 설정으로 분리한다.
+ // v7.34: 기존 거래처의 솔라피/카카오 설정은 절대 비우거나 덮어쓰지 않는다.
  const solapiFile=tenantFile(tenant.code,'solapi-settings.json');
- const old=readJsonObject(solapiFile,{});if(Object.keys(old).length){atomicWrite(tenantFile(tenant.code,'solapi-settings-before-v78-backup.json'),JSON.stringify(old,null,2))}
- atomicWrite(solapiFile,'{}');
+ const old=readJsonObject(solapiFile,{});
+ if(Object.keys(old).length){atomicWrite(tenantFile(tenant.code,'solapi-settings-preserved-v734.json'),JSON.stringify(old,null,2))}
  atomicWrite(path.join(tenantDir(tenant.code),'tenant-settings.json'),JSON.stringify({company:'땡라이브',tenantCode:tenant.code,customersRestoredAt:new Date().toISOString(),solapiMode:'tenant-own-setting'},null,2));
  atomicWrite(marker,JSON.stringify({tenantCode:tenant.code,customerCount:sourceCustomers.length,at:new Date().toISOString()},null,2));
 }
 migrateOwnerLegacyDataOnce();
 restoreDdaengCustomersAndSeparateSolapiOnce();
+function restoreBundledDdaengDataIfEmpty(){
+ try{
+  const current=tenantReadState(DDAENG_TENANT_CODE);
+  if(Array.isArray(current.orders)&&current.orders.length>0)return;
+  const bundled=path.join(ROOT,'data','initial-backup.json');
+  if(!fs.existsSync(bundled))return;
+  const backup=readJsonObject(bundled,{}),source=backup.state||backup;
+  if(!Array.isArray(source.orders)||source.orders.length===0)return;
+  const restored={...current,...source,shippingScans:current.shippingScans||source.shippingScans||{},updatedAt:new Date().toISOString()};
+  tenantWriteState(DDAENG_TENANT_CODE,restored);
+  console.log(`[DATA RECOVERY] ${DDAENG_TENANT_CODE}: orders ${restored.orders.length}, customers ${(restored.customers||[]).length}, payments ${(restored.payments||[]).length}`);
+ }catch(e){console.error('[DATA RECOVERY] 실패:',e.message)}
+}
+restoreBundledDdaengDataIfEmpty();
 
 function readBody(req,max=1024*1024){
  return new Promise((resolve,reject)=>{
@@ -582,6 +616,7 @@ const server=http.createServer((req,res)=>{
  if(u.pathname==='/api/public/packing/tracking'&&req.method==='POST')return readBody(req).then(body=>{try{const d=JSON.parse(body||'{}'),code=String(d.code||'').trim().toUpperCase(),tc=String(d.tenantCode||''),trackingNumber=String(d.trackingNumber||'').replace(/\s+/g,'').trim();if(!code||!tc)return json(res,400,{ok:false,error:'QR 코드 또는 거래처 코드가 없습니다.'});if(!trackingNumber)return json(res,400,{ok:false,error:'송장번호를 입력하거나 스캔해 주세요.'});if(trackingNumber.length<6||trackingNumber.length>40)return json(res,400,{ok:false,error:'송장번호 형식을 확인해 주세요.'});const st=tenantReadState(tc);st.shippingScans=st.shippingScans||{};const prev=st.shippingScans[code]||{};const trackingUpdatedAt=new Date().toISOString();st.shippingScans[code]={...prev,trackingNumber,trackingUpdatedAt};tenantWriteState(tc,st);return json(res,200,{ok:true,trackingNumber,trackingUpdatedAt})}catch(e){return json(res,400,{ok:false,error:e.message})}})
 
 
+ if(u.pathname==='/api/packing/tracking/bulk'&&req.method==='POST')return readBody(req,5*1024*1024).then(body=>{try{const d=JSON.parse(body||'{}'),updates=Array.isArray(d.updates)?d.updates:[];if(!updates.length)return json(res,400,{ok:false,error:'등록할 송장정보가 없습니다.'});const st=tenantReadState(tenantCode);st.shippingScans=st.shippingScans||{};let updated=0,skipped=0;for(const u of updates){const code=String(u.code||'').trim().toUpperCase(),trackingNumber=String(u.trackingNumber||'').replace(/\s+/g,'').trim(),courier=String(u.courier||'파일접수').trim();if(!code||!trackingNumber){skipped++;continue}const prev=st.shippingScans[code]||{};if(prev.trackingNumber&&prev.trackingNumber!==trackingNumber){skipped++;continue}st.shippingScans[code]={...prev,trackingNumber,courier,trackingUpdatedAt:new Date().toISOString(),trackingSource:'file-upload'};updated++}tenantWriteState(tenantCode,st);return json(res,200,{ok:true,updated,skipped})}catch(e){return json(res,400,{ok:false,error:e.message})}})
  if(u.pathname==='/api/packing/scans'&&req.method==='GET'){const st=tenantReadState(tenantCode);return json(res,200,{ok:true,shippingScans:st.shippingScans||{}})}
  if(u.pathname==='/api/packing/status'&&req.method==='POST')return readBody(req).then(body=>{try{const d=JSON.parse(body||'{}'),code=String(d.code||'').trim().toUpperCase();if(!code)return json(res,400,{ok:false,error:'택배코드가 없습니다.'});const st=tenantReadState(tenantCode);st.shippingScans=st.shippingScans||{};const prev=st.shippingScans[code]||{};st.shippingScans[code]={...prev,at:new Date().toISOString(),source:String(d.source||'admin-manual'),worker:String(d.worker||'관리자')};tenantWriteState(tenantCode,st);return json(res,200,{ok:true,scan:st.shippingScans[code]})}catch(e){return json(res,400,{ok:false,error:e.message})}})
  if(u.pathname==='/api/packing/status'&&req.method==='DELETE'){const code=String(u.query.code||'').trim().toUpperCase();if(!code)return json(res,400,{ok:false,error:'택배코드가 없습니다.'});const st=tenantReadState(tenantCode);st.shippingScans=st.shippingScans||{};delete st.shippingScans[code];tenantWriteState(tenantCode,st);return json(res,200,{ok:true})}
@@ -637,7 +672,7 @@ const server=http.createServer((req,res)=>{
    'X-Accel-Buffering':'no'
   });
   res.write(`event: customers\ndata: ${JSON.stringify(tenantReadCustomers(tenantCode))}\n\n`);
-  sseClients.add(res);
+  sseClients.set(res,tenantCode);
   const keep=setInterval(()=>{try{res.write(': keepalive\n\n')}catch(e){}},15000);
   req.on('close',()=>{clearInterval(keep);sseClients.delete(res)});
   return;
@@ -658,7 +693,7 @@ const server=http.createServer((req,res)=>{
    let list=tenantReadCustomers(tenantCode),i=list.findIndex(x=>x.nickname===c.nickname||x.phone===c.phone);
    const next={id:c.id||Date.now().toString(36),joinedAt:c.joinedAt||new Date().toLocaleString('ko-KR'),source:c.source||'가입폼',...c};
    if(i>=0)list[i]={...list[i],...next};else list.push(next);
-   tenantWriteCustomers(tenantCode,list);const st=tenantReadState(tenantCode);st.customers=list;tenantWriteState(tenantCode,st);json(res,200,next)
+   tenantWriteCustomers(tenantCode,list);const st=tenantReadState(tenantCode);st.customers=list;atomicWrite(tenantFile(tenantCode,'server-state.json'),JSON.stringify({...st,customers:list,updatedAt:new Date().toISOString()},null,2));json(res,200,{...next,totalCustomers:list.length})
   }catch(e){json(res,400,{error:'잘못된 요청'})}})
  }
  let p=u.pathname==='/'?'/index.html':u.pathname;
