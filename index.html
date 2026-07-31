@@ -1825,96 +1825,52 @@ tr:hover td{background:#f6f7f9!important;color:inherit!important}.exact-receipt 
 })();
 </script>
 
-<!-- V744_MMS_CANVAS_SAFE_PATCH_START -->
-<script id="v745-mms-canvas-compact-patch">
+<!-- V744_MMS_COMPACT_ACCOUNT_VISIBLE_ONLY_START -->
+<script id="v744-mms-compact-account-visible-only">
 (function(){
-  'use strict';
-  // MMS에서 계좌영역이 잘리지 않도록 전체 정산서를 더 컴팩트하게 그리고,
-  // 입금계좌는 계좌번호가 가장 잘 보이도록 강조합니다.
-  const safeReceiptImageBase64 = async function(r){
-    const W=794,H=1123,c=document.createElement('canvas');
-    c.width=W;c.height=H;const x=c.getContext('2d');
-    const left=38,right=W-38,width=right-left;let y=26;
-    const line=(x1,y1,x2,y2,w=1,color='#333')=>{x.strokeStyle=color;x.lineWidth=w;x.beginPath();x.moveTo(x1,y1);x.lineTo(x2,y2);x.stroke()};
-    const box=(bx,by,bw,bh,fill='#fff',stroke='#666',lw=1)=>{x.fillStyle=fill;x.fillRect(bx,by,bw,bh);x.strokeStyle=stroke;x.lineWidth=lw;x.strokeRect(bx,by,bw,bh)};
-    const txt=(t,tx,ty,font='14px sans-serif',align='left',color='#111')=>{x.font=font;x.textAlign=align;x.textBaseline='middle';x.fillStyle=color;x.fillText(String(t??''),tx,ty)};
-    const fit=(t,max,fontSize=14,bold=false,min=9)=>{let s=fontSize;while(s>min){x.font=`${bold?'bold ':''}${s}px sans-serif`;if(x.measureText(String(t||'')).width<=max)break;s--}return `${bold?'bold ':''}${s}px sans-serif`};
-    const drawTextLine=(label, value, rowH=34, valueFont=12)=>{box(left,y,84,rowH,'#f2f2f2','#777');box(left+84,y,width-84,rowH,'#fff','#777');txt(label,left+42,y+rowH/2,'bold 12px sans-serif','center');txt(value,left+94,y+rowH/2,fit(value,width-106,valueFont,false,9));y+=rowH};
-    x.fillStyle='#fff';x.fillRect(0,0,W,H);
-
-    txt((window.__tenantCompany||state.settings?.company||'FIRST OMS'),left,y+8,'bold 13px sans-serif');
-    txt('정산서',W/2,y+18,'bold 34px sans-serif','center');
-    const orderNo=String(r.date||'').replaceAll('-','')+'-'+String(indexOfReceiptKey(r.key)+1).padStart(3,'0');
-    const ox=right-184, oy=y-2, ow=184, rh=24;
-    box(ox,oy,ow,rh*2,'#fff','#333',1);box(ox,oy,58,rh,'#f2f2f2','#777');box(ox,oy+rh,58,rh,'#f2f2f2','#777');
-    line(ox+58,oy,ox+58,oy+rh*2);line(ox,oy+rh,ox+ow,oy+rh);
-    txt('주문일',ox+29,oy+rh/2,'bold 11px sans-serif','center');txt(r.date||'',ox+68,oy+rh/2,'11px sans-serif');
-    txt('주문번호',ox+29,oy+rh+rh/2,'bold 11px sans-serif','center');txt(orderNo,ox+68,oy+rh+rh/2,'11px sans-serif');
-
-    y=88;line(left,y,right,y,2.5);y+=26;
-    txt(`${r.nick}님 정산서`,left,y,'bold 21px sans-serif');txt(`정산서 ${indexOfReceiptKey(r.key)+1}`,right,y,'bold 12px sans-serif','right');y+=22;
-
-    const cst=r.customer||{}, addr=[cst.postalCode,cst.address,cst.detailAddress].filter(Boolean).join(' ')||'주소 미등록';
-    drawTextLine('고객명', cst.name||r.nick, 34, 16);
-    drawTextLine('배송지', addr, 38, 11);
-    drawTextLine('연락처', cst.phone||'연락처 미등록', 34, 12);
-    drawTextLine('메모', cst.memo||'', 34, 11);
-
-    const code=shippingCodeFor({key:r.key,name:cst.name||'',nick:r.nick,phone:cst.phone||'',address:addr,dates:new Set([r.date]),items:r.items,subtotal:r.subtotal,fee:r.fee,total:r.total,status:r.payment?.status||'unpaid'}), tracking=state.shippingScans?.[code]?.trackingNumber||'';
-    drawTextLine('송장번호', tracking||'', 32, 12);
-    y+=8;
-
-    const cols=[50,332,66,105,105], heads=['번호','상품명','수량','단가','금액'];
-    let cx=left;for(let i=0;i<cols.length;i++){box(cx,y,cols[i],28,'#1b1b1b','#1b1b1b');txt(heads[i],cx+cols[i]/2,y+14,'bold 12px sans-serif','center','#fff');cx+=cols[i]}y+=28;
-    const srcItems=(r.items||[]);
-    const maxRows=11;
-    let items=srcItems.slice(0,maxRows);
-    const extraCount=Math.max(0,srcItems.length-maxRows);
-    if(extraCount){items=[...items,{number:'',item:`외 ${extraCount}건`,qty:'',unit:'',amount:''}]}
-    for(let i=0;i<items.length;i++){
-      const it=items[i],h=31;cx=left;
-      const vals=[it.number||i+1,it.item||'',it.qty??'',it.unit!==''&&it.unit!=null?money(it.unit):'',it.amount!==''&&it.amount!=null?money(it.amount):''];
-      for(let j=0;j<cols.length;j++){
-        box(cx,y,cols[j],h,'#fff','#888');
-        txt(vals[j],j===1?cx+7:cx+cols[j]/2,y+h/2,fit(vals[j],cols[j]-10,j===1?12:11,false,8),j===1?'left':'center');
-        cx+=cols[j]
-      }
-      y+=h
-    }
-    if(!items.length){box(left,y,width,34,'#fff','#888');txt('등록된 상품이 없습니다.',W/2,y+17,'12px sans-serif','center','#666');y+=34}
-
-    y+=10;
-    const sumRows=[['상품합계',money(r.subtotal)],['배송비',money(r.fee)]];
-    for(const [lab,val] of sumRows){box(left,y,width-176,30,'#f4f4f4','#777');box(right-176,y,176,30,'#fff','#777');txt(lab,right-190,y+15,'12px sans-serif','right');txt(val,right-12,y+15,'bold 13px sans-serif','right');y+=30}
-    y+=8;
-    box(left,y,width-220,52,'#fff','#111',2.5);box(right-220,y,220,52,'#fff','#111',2.5);
-    txt('총 결제금액',left+16,y+26,'bold 18px sans-serif');txt(money(r.total),right-14,y+26,'bold 26px sans-serif','right');y+=62;
-
-    const notice=(state.settings?.paymentNotice||'입금자명은 주문자명과 동일하게 부탁드립니다.').replace(/
-+/g,' / ');
-    box(left,y,width,42,'#fff8f8','#d33',1.5);
-    txt(notice,W/2,y+21,fit(notice,width-20,13,true,9),'center','#c00');y+=50;
-
-    const bank=state.settings?.bank||'카카오뱅크';
-    const account=state.settings?.account||'계좌번호 미설정';
-    const holder=state.settings?.holder||'김미숙';
-    box(left,y,118,52,'#fff3a6','#b79a00',1.5);box(left+118,y,width-118,52,'#fffef0','#b79a00',1.5);
-    txt('입금계좌',left+59,y+26,'bold 14px sans-serif','center','#6b5300');
-    txt(account,left+136,y+21,fit(account,width-150,21,true,12),'left','#111');
-    txt(`${bank} · 예금주 ${holder}`,left+136,y+39,fit(`${bank} · 예금주 ${holder}`,width-150,11,false,9),'left','#555');
-    y+=60;
-
-    line(left,y,right,y,1.5,'#444');
-    const contact=state.settings?.contact||'문의는 카카오채널로 부탁드립니다.';
-    txt(contact,left,y+18,fit(contact,width-90,11,false,9),'left','#444');
-    txt('FIRST OMS',W/2,H-18,'11px sans-serif','center','#666');
-
-    let q=.90,data=c.toDataURL('image/jpeg',q);while(data.length>360000&&q>.55){q-=.05;data=c.toDataURL('image/jpeg',q)}return data.split(',')[1];
-  };
-  window.receiptImageBase64 = safeReceiptImageBase64;
-  try { receiptImageBase64 = safeReceiptImageBase64; } catch (_) {}
+'use strict';
+function v744money(v){return (Number(v)||0).toLocaleString('ko-KR')+'원';}
+function v744fit(ctx,text,max,size,bold){let s=size;while(s>9){ctx.font=(bold?'700 ':'')+s+'px sans-serif';if(ctx.measureText(String(text||'')).width<=max)break;s--;}return (bold?'700 ':'')+s+'px sans-serif';}
+window.receiptImageBase64=async function(r){
+  const W=794,H=1000,canvas=document.createElement('canvas');canvas.width=W;canvas.height=H;
+  const c=canvas.getContext('2d');c.fillStyle='#fff';c.fillRect(0,0,W,H);
+  const L=34,R=W-34,BW=R-L;
+  const line=(x1,y1,x2,y2,w=1,color='#444')=>{c.strokeStyle=color;c.lineWidth=w;c.beginPath();c.moveTo(x1,y1);c.lineTo(x2,y2);c.stroke();};
+  const box=(x,y,w,h,fill='#fff',stroke='#777',lw=1)=>{c.fillStyle=fill;c.fillRect(x,y,w,h);c.strokeStyle=stroke;c.lineWidth=lw;c.strokeRect(x,y,w,h);};
+  const text=(t,x,y,font='13px sans-serif',align='left',color='#111')=>{c.font=font;c.textAlign=align;c.textBaseline='middle';c.fillStyle=color;c.fillText(String(t??''),x,y);};
+  let y=28;
+  text('땡라이브 × FIRST OMS',L,y+10,'700 13px sans-serif');
+  text('정 산 서',W/2,y+25,'700 34px sans-serif','center');
+  const idx=(typeof indexOfReceiptKey==='function'?indexOfReceiptKey(r.key):0);
+  const orderNo=String(r.date||'').replaceAll('-','')+'-'+String(idx+1).padStart(3,'0');
+  const ox=R-190,oy=y-2,rh=25;box(ox,oy,190,rh*2);box(ox,oy,65,rh,'#f1f1f1');box(ox,oy+rh,65,rh,'#f1f1f1');line(ox+65,oy,ox+65,oy+rh*2);line(ox,oy+rh,ox+190,oy+rh);
+  text('주문일',ox+32,oy+rh/2,'700 11px sans-serif','center');text(r.date||'',ox+72,oy+rh/2,'11px sans-serif');
+  text('주문번호',ox+32,oy+rh+rh/2,'700 11px sans-serif','center');text(orderNo,ox+72,oy+rh+rh/2,'11px sans-serif');
+  y=90;line(L,y,R,y,3);y+=27;
+  text((r.nick||'')+'님 정산서',L,y,'700 22px sans-serif');text('정산서 '+(idx+1),R,y,'700 13px sans-serif','right');y+=21;
+  const cust=r.customer||{};
+  const info=[['고객명',cust.name||r.nick],['배송지',[cust.postalCode,cust.address,cust.detailAddress].filter(Boolean).join(' ')||'주소 미등록'],['연락처',cust.phone||'연락처 미등록'],['메모',cust.memo||'']];
+  for(const [lab,val] of info){const h=34;box(L,y,82,h,'#f3f3f3');box(L+82,y,BW-82,h);text(lab,L+41,y+h/2,'700 12px sans-serif','center');text(val,L+93,y+h/2,v744fit(c,val,BW-108,lab==='고객명'?16:12,lab==='고객명'));y+=h;}
+  let tracking='';try{const code=typeof shippingCodeFor==='function'?shippingCodeFor({key:r.key,name:cust.name||'',nick:r.nick,phone:cust.phone||'',address:[cust.postalCode,cust.address,cust.detailAddress].filter(Boolean).join(' '),dates:new Set([r.date]),items:r.items,subtotal:r.subtotal,fee:r.fee,total:r.total,status:r.payment?.status||'unpaid'}):'';tracking=(state.shippingScans?.[code]?.trackingNumber||'');}catch(_e){}
+  box(L,y,82,31,'#f3f3f3');box(L+82,y,BW-82,31);text('송장번호',L+41,y+15.5,'700 12px sans-serif','center');text(tracking,L+93,y+15.5,'12px sans-serif');y+=39;
+  const cols=[52,326,66,105,105],heads=['번호','상품명','수량','단가','금액'];let x=L;
+  for(let i=0;i<cols.length;i++){box(x,y,cols[i],28,'#171717','#171717');text(heads[i],x+cols[i]/2,y+14,'700 12px sans-serif','center','#fff');x+=cols[i];}y+=28;
+  const items=Array.isArray(r.items)?r.items:[];
+  const maxRows=14,rowH=29;
+  for(let i=0;i<Math.min(items.length,maxRows);i++){const it=items[i],vals=[i+1,it.item||'',Number(it.qty)||0,v744money(it.unit),v744money(it.amount)];x=L;for(let j=0;j<cols.length;j++){box(x,y,cols[j],rowH);text(vals[j],j===1?x+7:x+cols[j]/2,y+rowH/2,v744fit(c,vals[j],cols[j]-10,j===1?12:11,false),j===1?'left':'center');x+=cols[j];}y+=rowH;}
+  if(items.length>maxRows){text('외 '+(items.length-maxRows)+'개 상품',R,y+12,'11px sans-serif','right','#666');y+=20;}
+  y+=7;
+  for(const [lab,val] of [['상품합계',v744money(r.subtotal)],['배송비',v744money(r.fee)]]){box(L,y,BW-170,29,'#f5f5f5');box(R-170,y,170,29);text(lab,R-184,y+14.5,'12px sans-serif','right');text(val,R-10,y+14.5,'700 13px sans-serif','right');y+=29;}
+  y+=7;box(L,y,BW-220,48,'#fff','#111',2);box(R-220,y,220,48,'#fff','#111',2);text('총 결제금액',L+14,y+24,'700 17px sans-serif');text(v744money(r.total),R-12,y+24,'700 24px sans-serif','right');y+=57;
+  const notice=(state.settings?.paymentNotice||'입금자명은 주문자명과 동일하게 부탁드립니다.').replace(/\n/g,' ');box(L,y,BW,40,'#fff8f8','#cc3333',1.5);text(notice,W/2,y+20,v744fit(c,notice,BW-18,13,true),'center','#b40000');y+=49;
+  const bank=state.settings?.bank||'카카오뱅크',account=state.settings?.account||'계좌번호 미설정',holder=state.settings?.holder||'';
+  box(L,y,112,56,'#fff3b0','#b79a00');box(L+112,y,BW-112,56,'#fff3b0','#b79a00');text('입금계좌',L+56,y+28,'700 15px sans-serif','center');
+  text(bank+'  '+account,L+126,y+20,v744fit(c,bank+'  '+account,BW-140,18,true));text('예금주 '+holder,L+126,y+40,'700 13px sans-serif');
+  y+=66;line(L,y,R,y,1.5);text(state.settings?.contact||'문의는 카카오채널로 부탁드립니다.',L,y+18,'12px sans-serif');text('FIRST OMS',W/2,H-16,'11px sans-serif','center','#777');
+  let q=.88,data=canvas.toDataURL('image/jpeg',q);while(data.length>300000&&q>.50){q-=.06;data=canvas.toDataURL('image/jpeg',q);}return data.split(',')[1];
+};
 })();
 </script>
-<!-- V744_MMS_CANVAS_SAFE_PATCH_END -->
+<!-- V744_MMS_COMPACT_ACCOUNT_VISIBLE_ONLY_END -->
 </body>
 </html>
