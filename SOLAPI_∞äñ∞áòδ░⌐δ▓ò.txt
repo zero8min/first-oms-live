@@ -1,0 +1,15 @@
+SOLAPI 실제 문자전송 설정
+
+Render 대시보드 → Environment에서 아래 3개를 등록하세요.
+
+SOLAPI_API_KEY=솔라피 API Key
+SOLAPI_API_SECRET=솔라피 API Secret
+SOLAPI_SENDER=솔라피에서 승인된 발신번호 (숫자만, 예: 07012345678)
+
+저장 후 Render에서 재배포/재시작합니다.
+정산서 화면의 “솔라피 문자전송” 버튼을 누르면 고객DB 전화번호로 즉시 전송 요청합니다.
+
+주의
+- API Key와 Secret은 index.html에 입력하지 마세요. 반드시 Render 환경변수로만 저장하세요.
+- SOLAPI_SENDER는 솔라피에 등록·승인된 발신번호여야 합니다.
+- 잔액과 발송한도가 있어야 실제 발송됩니다.

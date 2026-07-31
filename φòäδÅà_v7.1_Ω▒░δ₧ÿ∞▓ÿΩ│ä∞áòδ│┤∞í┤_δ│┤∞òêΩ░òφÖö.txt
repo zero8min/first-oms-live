@@ -1,0 +1,35 @@
+FIRST OMS 땡라이브서버 v7.1 거래처 계정보존 보안강화
+
+[반영 내용]
+1. 거래처 계정은 Render Persistent Disk의 data/accounts.json에 저장
+2. 변경 전 accounts-backup.json 및 account-backups/ 시간별 백업 생성
+3. accounts.json이 손상되면 accounts-backup.json → 최신 시간별 백업 순서로 자동 복구
+4. 기존 계정이 있는 상태에서 빈 목록으로 전체 초기화하려는 저장 요청 차단
+5. 저장은 임시파일 작성 후 교체하는 원자적 저장 방식 적용
+6. 최고관리자 계정은 기존 계정이 없을 때만 최초 1회 생성
+7. FIRST-0001 등 기존 거래처 코드는 유지, 신규 거래처만 다음 코드 발급
+8. 거래처별 보존 폴더 자동 생성
+   data/tenants/FIRST-0001/customers.json
+   data/tenants/FIRST-0001/server-state.json
+   data/tenants/FIRST-0001/shipping.json
+   data/tenants/FIRST-0001/cs-history.json
+   data/tenants/FIRST-0001/sales-archives/
+9. 최고관리자용 계정 수동 백업 API 추가
+10. DATA_DIR 환경변수를 지원하며, 미설정 시 프로젝트의 data 폴더 사용
+
+[Render 필수]
+Persistent Disk Mount Path:
+/opt/render/project/src/data
+
+기존 data 폴더는 삭제하거나 GitHub에 올리지 마세요.
+배포 시 ZIP 안의 코드 파일을 교체하되 Render Persistent Disk의 기존 자료는 유지해야 합니다.
+
+[교체 파일]
+이번 보강의 핵심 교체 파일은 server.js입니다.
+연결 오류 방지를 위해 ZIP 전체 코드 기준으로 배포하는 것을 권장합니다.
+
+[검증]
+- Node 문법 검사 통과
+- 신규 계정 저장 폴더 생성 확인
+- accounts.json 고의 손상 후 백업 자동 복구 확인
+- 최고관리자 중복 생성 방지 확인

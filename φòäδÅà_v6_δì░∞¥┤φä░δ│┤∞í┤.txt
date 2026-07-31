@@ -1,0 +1,19 @@
+땡라이브 정산서버 v6.0 데이터 보존 강화본
+
+이번 파일에서 우선 적용된 핵심
+1. 고객DB는 삭제 대신 보관 처리되어 원본 기록이 남습니다.
+2. 고객DB는 customers.json / customers-backup.json / customers.xlsx 및 시간별 백업에 저장됩니다.
+3. 판매리스트·주문자료는 server-state.json / server-state-backup.json / sales-list.xlsx로 자동 저장됩니다.
+4. 방송일자별 판매리스트는 data/sales-archives/YYYY-MM-DD.json 및 .xlsx로 자동 보관됩니다.
+5. 전체 상태는 data/state-backups 폴더에 최대 100개 시점 백업으로 보존됩니다.
+6. 브라우저 localStorage에도 함께 저장되므로 브라우저+서버 이중 보존됩니다.
+7. 전체 백업 버튼은 서버의 최신 전체자료를 내려받습니다.
+
+매우 중요
+- Render 일반 임시 디스크만 사용하면 재배포 때 서버 파일이 초기화될 수 있습니다.
+- data 폴더를 Render Persistent Disk에 연결해야 서버 재배포 후에도 보존됩니다.
+- 배포 전에 기존 서버 data 폴더 전체를 반드시 별도 다운로드하십시오.
+- 이 파일은 기존 땡라이브서버 원본을 덮어쓰지 않는 v6 복사본입니다.
+
+이번 버전은 데이터 보존 기반을 먼저 강화한 1차 개발본입니다.
+거래처 로그인/최고관리자 SaaS, QR 포장검수, 송장 API 자동발행은 별도 서버 DB와 인증 설계가 필요한 다음 개발 단계입니다.

@@ -1,0 +1,30 @@
+FIRST OMS 카카오 알림톡 연동 방법
+
+1. 솔라피 콘솔에서 카카오 비즈니스 채널을 연결합니다.
+2. 아래 변수명이 포함된 알림톡 템플릿을 등록하고 승인을 받습니다.
+
+#{고객명}
+#{닉네임}
+#{상품내역}
+#{상품합계}
+#{배송비}
+#{결제금액}
+#{은행}
+#{예금주}
+#{계좌번호}
+#{문의안내}
+
+3. Render > FIRST OMS 서비스 > Environment에 아래 값을 추가합니다.
+
+SOLAPI_API_KEY=솔라피 API Key
+SOLAPI_API_SECRET=솔라피 API Secret
+SOLAPI_SENDER=승인된 문자 발신번호(하이픈 없이)
+SOLAPI_KAKAO_PF_ID=솔라피에 연결된 카카오채널 프로필 ID
+SOLAPI_KAKAO_TEMPLATE_ID=승인된 알림톡 템플릿 ID
+
+4. 저장 후 Manual Deploy > Deploy latest commit으로 재배포합니다.
+5. FIRST OMS 정산서 화면에서 “연동상태 확인”을 누릅니다.
+6. 고객 정산서의 “카카오 알림톡 전송”을 누릅니다.
+
+알림톡 실패 시 등록된 발신번호로 문자가 자동 대체 발송됩니다.
+알림톡 문구는 카카오 승인을 받은 템플릿과 변수명이 정확히 일치해야 합니다.
