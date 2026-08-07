@@ -309,6 +309,7 @@ function restoreBundledDdaengDataIfEmpty(){
   const backup=readJsonObject(bundled,{}),source=backup.state||backup;
   if(!Array.isArray(source.orders)||source.orders.length===0)return;
   const restored={...current,...source,shippingScans:current.shippingScans||source.shippingScans||{},updatedAt:new Date().toISOString()};
+  if(Array.isArray(restored.customers))tenantWriteCustomers(DDAENG_TENANT_CODE,restored.customers);
   tenantWriteState(DDAENG_TENANT_CODE,restored);
   console.log(`[DATA RECOVERY] ${DDAENG_TENANT_CODE}: orders ${restored.orders.length}, customers ${(restored.customers||[]).length}, payments ${(restored.payments||[]).length}`);
  }catch(e){console.error('[DATA RECOVERY] 실패:',e.message)}
@@ -622,7 +623,15 @@ const server=http.createServer((req,res)=>{
  if(u.pathname==='/api/packing/status'&&req.method==='DELETE'){const code=String(u.query.code||'').trim().toUpperCase();if(!code)return json(res,400,{ok:false,error:'택배코드가 없습니다.'});const st=tenantReadState(tenantCode);st.shippingScans=st.shippingScans||{};delete st.shippingScans[code];tenantWriteState(tenantCode,st);return json(res,200,{ok:true})}
  if(u.pathname==='/api/state'&&req.method==='GET')return json(res,200,{ok:true,state:tenantReadState(tenantCode),archives:tenantListSalesArchives(tenantCode),tenantCode});
  if(u.pathname==='/api/state'&&req.method==='POST'){
-  return readBody(req,20*1024*1024).then(body=>{try{const st=JSON.parse(body||'{}'),current=tenantReadState(tenantCode);st.shippingScans=current.shippingScans||{};const saved=tenantWriteState(tenantCode,st);return json(res,200,{ok:true,updatedAt:saved.updatedAt,orders:(saved.orders||[]).length,customers:(saved.customers||[]).length})}catch(e){return json(res,400,{ok:false,error:e.message})}})
+  return readBody(req,20*1024*1024).then(body=>{try{
+   const st=JSON.parse(body||'{}'),current=tenantReadState(tenantCode);
+   // 전체복원/자동저장에 고객 배열이 포함되면 customers.json을 먼저 갱신한다.
+   // SOLAPI 설정(solapi-settings.json)은 이 경로에서 읽거나 쓰지 않는다.
+   if(Array.isArray(st.customers))tenantWriteCustomers(tenantCode,st.customers);
+   st.shippingScans=current.shippingScans||st.shippingScans||{};
+   const saved=tenantWriteState(tenantCode,st);
+   return json(res,200,{ok:true,updatedAt:saved.updatedAt,orders:(saved.orders||[]).length,customers:(saved.customers||[]).length})
+  }catch(e){return json(res,400,{ok:false,error:e.message})}})
  }
  if(u.pathname==='/api/state/backup'&&req.method==='GET'){
   const st=tenantReadState(tenantCode);const payload={version:7.5,tenantCode,exportedAt:new Date().toISOString(),state:st};
