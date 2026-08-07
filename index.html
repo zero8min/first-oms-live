@@ -491,7 +491,7 @@ const orderAliases={
  amount:['금액','합계','총액','판매금액'],
  date:['방송일','방송일자','주문일','날짜']
 };
-function importOrders(rows,filename){
+async function importOrders(rows,filename){
  const hi=findHeader(rows,orderAliases), map=colMap(rows[hi]||[],orderAliases);
  const bdate=$('broadcastDate').value||today(), fee=Number($('shippingFee').value)||0;
  let parsed=[];
@@ -502,12 +502,18 @@ function importOrders(rows,filename){
   const unit=Number(String(map.unit>=0?r[map.unit]:0).replace(/[^0-9.-]/g,''))||0;
   const amount=Number(String(map.amount>=0?r[map.amount]:0).replace(/[^0-9.-]/g,''))||qty*unit;
   const dateVal=map.date>=0&&r[map.date]?formatDate(r[map.date]):bdate;
-  parsed.push({id:crypto.randomUUID(),number:String(number||idx+1).replace(/^#/,'').trim(),date:dateVal,nick:String(nick).trim(),item:String(item).trim(),qty,unit,amount,fee,source:filename});
+  parsed.push({id:crypto.randomUUID(),number:String(number||idx+1).replace(/^#/,'').trim(),date:dateVal,nick:cleanBrokenText(nick),item:cleanBrokenText(item),qty,unit,amount,fee,source:filename});
  });
  if($('duplicateMode').value==='replaceDate'){
   const dates=[...new Set(parsed.map(x=>x.date))]; state.orders=state.orders.filter(o=>!dates.includes(o.date));
  }
- state.orders.push(...parsed); autoMatchAll(); saveSilently(); renderAll(); go('orders');
+ state.orders.push(...parsed);
+ // 판매리스트를 바꾼 직후 최신 고객DB를 다시 받아 매칭한 뒤 정산서를 만듭니다.
+ // SOLAPI/MMS 전송 코드는 변경하지 않습니다.
+ try{await syncServerCustomers(false)}catch(e){console.warn('판매리스트 업로드 후 고객DB 동기화 실패',e)}
+ autoMatchAll(); saveSilently(); renderAll();
+ if($('receiptDate')&&parsed.length){const dates=[...new Set(parsed.map(x=>x.date))];if(dates.length===1)$('receiptDate').value=dates[0]}
+ go('orders');
  alert(parsed.length+'개 주문행을 불러왔습니다.');
 }
 function formatDate(v){
@@ -551,7 +557,9 @@ function getReceipts(){
   groups.get(k).items.push(o);
  });
  return [...groups.values()].map(g=>{
-  const c=state.customers.find(x=>x.id===g.customerId)||null;
+  let c=state.customers.find(x=>x.id===g.customerId)||null;
+  // 새 판매리스트에서 customerId가 아직 없거나 예전 값이어도 닉네임으로 현재 고객DB를 다시 찾습니다.
+  if(!c){const m=findCustomerByNick(g.nick);c=m.customer||null;if(c){g.customerId=c.id;g.matchStatus=m.status}}
   const subtotal=g.items.reduce((a,x)=>a+(Number(x.amount)||0),0), total=subtotal+(Number(g.fee)||0);
   const pay=matchPayment(g,c,total);
   return {...g,customer:c,subtotal,total,payment:pay,starred:g.items.some(x=>x.starred)};
