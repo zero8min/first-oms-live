@@ -649,9 +649,13 @@ const server=http.createServer((req,res)=>{
  if(u.pathname==='/api/state'&&req.method==='POST'){
   return readBody(req,20*1024*1024).then(body=>{try{
    const st=JSON.parse(body||'{}'),current=tenantReadState(tenantCode);
-   // 전체복원/자동저장에 고객 배열이 포함되면 customers.json을 먼저 갱신한다.
+   // v7.46.3: 일반 자동저장은 고객DB를 절대 덮어쓰지 않는다.
+   // 고객DB 변경은 /api/customers(추가/수정/삭제) 또는 명시적 전체복원에서만 허용한다.
+   // 이렇게 해야 오래된 화면 state(예: 243/286명)가 새 고객을 지우지 않는다.
+   const isExplicitRestore=String(u.query.restore||'')==='1';
+   if(isExplicitRestore && Array.isArray(st.customers))tenantWriteCustomers(tenantCode,st.customers);
+   else delete st.customers;
    // SOLAPI 설정(solapi-settings.json)은 이 경로에서 읽거나 쓰지 않는다.
-   if(Array.isArray(st.customers))tenantWriteCustomers(tenantCode,st.customers);
    st.shippingScans=current.shippingScans||st.shippingScans||{};
    const saved=tenantWriteState(tenantCode,st);
    return json(res,200,{ok:true,updatedAt:saved.updatedAt,orders:(saved.orders||[]).length,customers:(saved.customers||[]).length})

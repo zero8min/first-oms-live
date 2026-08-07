@@ -1256,7 +1256,7 @@ $('backupFile').onchange=e=>{
    if(!restored||!Array.isArray(restored.customers)) throw new Error('올바른 백업 파일이 아닙니다.');
    // 화면에만 먼저 넣지 않고 서버에 즉시 전체복원한다. 이렇게 해야 기존 고객 SSE가 복원값을 되돌리지 않는다.
    const next={...restored,orders:Array.isArray(restored.orders)?restored.orders:[],customers:restored.customers,payments:Array.isArray(restored.payments)?restored.payments:[],settings:{...state.settings,...(restored.settings||{})}};
-   const resp=await fetch('/api/state',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(next)});
+   const resp=await fetch('/api/state?restore=1',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(next)});
    const saved=await resp.json(); if(!resp.ok)throw new Error(saved.error||'서버 복원 저장 실패');
    state=next; localStorage.setItem(KEY,JSON.stringify(state)); autoMatchAll(); renderAll();
    await syncServerCustomers(false);
