@@ -316,6 +316,30 @@ function restoreBundledDdaengDataIfEmpty(){
 }
 restoreBundledDdaengDataIfEmpty();
 
+// v7.46.1 고객DB 보강: 번들 전체백업의 고객 수가 현재 FIRST-0001 고객DB보다 많으면
+// 고객 목록만 1회 복원한다. 주문/입금/설정 및 SOLAPI 파일은 변경하지 않는다.
+function restoreBundledDdaengCustomersIfNewerOnce(){
+ try{
+  const marker=path.join(DATA_ROOT,'.v7461-ddaeng-customers-287-restored');
+  if(fs.existsSync(marker))return;
+  const bundled=path.join(ROOT,'data','initial-backup.json');
+  if(!fs.existsSync(bundled))return;
+  const backup=readJsonObject(bundled,{}),source=backup.state||backup;
+  const bundledCustomers=Array.isArray(source.customers)?source.customers:[];
+  if(!bundledCustomers.length)return;
+  const currentCustomers=tenantReadCustomers(DDAENG_TENANT_CODE);
+  if(bundledCustomers.length>currentCustomers.length){
+   tenantWriteCustomers(DDAENG_TENANT_CODE,bundledCustomers);
+   // server-state.json의 customers도 authoritative customers.json과 즉시 맞춘다.
+   const currentState=tenantReadState(DDAENG_TENANT_CODE);
+   tenantWriteState(DDAENG_TENANT_CODE,currentState);
+   console.log(`[CUSTOMER RECOVERY] ${DDAENG_TENANT_CODE}: ${currentCustomers.length} -> ${bundledCustomers.length}`);
+  }
+  atomicWrite(marker,JSON.stringify({tenantCode:DDAENG_TENANT_CODE,before:currentCustomers.length,after:tenantReadCustomers(DDAENG_TENANT_CODE).length,at:new Date().toISOString(),source:'data/initial-backup.json',scope:'customers-only'},null,2));
+ }catch(e){console.error('[CUSTOMER RECOVERY] 실패:',e.message)}
+}
+restoreBundledDdaengCustomersIfNewerOnce();
+
 function readBody(req,max=1024*1024){
  return new Promise((resolve,reject)=>{
   let body='';req.on('data',d=>{body+=d;if(body.length>max){reject(new Error('요청이 너무 큽니다'));req.destroy()}});
