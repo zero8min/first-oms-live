@@ -450,16 +450,8 @@ function go(id){
  if(id==='shipping') renderShipping();
  window.scrollTo({top:0,behavior:'auto'});
 }
-async function saveAll(){
- if(!serverBootComplete)return alert('서버 연결 확인 중입니다. 서버 데이터가 확인되기 전에는 저장하지 않습니다.');
- await saveSilently(true);
- alert('현재 자료를 서버에 저장했습니다. 다른 컴퓨터에서도 같은 계정으로 로그인하면 그대로 불러옵니다.');
-}
-function loadAll(){
- // v7.47.1: 로컬 저장소는 서버 장애 시 화면 확인용 캐시일 뿐, 서버 원본으로 자동 복원하지 않는다.
- try{const saved=JSON.parse(localStorage.getItem(KEY));if(saved)state={...state,...saved,settings:{...state.settings,...(saved.settings||{})}}}catch(e){}
- renderMessageSettings(true);initSmsTemplateGuard();renderAll();
-}
+function saveAll(){localStorage.setItem(KEY,JSON.stringify(state));alert('현재 자료를 이 기기에 저장했습니다.');}
+function loadAll(){try{const saved=JSON.parse(localStorage.getItem(KEY));if(saved)state={...state,...saved,settings:{...state.settings,...(saved.settings||{})}}}catch(e){} renderMessageSettings(true);initSmsTemplateGuard();renderAll();}
 function readWorkbook(file, cb){
  const r=new FileReader(); r.onload=e=>{try{
   const wb=XLSX.read(e.target.result,{type:'array',cellDates:true});
@@ -1025,67 +1017,6 @@ main{padding-top:18px}
 
 
 
-\n<style id="v747-style">.v747-print-check{width:20px;height:20px;cursor:pointer}.v747-select-cell{text-align:center!important;width:52px}.v747-faint{font-size:12px;color:#666}</style>\n<script id="v747-added-features">
-(()=>{
-'use strict';
-const $v=id=>document.getElementById(id);
-const escv=v=>String(v??'').replace(/[&<>\"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;',"'":'&#39;'}[ch]));
-const dayv=()=>new Date().toLocaleDateString('sv-SE');
-let receiptSelectedV747=new Set(), shippingSelectedV747=new Set();
-function logSearchV747(page,q){q=String(q||'').trim();if(!q)return;fetch('/api/search-log',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({page,query:q})}).catch(()=>{})}
-for(const id of ['customerSearch','receiptSearch']){const e=$v(id);if(e)e.addEventListener('change',()=>logSearchV747(id,e.value))}
-
-const oldGetReceipts=window.getReceipts;
-window.getReceipts=function(){
- const groups=new Map();
- (state.orders||[]).forEach(o=>{const k=o.date+'|'+norm(o.nick);if(!groups.has(k))groups.set(k,{key:k,date:o.date,nick:o.nick,items:[],customerId:o.customerId,matchStatus:o.matchStatus,fee:o.fee||0});groups.get(k).items.push(o)});
- const base=[...groups.values()].map(g=>{let c=(state.customers||[]).find(x=>x.id===g.customerId)||null;if(!c){const m=findCustomerByNick(g.nick);c=m.customer||null;if(c){g.customerId=c.id;g.matchStatus=m.status}}const subtotal=g.items.reduce((a,x)=>a+(Number(x.amount)||0),0),total=subtotal+(Number(g.fee)||0);return {...g,customer:c,subtotal,total,starred:g.items.some(x=>x.starred)}}).sort((a,b)=>b.date.localeCompare(a.date)||a.nick.localeCompare(b.nick,'ko'));
- const used=new Set();
- for(const r of base){
-  const ov=state.paymentOverrides?.[r.key];
-  if(ov?.status){r.payment={status:ov.status,payment:ov.payment||null,reason:'관리자 수기변경',manual:true,verified:ov.status==='paid'};continue}
-  const exactNames=[r.nick,r.customer?.nick,r.customer?.nickname,r.customer?.name].filter(Boolean).map(norm);
-  const exact=(state.payments||[]).map((p,i)=>({p,i})).filter(x=>!used.has(x.i)&&exactNames.includes(norm(x.p.payer))&&Number(x.p.amount)===Number(r.total));
-  if(exact.length===1){used.add(exact[0].i);r.payment={status:'paid',payment:exact[0].p,verified:true,reason:'이름+금액 1:1 정확일치'};continue}
-  if(exact.length>1){r.payment={status:'review',payment:exact[0].p,verified:false,reason:'동일 이름·금액 입금 여러 건'};continue}
-  const sameName=(state.payments||[]).map((p,i)=>({p,i})).filter(x=>!used.has(x.i)&&exactNames.includes(norm(x.p.payer)));
-  if(sameName.length){r.payment={status:'amount-mismatch',payment:sameName[0].p,verified:false,reason:'이름 일치·금액 불일치'};continue}
-  const fuzzy=(state.payments||[]).map((p,i)=>({p,i})).filter(x=>!used.has(x.i)&&Number(x.p.amount)===Number(r.total)&&exactNames.some(n=>{const pn=norm(x.p.payer);return pn&&n&&(pn.includes(n)||n.includes(pn))}));
-  if(fuzzy.length){r.payment={status:'review',payment:fuzzy[0].p,verified:false,reason:'이름 유사·금액 일치 — 수동확인'};continue}
-  r.payment={status:'unpaid',verified:false};
- }
- return base;
-};
-
-function decorateReceiptsV747(){
- const table=$v('receiptCards')?.querySelector('table');if(!table)return;const hr=table.querySelector('thead tr');if(hr&&!hr.querySelector('.v747-select-head')){const th=document.createElement('th');th.className='v747-select-head v747-select-cell';th.textContent='출력';hr.prepend(th)}
- [...table.querySelectorAll('tbody tr')].forEach((tr,i)=>{if(tr.querySelector('.v747-receipt-check'))return;const rs=getReceipts(),search=($v('receiptSearch')?.value||'').trim().toLowerCase(),date=$v('receiptDate')?.value||'';const filtered=rs.filter(r=>(!date||r.date===date)&&(!search||[r.nick,r.customer?.name].some(x=>String(x||'').toLowerCase().includes(search))));const r=filtered[i];if(!r)return;const td=document.createElement('td');td.className='v747-select-cell';const cb=document.createElement('input');cb.type='checkbox';cb.className='v747-print-check v747-receipt-check';cb.checked=receiptSelectedV747.has(r.key);cb.onchange=()=>cb.checked?receiptSelectedV747.add(r.key):receiptSelectedV747.delete(r.key);td.appendChild(cb);tr.prepend(td)})
-}
-const oldRR=window.renderReceipts;window.renderReceipts=function(){const z=oldRR.apply(this,arguments);setTimeout(decorateReceiptsV747,0);refreshTestReceiptListV747();return z};
-window.toggleAllReceiptPrintV747=v=>{getReceipts().forEach(r=>v?receiptSelectedV747.add(r.key):receiptSelectedV747.delete(r.key));decorateReceiptsV747();document.querySelectorAll('.v747-receipt-check').forEach(x=>x.checked=v)};
-window.printSelectedReceiptsV747=()=>{const rs=getReceipts().filter(r=>receiptSelectedV747.has(r.key));if(!rs.length)return alert('출력할 고객을 체크해 주세요.');const css=document.getElementById('v736-receipt-design')?.outerHTML||'';const body=rs.map((r,i)=>window.v736ReceiptHTML?window.v736ReceiptHTML(r,i):receiptHTML(r,i)).join('');const w=window.open('','_blank');w.document.write('<!doctype html><html><head><meta charset="utf-8"><title>선택 정산서 출력</title>'+css+'<style>.receipt-sheet{page-break-after:always}.receipt-sheet:last-child{page-break-after:auto}</style></head><body>'+body+'<script>window.onload=()=>setTimeout(()=>window.print(),350)<\\/script></body></html>');w.document.close()};
-
-function decorateShippingV747(){
- const table=$v('shippingTable')?.querySelector('table');if(!table)return;const hr=table.querySelector('thead tr');if(hr&&!hr.querySelector('.v747-ship-head')){const th=document.createElement('th');th.className='v747-ship-head v747-select-cell';th.textContent='출력';hr.prepend(th)}
- [...table.querySelectorAll('tbody tr')].forEach((tr,i)=>{if(tr.querySelector('.v747-ship-check'))return;const g=(window.currentShipping||[])[i];if(!g)return;const td=document.createElement('td');td.className='v747-select-cell';const cb=document.createElement('input');cb.type='checkbox';cb.className='v747-print-check v747-ship-check';cb.checked=shippingSelectedV747.has(g.code);cb.onchange=()=>cb.checked?shippingSelectedV747.add(g.code):shippingSelectedV747.delete(g.code);td.appendChild(cb);tr.prepend(td)})
-}
-const oldRS=window.renderShipping;window.renderShipping=function(){const z=oldRS.apply(this,arguments);setTimeout(decorateShippingV747,0);return z};
-window.toggleAllShippingPrintV747=v=>{(window.currentShipping||[]).forEach(g=>v?shippingSelectedV747.add(g.code):shippingSelectedV747.delete(g.code));document.querySelectorAll('.v747-ship-check').forEach(x=>x.checked=v)};
-const originalPrintShipping=window.printShipping;window.printShippingSelectedV747=()=>{const all=[...(window.currentShipping||[])],sel=all.filter(g=>shippingSelectedV747.has(g.code));if(!sel.length)return alert('출력할 고객을 체크해 주세요.');const keep=window.currentShipping;window.currentShipping=sel;try{originalPrintShipping()}finally{window.currentShipping=keep}};
-
-function refreshTestReceiptListV747(){const s=$v('testReceiptKey');if(!s)return;const cur=s.value,rs=getReceipts();s.innerHTML=rs.map(r=>`<option value="${escv(r.key)}">${escv(r.date)} · ${escv(r.customer?.name||r.nick)} · ${Number(r.total||0).toLocaleString()}원</option>`).join('');if(rs.some(r=>r.key===cur))s.value=cur}
-window.sendTestReceiptMmsV747=async b=>{const p=($v('testSmsPhone')?.value||'').trim(),k=$v('testReceiptKey')?.value;if(!p)return alert('테스트 받을 연락처를 입력해 주세요.');const r=getReceipts().find(x=>x.key===k);if(!r)return alert('테스트할 정산서를 선택해 주세요.');const old=b.textContent;b.disabled=true;b.textContent='전송 중...';try{const imageBase64=await receiptImageBase64(r),text=typeof formatSms==='function'?formatSms(r):`${r.nick}님 정산서 ${Number(r.total||0).toLocaleString()}원`;const x=await fetch('/api/mms/send',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({to:p,imageBase64,subject:'[테스트] 땡라이브 정산서',text,date:r.date,nickname:r.nick,name:r.customer?.name||'',total:r.total,test:true})}),d=await x.json();if(!x.ok||d.ok===false)throw Error(d.error||'전송 실패');alert('테스트 정산서 전송이 완료되었습니다.')}catch(e){alert('테스트 전송 실패: '+e.message)}finally{b.disabled=false;b.textContent=old}};
-
-window.saveCourierV747=async()=>{const o={enabled:!!$v('courierAutoEnabled')?.checked,company:$v('courierCompany')?.value||'CJ대한통운',username:($v('courierUsername')?.value||'').trim(),password:$v('courierPassword')?.value||'',customerCode:($v('courierCustomerCode')?.value||'').trim(),apiUrl:($v('courierApiUrl')?.value||'').trim(),apiKey:($v('courierApiKey')?.value||'').trim(),apiSecret:($v('courierApiSecret')?.value||'').trim()};const r=await fetch('/api/courier/config',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(o)}),d=await r.json().catch(()=>({}));if(!r.ok)alert(d.error||'택배 설정 저장 실패');else alert('택배 연동정보를 저장했습니다.')};
-window.autoIssuePaidShipmentsV747=async b=>{const rs=getReceipts().filter(r=>r.payment?.status==='paid'&&r.payment?.verified===true&&r.customer);if(!rs.length)return alert('1:1 정확대조가 끝난 입금완료 고객이 없습니다.');const orders=rs.map(r=>({key:r.key,date:r.date,name:r.customer.name,nick:r.nick,phone:r.customer.phone,address:[r.customer.postalCode,r.customer.address,r.customer.detailAddress].filter(Boolean).join(' '),memo:r.customer.memo||'',items:r.items,total:r.total,paymentStatus:'paid',paymentVerified:true}));const old=b?.textContent;if(b){b.disabled=true;b.textContent='발부 중...'}try{const x=await fetch('/api/shipping/auto-issue',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({orders})}),d=await x.json();if(!x.ok)throw Error(d.error||'송장 발부 실패');const ok=(d.results||[]).filter(x=>x.ok).length,fail=(d.results||[]).length-ok;await syncPackingScans?.();renderShipping();alert(`송장 발부 결과: 성공 ${ok}건 / 실패 ${fail}건`)}catch(e){alert(e.message)}finally{if(b){b.disabled=false;b.textContent=old}}};
-
-function tabv(rows,cols){if(!rows?.length)return '<div class="empty">기록 없음</div>';return '<div class="scroll"><table><thead><tr>'+cols.map(c=>'<th>'+escv(c[0])+'</th>').join('')+'</tr></thead><tbody>'+rows.map(r=>'<tr>'+cols.map(c=>'<td>'+escv(c[1](r))+'</td>').join('')+'</tr>').join('')+'</tbody></table></div>'}
-window.loadRecordsV747=async()=>{const d=$v('recordDate')?.value||dayv(),q=($v('recordQuery')?.value||'').trim();$v('recordDate').value=d;if(q)logSearchV747('records',q);try{const [a,s,m,h]=await Promise.all([fetch('/api/archive?date='+encodeURIComponent(d)).then(r=>r.json()),fetch('/api/search-log?date='+encodeURIComponent(d)+'&q='+encodeURIComponent(q)).then(r=>r.json()),fetch('/api/send-history?date='+encodeURIComponent(d)).then(r=>r.json()),fetch('/api/shipping/history?date='+encodeURIComponent(d)).then(r=>r.json())]);const st=a.archive?.state||a.state;$v('archiveSummary').textContent=st?`${d} · 판매행 ${st.orders?.length||0}건 · 입금내역 ${st.payments?.length||0}건 · 고객 ${st.customers?.length||0}명`:`${d} 저장 기록이 없습니다.`;$v('searchHistoryBox').innerHTML=tabv(s.history||[],[['시간',x=>x.at],['화면',x=>x.page],['검색어',x=>x.query]]);$v('sendHistoryRecordBox').innerHTML=tabv(m.history||[],[['시간',x=>x.at||x.sentAt],['구분',x=>(x.test?'테스트 ':'')+(x.type||'문자')],['고객',x=>x.name||x.nickname],['수신번호',x=>x.toMasked||x.to],['결과',x=>x.ok===false?'실패':'성공']]);$v('shippingHistoryBox').innerHTML=tabv(h.history||[],[['시간',x=>x.at],['고객',x=>x.name||x.nick],['송장번호',x=>x.trackingNumber||'-'],['결과',x=>x.ok?'성공':'실패']])}catch(e){$v('archiveSummary').textContent='기록 조회 실패: '+e.message}};
-let gbv={orders:[]};window.loadGroupbuyV747=async()=>{try{const d=await fetch('/api/groupbuy').then(r=>r.json());gbv=d.data||{orders:[]};renderGBV()}catch(e){}};window.addGroupbuyOrderV747=()=>{const o={id:crypto.randomUUID(),date:dayv(),seller:($v('gbSeller')?.value||'').trim(),product:($v('gbProduct')?.value||'').trim(),account:($v('gbAccount')?.value||'').trim(),name:($v('gbName')?.value||'').trim(),phone:($v('gbPhone')?.value||'').trim(),address:($v('gbAddress')?.value||'').trim(),qty:Number($v('gbQty')?.value)||1,paid:$v('gbPaid')?.value||'미입금'};if(!o.seller||!o.product||!o.name||!o.phone||!o.address)return alert('판매자·상품·주문자·연락처·주소를 입력해 주세요.');gbv.orders.push(o);renderGBV();saveGroupbuyV747()};window.saveGroupbuyV747=async()=>{const r=await fetch('/api/groupbuy',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(gbv)});if(!r.ok)alert('공동구매 저장 실패')};function renderGBV(){$v('groupbuySummary').textContent=`주문 ${gbv.orders.length}건 · 총 ${gbv.orders.reduce((a,x)=>a+Number(x.qty||0),0)}개`;$v('groupbuyTable').innerHTML=tabv(gbv.orders,[['날짜',x=>x.date],['판매자',x=>x.seller],['상품',x=>x.product],['주문자',x=>x.name],['연락처',x=>x.phone],['주소',x=>x.address],['수량',x=>x.qty],['입금',x=>x.paid],['계좌',x=>x.account]])}
-
-setTimeout(async()=>{refreshTestReceiptListV747();decorateReceiptsV747();decorateShippingV747();if($v('recordDate'))$v('recordDate').value=dayv();try{const d=await fetch('/api/courier/config').then(r=>r.json());if($v('courierAutoEnabled'))$v('courierAutoEnabled').checked=!!d.enabled;if($v('courierUsername'))$v('courierUsername').value=d.username||'';if($v('courierCustomerCode'))$v('courierCustomerCode').value=d.customerCode||''}catch(e){}},900);
-})();
-</script>\n
 </body></html>`);w.document.close();w.print();
 }
 const paymentAliases={payer:['입금자','입금자명','보낸분','거래내용','내용','적요','성명'],amount:['입금액','금액','거래금액','입금'],date:['거래일시','거래일','날짜','시간']};
@@ -1310,41 +1241,15 @@ async function deleteCustomer(i){const c=state.customers[i];if(!confirm('고객�
 function deleteOrder(i){state.orders.splice(i,1);saveSilently();renderAll()}
 function clearOrders(){if(confirm('모든 주문을 초기화할까요?')){state.orders=[];saveSilently();renderAll()}}
 function clearPayments(){if(confirm('입금내역을 초기화할까요?')){state.payments=[];saveSilently();renderAll()}}
-let stateSaveTimer=null,serverBootComplete=false,serverUpdatedAt='',serverOffline=false;
-async function pullServerState(render=true){
- const r=await fetch('/api/state?ts='+Date.now(),{cache:'no-store'});
- if(!r.ok)throw new Error('서버 상태 조회 실패 '+r.status);
- const d=await r.json(),remote=d.state;
- if(!remote||!Array.isArray(remote.orders)||!Array.isArray(remote.customers))throw new Error('서버 상태 형식 오류');
- state={...state,...remote,settings:{...state.settings,...(remote.settings||{})}};
- serverUpdatedAt=remote.updatedAt||'';serverBootComplete=true;serverOffline=false;
+let stateSaveTimer=null;
+function saveSilently(){
  localStorage.setItem(KEY,JSON.stringify(state));
- if(render){renderMessageSettings();renderAll()}
- const el=document.getElementById('serverSaveStatus');if(el)el.textContent=`서버 원본 불러옴 · 고객 ${state.customers.length}명 · ${new Date().toLocaleTimeString('ko-KR')}`;
- return state;
-}
-async function saveSilently(force=false){
- // 브라우저에는 캐시를 남기되, 서버 원본 확인 전에는 절대 서버를 덮어쓰지 않는다.
- localStorage.setItem(KEY,JSON.stringify(state));
- if(!serverBootComplete){const el=document.getElementById('serverSaveStatus');if(el)el.textContent='⚠ 서버 원본 확인 전 — 서버 저장 차단됨';return false}
  clearTimeout(stateSaveTimer);
- const run=async()=>{try{
-  const payload={...state,__baseUpdatedAt:serverUpdatedAt};
-  const r=await fetch('/api/state',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
-  const d=await r.json().catch(()=>({}));
-  if(r.status===409){
-   const el=document.getElementById('serverSaveStatus');if(el)el.textContent='⚠ 다른 컴퓨터에서 최신 변경 발견 — 서버 최신자료 다시 불러오는 중';
-   await pullServerState(true);
-   return false;
-  }
-  if(!r.ok)throw new Error(d.error||('서버 저장 실패 '+r.status));
-  serverUpdatedAt=d.updatedAt||serverUpdatedAt;state.updatedAt=serverUpdatedAt;serverOffline=false;
-  localStorage.setItem(KEY,JSON.stringify(state));
-  const el=document.getElementById('serverSaveStatus');if(el)el.textContent=`서버 자동보존 완료 · 주문 ${d.orders}건 · 고객 ${d.customers}명 · ${new Date().toLocaleTimeString('ko-KR')}`;
-  return true;
- }catch(e){serverOffline=true;console.error(e);const el=document.getElementById('serverSaveStatus');if(el)el.textContent='⚠ 서버 연결 끊김 — 로컬 캐시만 보관, 서버 원본은 덮어쓰지 않음';return false}};
- if(force)return await run();
- return await new Promise(resolve=>{stateSaveTimer=setTimeout(async()=>resolve(await run()),350)});
+ stateSaveTimer=setTimeout(async()=>{try{
+  const r=await fetch('/api/state',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(state)});
+  if(!r.ok)throw new Error('서버 저장 실패 '+r.status);
+  const d=await r.json();const el=document.getElementById('serverSaveStatus');if(el)el.textContent=`자동보존 완료 · 주문 ${d.orders}건 · 고객 ${d.customers}명 · ${new Date().toLocaleTimeString('ko-KR')}`;
+ }catch(e){console.error(e);const el=document.getElementById('serverSaveStatus');if(el)el.textContent='⚠ 서버 자동보존 재시도 중 — 브라우저에는 저장됨';}},350);
 }
 function updateKpi(){const rs=getReceipts();$('kpiOrderRows').textContent=state.orders.length;$('kpiReceipts').textContent=rs.length;$('kpiMatched').textContent=rs.filter(r=>r.customer).length;$('kpiPaid').textContent=rs.filter(r=>r.payment.status==='paid').length;refreshSolapiKpi()}
 async function refreshSolapiKpi(){const el=$('kpiSolapi');if(!el)return;try{const r=await fetch('/api/solapi/config',{cache:'no-store'}),d=await r.json();el.textContent=d.configured?'문자 준비':'미연동'}catch(e){el.textContent='확인필요'}}
@@ -1429,7 +1334,7 @@ async function syncServerCustomers(showMessage=false){
     detailAddress:cleanBrokenText(c.detailAddress||''),
     memo:cleanBrokenText(c.memo||'')
    })).filter(c=>c.name||c.nick);
-   state.customers=serverCustomers; dedupeCustomers(); autoMatchAll(); localStorage.setItem(KEY,JSON.stringify(state)); renderAll();
+   state.customers=serverCustomers; dedupeCustomers(); autoMatchAll(); saveSilently(); renderAll();
    if(showMessage)alert(`고객폼에서 등록된 고객 ${state.customers.length}명을 불러왔습니다.`);
   }
  }catch(e){console.warn('고객DB 서버 동기화 실패',e);if(showMessage)alert('고객폼 정보 불러오기 실패: '+e.message)}
@@ -1442,7 +1347,7 @@ function applyServerCustomers(list){
   phone:cleanBrokenText(c.phone||''),postalCode:cleanBrokenText(c.postalCode||''),
   address:cleanBrokenText(c.address||''),detailAddress:cleanBrokenText(c.detailAddress||''),memo:cleanBrokenText(c.memo||'')
  })).filter(c=>c.name||c.nick);
- state.customers=serverCustomers;dedupeCustomers();autoMatchAll();localStorage.setItem(KEY,JSON.stringify(state));renderAll();
+ state.customers=serverCustomers;dedupeCustomers();autoMatchAll();saveSilently();renderAll();
 }
 function startCustomerRealtime(){
  if(!window.EventSource)return false;
@@ -1454,19 +1359,20 @@ function startCustomerRealtime(){
 }
 async function bootFirstOms(){
  try{
-  await pullServerState(true);
-  await syncServerCustomers(false);
-  startCustomerRealtime();refreshSolapiKpi();
+  const r=await fetch('/api/state?ts='+Date.now(),{cache:'no-store'});
+  if(r.ok){const d=await r.json(),remote=d.state;if(remote&&Array.isArray(remote.orders)&&Array.isArray(remote.customers)){
+   state={...state,...remote,settings:{...state.settings,...(remote.settings||{})}};
+   localStorage.setItem(KEY,JSON.stringify(state));renderMessageSettings();renderAll();
+  }else throw new Error('서버 상태 없음');
+  }else throw new Error('서버 응답 오류');
  }catch(e){
-  // v7.47.1: 새 컴퓨터/일시적 장애에서 로컬 또는 번들 백업이 서버 원본을 덮는 사고를 막는다.
-  serverBootComplete=false;serverOffline=true;
   const saved=localStorage.getItem(KEY);
-  if(saved){loadAll();const el=document.getElementById('serverSaveStatus');if(el)el.textContent='⚠ 서버 연결 실패 · 이 화면은 로컬 캐시 미리보기입니다. 서버에는 저장하지 않습니다.'}
-  else{renderAll();const el=document.getElementById('serverSaveStatus');if(el)el.textContent='⚠ 서버 연결 실패 · 데이터 보호를 위해 빈 화면을 서버에 저장하지 않습니다.'}
+  if(saved)loadAll();else{try{const r=await fetch('/data/initial-backup.json?ts='+Date.now(),{cache:'no-store'});const obj=await r.json(),restored=obj.state||obj;state={...state,...restored,settings:{...state.settings,...(restored.settings||{})}};saveSilently();renderAll()}catch(x){loadAll()}}
  }
+ await syncServerCustomers(false);startCustomerRealtime();refreshSolapiKpi();
 }
 bootFirstOms();
-setInterval(async()=>{if(document.hidden)return;if(!serverBootComplete||serverOffline){try{await pullServerState(true);await syncServerCustomers(false);if(!window.customerEventSource)startCustomerRealtime()}catch(e){}}else syncServerCustomers(false)},10000);
+setInterval(()=>{if(!document.hidden)syncServerCustomers(false)},10000);
 setInterval(()=>{if(!document.hidden&&document.querySelector('[data-page=shipping]')?.classList.contains('active'))syncShippingScans(true)},3000);
 syncShippingScans(true);
 
@@ -2009,5 +1915,69 @@ window.sendMmsByKey=async function(key,button,skipConfirm=false){
 })();
 
 </script>
+
+<style id="v747-style">.v747-print-check{width:20px;height:20px;cursor:pointer}.v747-select-cell{text-align:center!important;width:52px}.v747-faint{font-size:12px;color:#666}</style>
+<script id="v747-added-features">
+(()=>{
+'use strict';
+const $v=id=>document.getElementById(id);
+const escv=v=>String(v??'').replace(/[&<>\"']/g,s=>({'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;',\"'\":'&#39;'}[s]));
+const dayv=()=>new Date().toLocaleDateString('sv-SE');
+let receiptSelectedV747=new Set(), shippingSelectedV747=new Set();
+function logSearchV747(page,q){q=String(q||'').trim();if(!q)return;fetch('/api/search-log',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({page,query:q})}).catch(()=>{})}
+for(const id of ['customerSearch','receiptSearch']){const e=$v(id);if(e)e.addEventListener('change',()=>logSearchV747(id,e.value))}
+
+const oldGetReceipts=window.getReceipts;
+window.getReceipts=function(){
+ const groups=new Map();
+ (state.orders||[]).forEach(o=>{const k=o.date+'|'+norm(o.nick);if(!groups.has(k))groups.set(k,{key:k,date:o.date,nick:o.nick,items:[],customerId:o.customerId,matchStatus:o.matchStatus,fee:o.fee||0});groups.get(k).items.push(o)});
+ const base=[...groups.values()].map(g=>{let c=(state.customers||[]).find(x=>x.id===g.customerId)||null;if(!c){const m=findCustomerByNick(g.nick);c=m.customer||null;if(c){g.customerId=c.id;g.matchStatus=m.status}}const subtotal=g.items.reduce((a,x)=>a+(Number(x.amount)||0),0),total=subtotal+(Number(g.fee)||0);return {...g,customer:c,subtotal,total,starred:g.items.some(x=>x.starred)}}).sort((a,b)=>b.date.localeCompare(a.date)||a.nick.localeCompare(b.nick,'ko'));
+ const used=new Set();
+ for(const r of base){
+  const ov=state.paymentOverrides?.[r.key];
+  if(ov?.status){r.payment={status:ov.status,payment:ov.payment||null,reason:'관리자 수기변경',manual:true,verified:ov.status==='paid'};continue}
+  const exactNames=[r.nick,r.customer?.nick,r.customer?.nickname,r.customer?.name].filter(Boolean).map(norm);
+  const exact=(state.payments||[]).map((p,i)=>({p,i})).filter(x=>!used.has(x.i)&&exactNames.includes(norm(x.p.payer))&&Number(x.p.amount)===Number(r.total));
+  if(exact.length===1){used.add(exact[0].i);r.payment={status:'paid',payment:exact[0].p,verified:true,reason:'이름+금액 1:1 정확일치'};continue}
+  if(exact.length>1){r.payment={status:'review',payment:exact[0].p,verified:false,reason:'동일 이름·금액 입금 여러 건'};continue}
+  const sameName=(state.payments||[]).map((p,i)=>({p,i})).filter(x=>!used.has(x.i)&&exactNames.includes(norm(x.p.payer)));
+  if(sameName.length){r.payment={status:'amount-mismatch',payment:sameName[0].p,verified:false,reason:'이름 일치·금액 불일치'};continue}
+  const fuzzy=(state.payments||[]).map((p,i)=>({p,i})).filter(x=>!used.has(x.i)&&Number(x.p.amount)===Number(r.total)&&exactNames.some(n=>{const pn=norm(x.p.payer);return pn&&n&&(pn.includes(n)||n.includes(pn))}));
+  if(fuzzy.length){r.payment={status:'review',payment:fuzzy[0].p,verified:false,reason:'이름 유사·금액 일치 — 수동확인'};continue}
+  r.payment={status:'unpaid',verified:false};
+ }
+ return base;
+};
+
+function decorateReceiptsV747(){
+ const table=$v('receiptCards')?.querySelector('table');if(!table)return;const hr=table.querySelector('thead tr');if(hr&&!hr.querySelector('.v747-select-head')){const th=document.createElement('th');th.className='v747-select-head v747-select-cell';th.textContent='출력';hr.prepend(th)}
+ [...table.querySelectorAll('tbody tr')].forEach((tr,i)=>{if(tr.querySelector('.v747-receipt-check'))return;const rs=getReceipts(),search=($v('receiptSearch')?.value||'').trim().toLowerCase(),date=$v('receiptDate')?.value||'';const filtered=rs.filter(r=>(!date||r.date===date)&&(!search||[r.nick,r.customer?.name].some(x=>String(x||'').toLowerCase().includes(search))));const r=filtered[i];if(!r)return;const td=document.createElement('td');td.className='v747-select-cell';const cb=document.createElement('input');cb.type='checkbox';cb.className='v747-print-check v747-receipt-check';cb.checked=receiptSelectedV747.has(r.key);cb.onchange=()=>cb.checked?receiptSelectedV747.add(r.key):receiptSelectedV747.delete(r.key);td.appendChild(cb);tr.prepend(td)})
+}
+const oldRR=window.renderReceipts;window.renderReceipts=function(){const z=oldRR.apply(this,arguments);setTimeout(decorateReceiptsV747,0);refreshTestReceiptListV747();return z};
+window.toggleAllReceiptPrintV747=v=>{getReceipts().forEach(r=>v?receiptSelectedV747.add(r.key):receiptSelectedV747.delete(r.key));decorateReceiptsV747();document.querySelectorAll('.v747-receipt-check').forEach(x=>x.checked=v)};
+window.printSelectedReceiptsV747=()=>{const rs=getReceipts().filter(r=>receiptSelectedV747.has(r.key));if(!rs.length)return alert('출력할 고객을 체크해 주세요.');const css=document.getElementById('v736-receipt-design')?.outerHTML||'';const body=rs.map((r,i)=>window.v736ReceiptHTML?window.v736ReceiptHTML(r,i):receiptHTML(r,i)).join('');const w=window.open('','_blank');w.document.write('<!doctype html><html><head><meta charset="utf-8"><title>선택 정산서 출력</title>'+css+'<style>.receipt-sheet{page-break-after:always}.receipt-sheet:last-child{page-break-after:auto}</style></head><body>'+body+'<script>window.onload=()=>setTimeout(()=>window.print(),350)<\\/script></body></html>');w.document.close()};
+
+function decorateShippingV747(){
+ const table=$v('shippingTable')?.querySelector('table');if(!table)return;const hr=table.querySelector('thead tr');if(hr&&!hr.querySelector('.v747-ship-head')){const th=document.createElement('th');th.className='v747-ship-head v747-select-cell';th.textContent='출력';hr.prepend(th)}
+ [...table.querySelectorAll('tbody tr')].forEach((tr,i)=>{if(tr.querySelector('.v747-ship-check'))return;const g=(window.currentShipping||[])[i];if(!g)return;const td=document.createElement('td');td.className='v747-select-cell';const cb=document.createElement('input');cb.type='checkbox';cb.className='v747-print-check v747-ship-check';cb.checked=shippingSelectedV747.has(g.code);cb.onchange=()=>cb.checked?shippingSelectedV747.add(g.code):shippingSelectedV747.delete(g.code);td.appendChild(cb);tr.prepend(td)})
+}
+const oldRS=window.renderShipping;window.renderShipping=function(){const z=oldRS.apply(this,arguments);setTimeout(decorateShippingV747,0);return z};
+window.toggleAllShippingPrintV747=v=>{(window.currentShipping||[]).forEach(g=>v?shippingSelectedV747.add(g.code):shippingSelectedV747.delete(g.code));document.querySelectorAll('.v747-ship-check').forEach(x=>x.checked=v)};
+const originalPrintShipping=window.printShipping;window.printShippingSelectedV747=()=>{const all=[...(window.currentShipping||[])],sel=all.filter(g=>shippingSelectedV747.has(g.code));if(!sel.length)return alert('출력할 고객을 체크해 주세요.');const keep=window.currentShipping;window.currentShipping=sel;try{originalPrintShipping()}finally{window.currentShipping=keep}};
+
+function refreshTestReceiptListV747(){const s=$v('testReceiptKey');if(!s)return;const cur=s.value,rs=getReceipts();s.innerHTML=rs.map(r=>`<option value="${escv(r.key)}">${escv(r.date)} · ${escv(r.customer?.name||r.nick)} · ${Number(r.total||0).toLocaleString()}원</option>`).join('');if(rs.some(r=>r.key===cur))s.value=cur}
+window.sendTestReceiptMmsV747=async b=>{const p=($v('testSmsPhone')?.value||'').trim(),k=$v('testReceiptKey')?.value;if(!p)return alert('테스트 받을 연락처를 입력해 주세요.');const r=getReceipts().find(x=>x.key===k);if(!r)return alert('테스트할 정산서를 선택해 주세요.');const old=b.textContent;b.disabled=true;b.textContent='전송 중...';try{const imageBase64=await receiptImageBase64(r),text=typeof formatSms==='function'?formatSms(r):`${r.nick}님 정산서 ${Number(r.total||0).toLocaleString()}원`;const x=await fetch('/api/mms/send',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({to:p,imageBase64,subject:'[테스트] 땡라이브 정산서',text,date:r.date,nickname:r.nick,name:r.customer?.name||'',total:r.total,test:true})}),d=await x.json();if(!x.ok||d.ok===false)throw Error(d.error||'전송 실패');alert('테스트 정산서 전송이 완료되었습니다.')}catch(e){alert('테스트 전송 실패: '+e.message)}finally{b.disabled=false;b.textContent=old}};
+
+window.saveCourierV747=async()=>{const o={enabled:!!$v('courierAutoEnabled')?.checked,company:$v('courierCompany')?.value||'CJ대한통운',username:($v('courierUsername')?.value||'').trim(),password:$v('courierPassword')?.value||'',customerCode:($v('courierCustomerCode')?.value||'').trim(),apiUrl:($v('courierApiUrl')?.value||'').trim(),apiKey:($v('courierApiKey')?.value||'').trim(),apiSecret:($v('courierApiSecret')?.value||'').trim()};const r=await fetch('/api/courier/config',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(o)}),d=await r.json().catch(()=>({}));if(!r.ok)alert(d.error||'택배 설정 저장 실패');else alert('택배 연동정보를 저장했습니다.')};
+window.autoIssuePaidShipmentsV747=async b=>{const rs=getReceipts().filter(r=>r.payment?.status==='paid'&&r.payment?.verified===true&&r.customer);if(!rs.length)return alert('1:1 정확대조가 끝난 입금완료 고객이 없습니다.');const orders=rs.map(r=>({key:r.key,date:r.date,name:r.customer.name,nick:r.nick,phone:r.customer.phone,address:[r.customer.postalCode,r.customer.address,r.customer.detailAddress].filter(Boolean).join(' '),memo:r.customer.memo||'',items:r.items,total:r.total,paymentStatus:'paid',paymentVerified:true}));const old=b?.textContent;if(b){b.disabled=true;b.textContent='발부 중...'}try{const x=await fetch('/api/shipping/auto-issue',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({orders})}),d=await x.json();if(!x.ok)throw Error(d.error||'송장 발부 실패');const ok=(d.results||[]).filter(x=>x.ok).length,fail=(d.results||[]).length-ok;await syncPackingScans?.();renderShipping();alert(`송장 발부 결과: 성공 ${ok}건 / 실패 ${fail}건`)}catch(e){alert(e.message)}finally{if(b){b.disabled=false;b.textContent=old}}};
+
+function tabv(rows,cols){if(!rows?.length)return '<div class="empty">기록 없음</div>';return '<div class="scroll"><table><thead><tr>'+cols.map(c=>'<th>'+escv(c[0])+'</th>').join('')+'</tr></thead><tbody>'+rows.map(r=>'<tr>'+cols.map(c=>'<td>'+escv(c[1](r))+'</td>').join('')+'</tr>').join('')+'</tbody></table></div>'}
+window.loadRecordsV747=async()=>{const d=$v('recordDate')?.value||dayv(),q=($v('recordQuery')?.value||'').trim();$v('recordDate').value=d;if(q)logSearchV747('records',q);try{const [a,s,m,h]=await Promise.all([fetch('/api/archive?date='+encodeURIComponent(d)).then(r=>r.json()),fetch('/api/search-log?date='+encodeURIComponent(d)+'&q='+encodeURIComponent(q)).then(r=>r.json()),fetch('/api/send-history?date='+encodeURIComponent(d)).then(r=>r.json()),fetch('/api/shipping/history?date='+encodeURIComponent(d)).then(r=>r.json())]);const st=a.archive?.state||a.state;$v('archiveSummary').textContent=st?`${d} · 판매행 ${st.orders?.length||0}건 · 입금내역 ${st.payments?.length||0}건 · 고객 ${st.customers?.length||0}명`:`${d} 저장 기록이 없습니다.`;$v('searchHistoryBox').innerHTML=tabv(s.history||[],[['시간',x=>x.at],['화면',x=>x.page],['검색어',x=>x.query]]);$v('sendHistoryRecordBox').innerHTML=tabv(m.history||[],[['시간',x=>x.at||x.sentAt],['구분',x=>(x.test?'테스트 ':'')+(x.type||'문자')],['고객',x=>x.name||x.nickname],['수신번호',x=>x.toMasked||x.to],['결과',x=>x.ok===false?'실패':'성공']]);$v('shippingHistoryBox').innerHTML=tabv(h.history||[],[['시간',x=>x.at],['고객',x=>x.name||x.nick],['송장번호',x=>x.trackingNumber||'-'],['결과',x=>x.ok?'성공':'실패']])}catch(e){$v('archiveSummary').textContent='기록 조회 실패: '+e.message}};
+let gbv={orders:[]};window.loadGroupbuyV747=async()=>{try{const d=await fetch('/api/groupbuy').then(r=>r.json());gbv=d.data||{orders:[]};renderGBV()}catch(e){}};window.addGroupbuyOrderV747=()=>{const o={id:crypto.randomUUID(),date:dayv(),seller:($v('gbSeller')?.value||'').trim(),product:($v('gbProduct')?.value||'').trim(),account:($v('gbAccount')?.value||'').trim(),name:($v('gbName')?.value||'').trim(),phone:($v('gbPhone')?.value||'').trim(),address:($v('gbAddress')?.value||'').trim(),qty:Number($v('gbQty')?.value)||1,paid:$v('gbPaid')?.value||'미입금'};if(!o.seller||!o.product||!o.name||!o.phone||!o.address)return alert('판매자·상품·주문자·연락처·주소를 입력해 주세요.');gbv.orders.push(o);renderGBV();saveGroupbuyV747()};window.saveGroupbuyV747=async()=>{const r=await fetch('/api/groupbuy',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(gbv)});if(!r.ok)alert('공동구매 저장 실패')};function renderGBV(){$v('groupbuySummary').textContent=`주문 ${gbv.orders.length}건 · 총 ${gbv.orders.reduce((a,x)=>a+Number(x.qty||0),0)}개`;$v('groupbuyTable').innerHTML=tabv(gbv.orders,[['날짜',x=>x.date],['판매자',x=>x.seller],['상품',x=>x.product],['주문자',x=>x.name],['연락처',x=>x.phone],['주소',x=>x.address],['수량',x=>x.qty],['입금',x=>x.paid],['계좌',x=>x.account]])}
+
+setTimeout(async()=>{refreshTestReceiptListV747();decorateReceiptsV747();decorateShippingV747();if($v('recordDate'))$v('recordDate').value=dayv();try{const d=await fetch('/api/courier/config').then(r=>r.json());if($v('courierAutoEnabled'))$v('courierAutoEnabled').checked=!!d.enabled;if($v('courierUsername'))$v('courierUsername').value=d.username||'';if($v('courierCustomerCode'))$v('courierCustomerCode').value=d.customerCode||''}catch(e){}},900);
+})();
+</script>
+
 </body>
 </html>

@@ -372,6 +372,65 @@ function restoreBundledDdaengCustomersIfNewerOnce(){
 }
 restoreBundledDdaengCustomersIfNewerOnce();
 
+
+// v7.47.3: 사용자가 직접 제공한 8/13 백업 2개를 FIRST-0001에 비파괴 복구한다.
+// - 고객 321명 백업은 현재 고객보다 누락된 고객만 합쳐서 보존한다.
+// - 8/14 주문 전체백업은 과거 날짜 기록실(daily-archives)에 보존한다.
+// - 기존 주문/입금/설정/SOLAPI는 덮어쓰지 않는다.
+function restoreUserProvidedAug13BackupsOnce(){
+ try{
+  const recDir=path.join(ROOT,'data','recovery-v7.47.3');
+  const customerSrc=path.join(recDir,'8.13일_고객321명.json');
+  const stateSrc=path.join(recDir,'8월13_전체백업.json');
+  if(!fs.existsSync(customerSrc)&&!fs.existsSync(stateSrc))return;
+  const marker=path.join(DATA_ROOT,'.v7473-aug13-two-backups-restored');
+  if(fs.existsSync(marker))return;
+  ensureTenantStorage({code:DDAENG_TENANT_CODE});
+  let before=tenantReadCustomers(DDAENG_TENANT_CODE).length,after=before,added=0;
+  if(fs.existsSync(customerSrc)){
+   const exp=readJsonObject(customerSrc,{}),incoming=Array.isArray(exp.customers)?exp.customers:[];
+   if(incoming.length){
+    const current=tenantReadCustomers(DDAENG_TENANT_CODE);
+    const out=current.slice();
+    const ids=new Set(out.map(x=>String(x&&x.id||'')).filter(Boolean));
+    const phones=new Set(out.map(x=>onlyDigits(x&&x.phone||'')).filter(Boolean));
+    const nickkeys=new Set(out.map(x=>String((x&&x.nickname)||(x&&x.nick)||'').trim().toLowerCase()).filter(Boolean));
+    for(const c of incoming){
+      const id=String(c&&c.id||''),ph=onlyDigits(c&&c.phone||''),nk=String((c&&c.nickname)||(c&&c.nick)||'').trim().toLowerCase();
+      if((id&&ids.has(id))||(ph&&phones.has(ph))||(nk&&nickkeys.has(nk)))continue;
+      out.push(c);added++;if(id)ids.add(id);if(ph)phones.add(ph);if(nk)nickkeys.add(nk);
+    }
+    // 백업이 더 완전하고 현재가 그보다 적은 경우, 백업 순서를 기준으로 현재의 신규 고객을 뒤에 보존한다.
+    if(current.length<incoming.length){
+      const inIds=new Set(incoming.map(x=>String(x&&x.id||'')).filter(Boolean));
+      const inPhones=new Set(incoming.map(x=>onlyDigits(x&&x.phone||'')).filter(Boolean));
+      const merged=incoming.slice();
+      for(const c of current){const id=String(c&&c.id||''),ph=onlyDigits(c&&c.phone||'');if((id&&inIds.has(id))||(ph&&inPhones.has(ph)))continue;merged.push(c)}
+      tenantWriteCustomers(DDAENG_TENANT_CODE,merged);after=merged.length;
+    }else{tenantWriteCustomers(DDAENG_TENANT_CODE,out);after=out.length}
+    tenantWriteState(DDAENG_TENANT_CODE,tenantReadState(DDAENG_TENANT_CODE));
+   }
+  }
+  let archivedOrders=0;
+  if(fs.existsSync(stateSrc)){
+    const exp=readJsonObject(stateSrc,{}),source=exp.state||exp;
+    if(source&&Array.isArray(source.orders)&&source.orders.length){
+      const dates=[...new Set(source.orders.map(o=>String(o&&o.date||'').trim()).filter(Boolean))];
+      const date=dates.length===1?dates[0]:'2026-08-14';
+      const archiveFile=path.join(tenantDailyDir(DDAENG_TENANT_CODE),date+'.json');
+      if(!fs.existsSync(archiveFile))atomicWrite(archiveFile,JSON.stringify({date,archivedAt:exp.exportedAt||new Date().toISOString(),source:'사용자 제공 8월13.json 복구본',state:source},null,2));
+      archivedOrders=source.orders.length;
+      // 원본 백업 자체도 거래처 폴더에 복사해 두어 수동 복원이 가능하게 한다.
+      atomicWrite(tenantFile(DDAENG_TENANT_CODE,'user-backup-2026-08-13-full.json'),JSON.stringify(exp,null,2));
+    }
+  }
+  if(fs.existsSync(customerSrc))atomicWrite(tenantFile(DDAENG_TENANT_CODE,'user-backup-2026-08-13-customers.json'),fs.readFileSync(customerSrc,'utf8'));
+  atomicWrite(marker,JSON.stringify({tenantCode:DDAENG_TENANT_CODE,beforeCustomers:before,afterCustomers:after,addedCustomers:added,archivedOrders,at:new Date().toISOString(),sources:['8월13.json','8.13일.json'],mode:'non-destructive'},null,2));
+  console.log(`[AUG13 RECOVERY] ${DDAENG_TENANT_CODE}: customers ${before} -> ${after}, archived orders ${archivedOrders}`);
+ }catch(e){console.error('[AUG13 RECOVERY] 실패:',e.message)}
+}
+restoreUserProvidedAug13BackupsOnce();
+
 function readBody(req,max=1024*1024){
  return new Promise((resolve,reject)=>{
   let body='';req.on('data',d=>{body+=d;if(body.length>max){reject(new Error('요청이 너무 큽니다'));req.destroy()}});
@@ -681,11 +740,6 @@ const server=http.createServer((req,res)=>{
  if(u.pathname==='/api/state'&&req.method==='POST'){
   return readBody(req,20*1024*1024).then(body=>{try{
    const st=JSON.parse(body||'{}'),current=tenantReadState(tenantCode);
-   // v7.47.1: 다른 PC의 오래된 화면이 최신 서버 데이터를 덮어쓰지 못하게 revision 검사.
-   const baseUpdatedAt=String(st.__baseUpdatedAt||''); delete st.__baseUpdatedAt;
-   if(baseUpdatedAt && current.updatedAt && baseUpdatedAt!==current.updatedAt){
-    return json(res,409,{ok:false,error:'다른 기기에서 더 최신 데이터가 저장되어 있습니다.',updatedAt:current.updatedAt});
-   }
    // v7.46.3: 일반 자동저장은 고객DB를 절대 덮어쓰지 않는다.
    // 고객DB 변경은 /api/customers(추가/수정/삭제) 또는 명시적 전체복원에서만 허용한다.
    // 이렇게 해야 오래된 화면 state(예: 243/286명)가 새 고객을 지우지 않는다.

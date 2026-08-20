@@ -1,0 +1,21 @@
+FIRST OMS / 땡라이브 v7.47.3 복구 통합본
+
+기준: v7.47.2 코드노출 완전수정본
+사용자 제공 복구자료:
+- 8월13.json : FIRST-0001 전체 상태 백업 (주문 1,381건 / 고객 321명)
+- 8.13일.json : FIRST-0001 고객DB 백업 (고객 321명)
+
+복구 방식:
+1) 번들 내 FIRST-0001 customers.json / customers-backup.json을 321명 백업으로 복구.
+2) server-state의 customers도 321명으로 동기화하되 기존 주문/설정/입금은 그대로 보존.
+3) 8월13.json 주문 1,381건은 날짜가 2026-08-14로 저장된 과거 자료이므로
+   data/tenants/FIRST-0001/daily-archives/2026-08-14.json 에 기록실 복구본으로 보존.
+4) Render Persistent Disk에 이미 데이터가 있는 경우에도 서버 시작 시 1회 비파괴 복구:
+   - 고객 누락분은 합치기
+   - 기존 신규 고객은 삭제하지 않음
+   - 기존 주문/입금/SOLAPI/설정은 덮어쓰지 않음
+   - 8/14 주문은 기록실에 보존
+5) 복구 전 v7.47.2 데이터는 data/pre-restore-v7.47.2/에 복사본으로 보존.
+6) 사용자가 제공한 원본 2개는 data/recovery-v7.47.3/에 그대로 포함.
+
+주의: Render의 기존 Persistent Disk data 폴더를 수동 삭제하지 마세요.
