@@ -1,11 +1,15 @@
 {
-  "name": "first-oms-ddaenglive-emergency",
-  "version": "4.1.0",
+  "name": "first-oms-ddaenglive-v8",
+  "version": "8.0.0",
   "private": true,
   "scripts": {
-    "start": "node server.js"
+    "start": "node server.js",
+    "verify": "node verify-v8.js"
   },
   "dependencies": {
     "xlsx": "^0.18.5"
+  },
+  "engines": {
+    "node": ">=18"
   }
 }
