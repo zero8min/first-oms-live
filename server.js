@@ -681,6 +681,11 @@ const server=http.createServer((req,res)=>{
  if(u.pathname==='/api/state'&&req.method==='POST'){
   return readBody(req,20*1024*1024).then(body=>{try{
    const st=JSON.parse(body||'{}'),current=tenantReadState(tenantCode);
+   // v7.47.1: 다른 PC의 오래된 화면이 최신 서버 데이터를 덮어쓰지 못하게 revision 검사.
+   const baseUpdatedAt=String(st.__baseUpdatedAt||''); delete st.__baseUpdatedAt;
+   if(baseUpdatedAt && current.updatedAt && baseUpdatedAt!==current.updatedAt){
+    return json(res,409,{ok:false,error:'다른 기기에서 더 최신 데이터가 저장되어 있습니다.',updatedAt:current.updatedAt});
+   }
    // v7.46.3: 일반 자동저장은 고객DB를 절대 덮어쓰지 않는다.
    // 고객DB 변경은 /api/customers(추가/수정/삭제) 또는 명시적 전체복원에서만 허용한다.
    // 이렇게 해야 오래된 화면 state(예: 243/286명)가 새 고객을 지우지 않는다.

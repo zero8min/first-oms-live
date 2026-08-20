@@ -450,8 +450,16 @@ function go(id){
  if(id==='shipping') renderShipping();
  window.scrollTo({top:0,behavior:'auto'});
 }
-function saveAll(){localStorage.setItem(KEY,JSON.stringify(state));alert('현재 자료를 이 기기에 저장했습니다.');}
-function loadAll(){try{const saved=JSON.parse(localStorage.getItem(KEY));if(saved)state={...state,...saved,settings:{...state.settings,...(saved.settings||{})}}}catch(e){} renderMessageSettings(true);initSmsTemplateGuard();renderAll();}
+async function saveAll(){
+ if(!serverBootComplete)return alert('서버 연결 확인 중입니다. 서버 데이터가 확인되기 전에는 저장하지 않습니다.');
+ await saveSilently(true);
+ alert('현재 자료를 서버에 저장했습니다. 다른 컴퓨터에서도 같은 계정으로 로그인하면 그대로 불러옵니다.');
+}
+function loadAll(){
+ // v7.47.1: 로컬 저장소는 서버 장애 시 화면 확인용 캐시일 뿐, 서버 원본으로 자동 복원하지 않는다.
+ try{const saved=JSON.parse(localStorage.getItem(KEY));if(saved)state={...state,...saved,settings:{...state.settings,...(saved.settings||{})}}}catch(e){}
+ renderMessageSettings(true);initSmsTemplateGuard();renderAll();
+}
 function readWorkbook(file, cb){
  const r=new FileReader(); r.onload=e=>{try{
   const wb=XLSX.read(e.target.result,{type:'array',cellDates:true});
@@ -1302,15 +1310,41 @@ async function deleteCustomer(i){const c=state.customers[i];if(!confirm('고객�
 function deleteOrder(i){state.orders.splice(i,1);saveSilently();renderAll()}
 function clearOrders(){if(confirm('모든 주문을 초기화할까요?')){state.orders=[];saveSilently();renderAll()}}
 function clearPayments(){if(confirm('입금내역을 초기화할까요?')){state.payments=[];saveSilently();renderAll()}}
-let stateSaveTimer=null;
-function saveSilently(){
+let stateSaveTimer=null,serverBootComplete=false,serverUpdatedAt='',serverOffline=false;
+async function pullServerState(render=true){
+ const r=await fetch('/api/state?ts='+Date.now(),{cache:'no-store'});
+ if(!r.ok)throw new Error('서버 상태 조회 실패 '+r.status);
+ const d=await r.json(),remote=d.state;
+ if(!remote||!Array.isArray(remote.orders)||!Array.isArray(remote.customers))throw new Error('서버 상태 형식 오류');
+ state={...state,...remote,settings:{...state.settings,...(remote.settings||{})}};
+ serverUpdatedAt=remote.updatedAt||'';serverBootComplete=true;serverOffline=false;
  localStorage.setItem(KEY,JSON.stringify(state));
+ if(render){renderMessageSettings();renderAll()}
+ const el=document.getElementById('serverSaveStatus');if(el)el.textContent=`서버 원본 불러옴 · 고객 ${state.customers.length}명 · ${new Date().toLocaleTimeString('ko-KR')}`;
+ return state;
+}
+async function saveSilently(force=false){
+ // 브라우저에는 캐시를 남기되, 서버 원본 확인 전에는 절대 서버를 덮어쓰지 않는다.
+ localStorage.setItem(KEY,JSON.stringify(state));
+ if(!serverBootComplete){const el=document.getElementById('serverSaveStatus');if(el)el.textContent='⚠ 서버 원본 확인 전 — 서버 저장 차단됨';return false}
  clearTimeout(stateSaveTimer);
- stateSaveTimer=setTimeout(async()=>{try{
-  const r=await fetch('/api/state',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(state)});
-  if(!r.ok)throw new Error('서버 저장 실패 '+r.status);
-  const d=await r.json();const el=document.getElementById('serverSaveStatus');if(el)el.textContent=`자동보존 완료 · 주문 ${d.orders}건 · 고객 ${d.customers}명 · ${new Date().toLocaleTimeString('ko-KR')}`;
- }catch(e){console.error(e);const el=document.getElementById('serverSaveStatus');if(el)el.textContent='⚠ 서버 자동보존 재시도 중 — 브라우저에는 저장됨';}},350);
+ const run=async()=>{try{
+  const payload={...state,__baseUpdatedAt:serverUpdatedAt};
+  const r=await fetch('/api/state',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
+  const d=await r.json().catch(()=>({}));
+  if(r.status===409){
+   const el=document.getElementById('serverSaveStatus');if(el)el.textContent='⚠ 다른 컴퓨터에서 최신 변경 발견 — 서버 최신자료 다시 불러오는 중';
+   await pullServerState(true);
+   return false;
+  }
+  if(!r.ok)throw new Error(d.error||('서버 저장 실패 '+r.status));
+  serverUpdatedAt=d.updatedAt||serverUpdatedAt;state.updatedAt=serverUpdatedAt;serverOffline=false;
+  localStorage.setItem(KEY,JSON.stringify(state));
+  const el=document.getElementById('serverSaveStatus');if(el)el.textContent=`서버 자동보존 완료 · 주문 ${d.orders}건 · 고객 ${d.customers}명 · ${new Date().toLocaleTimeString('ko-KR')}`;
+  return true;
+ }catch(e){serverOffline=true;console.error(e);const el=document.getElementById('serverSaveStatus');if(el)el.textContent='⚠ 서버 연결 끊김 — 로컬 캐시만 보관, 서버 원본은 덮어쓰지 않음';return false}};
+ if(force)return await run();
+ return await new Promise(resolve=>{stateSaveTimer=setTimeout(async()=>resolve(await run()),350)});
 }
 function updateKpi(){const rs=getReceipts();$('kpiOrderRows').textContent=state.orders.length;$('kpiReceipts').textContent=rs.length;$('kpiMatched').textContent=rs.filter(r=>r.customer).length;$('kpiPaid').textContent=rs.filter(r=>r.payment.status==='paid').length;refreshSolapiKpi()}
 async function refreshSolapiKpi(){const el=$('kpiSolapi');if(!el)return;try{const r=await fetch('/api/solapi/config',{cache:'no-store'}),d=await r.json();el.textContent=d.configured?'문자 준비':'미연동'}catch(e){el.textContent='확인필요'}}
@@ -1395,7 +1429,7 @@ async function syncServerCustomers(showMessage=false){
     detailAddress:cleanBrokenText(c.detailAddress||''),
     memo:cleanBrokenText(c.memo||'')
    })).filter(c=>c.name||c.nick);
-   state.customers=serverCustomers; dedupeCustomers(); autoMatchAll(); saveSilently(); renderAll();
+   state.customers=serverCustomers; dedupeCustomers(); autoMatchAll(); localStorage.setItem(KEY,JSON.stringify(state)); renderAll();
    if(showMessage)alert(`고객폼에서 등록된 고객 ${state.customers.length}명을 불러왔습니다.`);
   }
  }catch(e){console.warn('고객DB 서버 동기화 실패',e);if(showMessage)alert('고객폼 정보 불러오기 실패: '+e.message)}
@@ -1408,7 +1442,7 @@ function applyServerCustomers(list){
   phone:cleanBrokenText(c.phone||''),postalCode:cleanBrokenText(c.postalCode||''),
   address:cleanBrokenText(c.address||''),detailAddress:cleanBrokenText(c.detailAddress||''),memo:cleanBrokenText(c.memo||'')
  })).filter(c=>c.name||c.nick);
- state.customers=serverCustomers;dedupeCustomers();autoMatchAll();saveSilently();renderAll();
+ state.customers=serverCustomers;dedupeCustomers();autoMatchAll();localStorage.setItem(KEY,JSON.stringify(state));renderAll();
 }
 function startCustomerRealtime(){
  if(!window.EventSource)return false;
@@ -1420,20 +1454,19 @@ function startCustomerRealtime(){
 }
 async function bootFirstOms(){
  try{
-  const r=await fetch('/api/state?ts='+Date.now(),{cache:'no-store'});
-  if(r.ok){const d=await r.json(),remote=d.state;if(remote&&Array.isArray(remote.orders)&&Array.isArray(remote.customers)){
-   state={...state,...remote,settings:{...state.settings,...(remote.settings||{})}};
-   localStorage.setItem(KEY,JSON.stringify(state));renderMessageSettings();renderAll();
-  }else throw new Error('서버 상태 없음');
-  }else throw new Error('서버 응답 오류');
+  await pullServerState(true);
+  await syncServerCustomers(false);
+  startCustomerRealtime();refreshSolapiKpi();
  }catch(e){
+  // v7.47.1: 새 컴퓨터/일시적 장애에서 로컬 또는 번들 백업이 서버 원본을 덮는 사고를 막는다.
+  serverBootComplete=false;serverOffline=true;
   const saved=localStorage.getItem(KEY);
-  if(saved)loadAll();else{try{const r=await fetch('/data/initial-backup.json?ts='+Date.now(),{cache:'no-store'});const obj=await r.json(),restored=obj.state||obj;state={...state,...restored,settings:{...state.settings,...(restored.settings||{})}};saveSilently();renderAll()}catch(x){loadAll()}}
+  if(saved){loadAll();const el=document.getElementById('serverSaveStatus');if(el)el.textContent='⚠ 서버 연결 실패 · 이 화면은 로컬 캐시 미리보기입니다. 서버에는 저장하지 않습니다.'}
+  else{renderAll();const el=document.getElementById('serverSaveStatus');if(el)el.textContent='⚠ 서버 연결 실패 · 데이터 보호를 위해 빈 화면을 서버에 저장하지 않습니다.'}
  }
- await syncServerCustomers(false);startCustomerRealtime();refreshSolapiKpi();
 }
 bootFirstOms();
-setInterval(()=>{if(!document.hidden)syncServerCustomers(false)},10000);
+setInterval(async()=>{if(document.hidden)return;if(!serverBootComplete||serverOffline){try{await pullServerState(true);await syncServerCustomers(false);if(!window.customerEventSource)startCustomerRealtime()}catch(e){}}else syncServerCustomers(false)},10000);
 setInterval(()=>{if(!document.hidden&&document.querySelector('[data-page=shipping]')?.classList.contains('active'))syncShippingScans(true)},3000);
 syncShippingScans(true);
 
