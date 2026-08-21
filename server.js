@@ -575,10 +575,53 @@ async function liveChatIdForVideo(videoId){
  return id
 }
 
+
+// v7.49 택배팀 무로그인 작업흐름 공통 유틸
+function shippingCodeV749(g){
+ const raw=[g.name||'',g.nick||'',g.phone||'',g.address||''].join('|');let h=2166136261;
+ for(let i=0;i<raw.length;i++){h^=raw.charCodeAt(i);h=Math.imul(h,16777619)}
+ return 'FIRST-'+(h>>>0).toString(36).toUpperCase().padStart(7,'0')
+}
+function packingJobsV749(tc){
+ const st=tenantReadState(tc), customers=tenantReadCustomers(tc), groups=new Map();
+ for(const o of (st.orders||[])){
+  const key=(o.customerId||o.nick)+'|'+(o.date||'');
+  if(!groups.has(key))groups.set(key,{key,name:'',nick:o.nick||'',phone:'',postalCode:'',address:'',memo:'',dates:new Set(),items:[],subtotal:0,fee:Number(o.fee)||0,total:0,tenantCode:tc});
+  const g=groups.get(key),c=customers.find(x=>x.id===o.customerId)||{};
+  g.name=c.name||'';g.phone=c.phone||'';g.postalCode=c.postalCode||'';g.address=[c.address,c.detailAddress].filter(Boolean).join(' ');g.memo=c.memo||'';g.dates.add(o.date||'');
+  g.items.push({number:o.number||g.items.length+1,item:o.item||'',qty:Number(o.qty)||0,unit:Number(o.unit)||0,amount:Number(o.amount)||0,service:!!(o.service||o.freebie||o.gift)||/(서비스|사은품|증정)/i.test(String(o.item||''))});
+  g.subtotal+=Number(o.amount)||0;
+ }
+ const arr=[...groups.values()].map(g=>({...g,dates:[...g.dates],total:g.subtotal+g.fee,code:shippingCodeV749(g)}))
+   .sort((a,b)=>String(a.dates[0]||'').localeCompare(String(b.dates[0]||''))||String(a.name||a.nick).localeCompare(String(b.name||b.nick),'ko'));
+ arr.forEach((g,i)=>{
+  const s=st.shippingScans?.[g.code]||{};
+  g.jobNo=String(i+1).padStart(3,'0');g.status=s.status||(s.shipmentScanAt?'ready':s.at?'packed':'waiting');
+  g.completedAt=s.packingCompletedAt||s.at||null;g.worker=s.worker||'';g.trackingNumber=s.trackingNumber||'';g.courier=s.courier||'CJ대한통운';
+  g.shipmentScanAt=s.shipmentScanAt||s.trackingUpdatedAt||null;g.deliverySmsSentAt=s.deliverySmsSentAt||null;g.deliverySmsError=s.deliverySmsError||'';g.packingRules=st.packingRules||{};
+ })
+ return arr
+}
+function tenantPackingAccessV750(tc){
+ const file=tenantFile(tc,'packing-access.json');let v=readJsonObject(file,{});
+ if(!v.token){v={token:crypto.randomBytes(24).toString('hex'),createdAt:new Date().toISOString()};atomicWrite(file,JSON.stringify(v,null,2))}
+ return v
+}
+function validPackingTokenV750(tc,token){
+ const a=String(tenantPackingAccessV750(tc).token||''),b=String(token||'');if(!a||!b||a.length!==b.length)return false;
+ try{return crypto.timingSafeEqual(Buffer.from(a),Buffer.from(b))}catch(e){return false}
+}
+function tenantCompanyV749(tc){const a=readAccounts().find(x=>x.code===tc);return a?.company||'땡라이브'}
+
 function json(res,code,data){res.writeHead(code,{'Content-Type':'application/json; charset=utf-8','Cache-Control':'no-store'});res.end(JSON.stringify(data))}
 writeCustomerExcel(readCustomers());
 const server=http.createServer((req,res)=>{
- res.setHeader('Access-Control-Allow-Origin','*');
+ res.setHeader('X-Content-Type-Options','nosniff');
+ res.setHeader('X-Frame-Options','DENY');
+ res.setHeader('Referrer-Policy','no-referrer');
+ res.setHeader('Permissions-Policy','camera=(self), geolocation=(), microphone=()');
+ const origin=String(req.headers.origin||''),host=String(req.headers.host||'');
+ if(origin&&(origin===`https://${host}`||origin===`http://${host}`))res.setHeader('Access-Control-Allow-Origin',origin);
  res.setHeader('Access-Control-Allow-Headers','Content-Type');
  res.setHeader('Access-Control-Allow-Methods','GET,POST,DELETE,OPTIONS');
  if(req.method==='OPTIONS'){res.writeHead(204);return res.end()}
@@ -609,6 +652,10 @@ const server=http.createServer((req,res)=>{
  if(u.pathname==='/api/admin/accounts/backups'&&req.method==='GET'){if(user.role!=='superadmin')return json(res,403,{ok:false,error:'최고관리자 권한이 필요합니다.'});try{const files=fs.readdirSync(ACCOUNT_BACKUP_DIR).filter(x=>x.endsWith('.json')).sort().reverse();return json(res,200,{ok:true,files})}catch(e){return json(res,500,{ok:false,error:e.message})}}
 
  const tenantCode=user?selectedTenantCode(req):String(u.query.tenant||'');
+ if(u.pathname==='/api/packing/access-link'&&req.method==='GET'){
+  if(!user)return json(res,401,{ok:false,error:'관리자 로그인이 필요합니다.'});const v=tenantPackingAccessV750(tenantCode);
+  return json(res,200,{ok:true,url:`/packing.html?tenant=${encodeURIComponent(tenantCode)}&token=${encodeURIComponent(v.token)}`})
+ }
 
  if(u.pathname==='/api/youtube/status'&&req.method==='GET'){
   const cfg=youtubeConfig(),auth=readJsonObject(tenantFile(tenantCode,'youtube-auth.json'),{});
@@ -723,13 +770,63 @@ const server=http.createServer((req,res)=>{
  }
 
 
- if(u.pathname==='/api/public/packing'&&req.method==='GET'){
-  const code=String(u.query.code||'').trim().toUpperCase();let found=null;const tenantCodes=readAccounts().filter(a=>a.role==='tenant'||a.role==='superadmin').map(a=>a.code);
-  for(const tc of tenantCodes){const st=tenantReadState(tc),customers=Array.isArray(st.customers)?st.customers:tenantReadCustomers(tc),groups=new Map();for(const o of (st.orders||[])){const k=(o.customerId||o.nick)+'|'+(o.date||'');if(!groups.has(k))groups.set(k,{name:'',nick:o.nick||'',phone:'',address:'',dates:new Set(),items:[],subtotal:0,fee:Number(o.fee)||0,total:0,code:'',tenantCode:tc});const g=groups.get(k),c=customers.find(x=>x.id===o.customerId)||{};g.name=c.name||'';g.phone=c.phone||'';g.address=[c.postalCode,c.address,c.detailAddress].filter(Boolean).join(' ');g.dates.add(o.date||'');g.items.push({number:o.number||g.items.length+1,item:o.item||'',qty:Number(o.qty)||0,unit:Number(o.unit)||0,amount:Number(o.amount)||0});g.subtotal+=Number(o.amount)||0}function sc(g){const raw=[g.name,g.nick,g.phone,g.address].join('|');let h=2166136261;for(let i=0;i<raw.length;i++){h^=raw.charCodeAt(i);h=Math.imul(h,16777619)}return 'FIRST-'+(h>>>0).toString(36).toUpperCase().padStart(7,'0')}found=[...groups.values()].map(g=>({...g,dates:[...g.dates],total:g.subtotal+g.fee,code:sc(g)})).find(g=>g.code===code);if(found){found.completedAt=st.shippingScans?.[code]?.at||null;found.worker=st.shippingScans?.[code]?.worker||'';found.trackingNumber=st.shippingScans?.[code]?.trackingNumber||'';found.trackingUpdatedAt=st.shippingScans?.[code]?.trackingUpdatedAt||null;break}}
-  if(!found)return json(res,404,{ok:false,error:'포장리스트를 찾을 수 없습니다.'});return json(res,200,{ok:true,job:found})
+
+ // v7.49 택배팀: 로그인 없이 다음 포장건 조회
+ if(u.pathname==='/api/public/packing/next'&&req.method==='GET'){
+  const tc=String(u.query.tenant||'FIRST-0001').trim(),worker=String(u.query.worker||'').trim(),token=String(u.query.token||'');if(!validPackingTokenV750(tc,token))return json(res,403,{ok:false,error:'포장팀 접근키가 올바르지 않습니다. 관리자 화면에서 포장화면을 다시 열어주세요.'});
+  const jobs=packingJobsV749(tc),job=jobs.find(x=>x.status!=='ready')||null;
+  return json(res,200,{ok:true,tenantCode:tc,company:tenantCompanyV749(tc),worker,job,remaining:jobs.filter(x=>x.status!=='ready').length,total:jobs.length})
  }
- if(u.pathname==='/api/public/packing/complete'&&req.method==='POST')return readBody(req).then(body=>{try{const d=JSON.parse(body||'{}'),code=String(d.code||'').trim().toUpperCase(),tc=String(d.tenantCode||'');if(!code||!tc)return json(res,400,{ok:false,error:'QR 코드 또는 거래처 코드가 없습니다.'});const st=tenantReadState(tc);st.shippingScans=st.shippingScans||{};const completedAt=new Date().toISOString();const prev=st.shippingScans[code]||{};st.shippingScans[code]={...prev,at:completedAt,source:'mobile-public',worker:String(d.worker||'').trim()};tenantWriteState(tc,st);return json(res,200,{ok:true,completedAt})}catch(e){return json(res,400,{ok:false,error:e.message})}})
- if(u.pathname==='/api/public/packing/tracking'&&req.method==='POST')return readBody(req).then(body=>{try{const d=JSON.parse(body||'{}'),code=String(d.code||'').trim().toUpperCase(),tc=String(d.tenantCode||''),trackingNumber=String(d.trackingNumber||'').replace(/\s+/g,'').trim();if(!code||!tc)return json(res,400,{ok:false,error:'QR 코드 또는 거래처 코드가 없습니다.'});if(!trackingNumber)return json(res,400,{ok:false,error:'송장번호를 입력하거나 스캔해 주세요.'});if(trackingNumber.length<6||trackingNumber.length>40)return json(res,400,{ok:false,error:'송장번호 형식을 확인해 주세요.'});const st=tenantReadState(tc);st.shippingScans=st.shippingScans||{};const prev=st.shippingScans[code]||{};const trackingUpdatedAt=new Date().toISOString();st.shippingScans[code]={...prev,trackingNumber,trackingUpdatedAt};tenantWriteState(tc,st);return json(res,200,{ok:true,trackingNumber,trackingUpdatedAt})}catch(e){return json(res,400,{ok:false,error:e.message})}})
+ // v7.49 [다 넣었어요] : 포장완료까지만 처리. 송장스캔 전에는 다음 주문으로 못 넘어감
+ if(u.pathname==='/api/public/packing/packed'&&req.method==='POST')return readBody(req).then(body=>{try{
+  const d=JSON.parse(body||'{}'),tc=String(d.tenantCode||'FIRST-0001').trim(),code=String(d.code||'').trim().toUpperCase(),worker=String(d.worker||'').trim();if(!validPackingTokenV750(tc,d.token))return json(res,403,{ok:false,error:'포장팀 접근키가 올바르지 않습니다.'});
+  if(!code||!worker)return json(res,400,{ok:false,error:'포장자 이름 또는 택배코드가 없습니다.'});
+  const job=packingJobsV749(tc).find(x=>x.code===code);if(!job)return json(res,404,{ok:false,error:'현재 포장 주문을 찾지 못했습니다.'});
+  const st=tenantReadState(tc);st.shippingScans=st.shippingScans||{};const prev=st.shippingScans[code]||{},now=new Date().toISOString();
+  st.shippingScans[code]={...prev,at:prev.at||now,packingCompletedAt:prev.packingCompletedAt||now,worker,source:'packing-team',status:prev.shipmentScanAt?'ready':'packed',courier:prev.courier||'CJ대한통운'};
+  tenantWriteState(tc,st);return json(res,200,{ok:true,status:'packed',packingCompletedAt:st.shippingScans[code].packingCompletedAt})
+ }catch(e){return json(res,400,{ok:false,error:e.message})}})
+
+ // v7.49 송장 최종스캔: 다른 고객 송장 차단 + 1회 자동문자 + 실패해도 포장은 완료
+ if(u.pathname==='/api/public/packing/scan-final'&&req.method==='POST')return readBody(req).then(async body=>{try{
+  const d=JSON.parse(body||'{}'),tc=String(d.tenantCode||'FIRST-0001').trim(),code=String(d.code||'').trim().toUpperCase(),worker=String(d.worker||'').trim(),tracking=String(d.trackingNumber||'').replace(/\s+/g,'').trim();if(!validPackingTokenV750(tc,d.token))return json(res,403,{ok:false,error:'포장팀 접근키가 올바르지 않습니다.'});
+  if(!code||!worker||!tracking)return json(res,400,{ok:false,error:'포장자/택배코드/송장번호를 확인해 주세요.'});
+  if(tracking.length<8||tracking.length>40)return json(res,400,{ok:false,error:'송장 바코드 형식이 올바르지 않습니다.'});
+  const job=packingJobsV749(tc).find(x=>x.code===code);if(!job)return json(res,404,{ok:false,error:'현재 포장 주문을 찾지 못했습니다.'});
+  const st=tenantReadState(tc);st.shippingScans=st.shippingScans||{};const prev=st.shippingScans[code]||{};
+  if(!prev.packingCompletedAt&&!prev.at)return json(res,409,{ok:false,error:'먼저 [다 넣었어요]를 눌러 포장완료 처리해 주세요.',reason:'NOT_PACKED'});
+  const owner=Object.entries(st.shippingScans).find(([other,v])=>other!==code&&String(v?.trackingNumber||'').replace(/\s+/g,'')===tracking);
+  if(owner)return json(res,409,{ok:false,error:'잘못된 송장입니다. 이 송장은 다른 고객에게 등록되어 있습니다.',reason:'WRONG_LABEL'});
+  const expected=String(prev.trackingNumber||'').replace(/\s+/g,'');
+  if(expected&&expected!==tracking)return json(res,409,{ok:false,error:'잘못된 송장입니다. 현재 고객에게 발부된 송장과 일치하지 않습니다.',reason:'WRONG_LABEL',expectedLast4:expected.slice(-4)});
+  if(prev.shipmentScanAt&&expected===tracking){
+   return json(res,200,{ok:true,already:true,status:'ready',trackingNumber:tracking,courier:prev.courier||'CJ대한통운',smsSent:!!prev.deliverySmsSentAt,smsFailed:!!prev.deliverySmsError})
+  }
+  const now=new Date().toISOString(),company=tenantCompanyV749(tc),courier='CJ대한통운';
+  let smsSent=!!prev.deliverySmsSentAt,smsFailed=false,smsError=prev.deliverySmsError||'';
+  if(!smsSent){
+   const text=`[${company} 배송안내]\n\n${job.name||job.nick}님, 주문하신 상품의 포장이 완료되었습니다.\n\n📦 송장번호: ${tracking}\n🚚 택배사: ${courier}\n\n안전하게 배송될 수 있도록 준비하였습니다.\n감사합니다.`;
+   try{
+    await sendSolapiSms(job.phone,text,tc);smsSent=true;smsError='';
+    tenantAppendSendHistory(tc,{at:now,sentAt:now,date:localBusinessDate(),type:'배송문자',name:job.name||'',nickname:job.nick||'',toMasked:onlyDigits(job.phone).replace(/^(\d{3})\d+(\d{4})$/,'$1****$2'),ok:true,trackingNumber:tracking})
+   }catch(e){
+    smsFailed=true;smsError=e.message||'문자 발송 실패';
+    tenantAppendSendHistory(tc,{at:now,sentAt:now,date:localBusinessDate(),type:'배송문자',name:job.name||'',nickname:job.nick||'',toMasked:onlyDigits(job.phone).replace(/^(\d{3})\d+(\d{4})$/,'$1****$2'),ok:false,error:smsError,trackingNumber:tracking})
+   }
+  }
+  st.shippingScans[code]={...prev,at:prev.at||now,packingCompletedAt:prev.packingCompletedAt||prev.at||now,worker,courier,trackingNumber:tracking,trackingUpdatedAt:now,shipmentScanAt:now,status:'ready',trackingSource:'packing-scan',deliverySmsSentAt:smsSent?(prev.deliverySmsSentAt||now):null,deliverySmsError:smsSent?'':smsError};
+  tenantWriteState(tc,st);
+  tenantAppendShipping(tc,{at:now,date:localBusinessDate(),code,name:job.name||'',nick:job.nick||'',trackingNumber:tracking,courier,worker,ok:true,smsSent,smsFailed});
+  return json(res,200,{ok:true,status:'ready',trackingNumber:tracking,courier,smsSent,smsFailed,smsError})
+ }catch(e){return json(res,400,{ok:false,error:e.message})}})
+
+ if(u.pathname==='/api/public/packing'&&req.method==='GET'){
+  const code=String(u.query.code||'').trim().toUpperCase(),tc=String(u.query.tenant||'FIRST-0001').trim(),token=String(u.query.token||'');
+  if(!validPackingTokenV750(tc,token))return json(res,403,{ok:false,error:'포장팀 접근키가 올바르지 않습니다. 관리자 화면에서 포장화면을 다시 열어주세요.'});
+  const found=packingJobsV749(tc).find(g=>g.code===code)||null;if(!found)return json(res,404,{ok:false,error:'포장리스트를 찾을 수 없습니다.'});return json(res,200,{ok:true,job:found})
+ }
+ if(u.pathname==='/api/public/packing/complete'&&req.method==='POST')return readBody(req).then(body=>{try{const d=JSON.parse(body||'{}'),code=String(d.code||'').trim().toUpperCase(),tc=String(d.tenantCode||'');if(!code||!tc)return json(res,400,{ok:false,error:'QR 코드 또는 거래처 코드가 없습니다.'});if(!validPackingTokenV750(tc,d.token))return json(res,403,{ok:false,error:'포장팀 접근키가 올바르지 않습니다.'});const st=tenantReadState(tc);st.shippingScans=st.shippingScans||{};const completedAt=new Date().toISOString();const prev=st.shippingScans[code]||{};st.shippingScans[code]={...prev,at:completedAt,source:'mobile-public',worker:String(d.worker||'').trim()};tenantWriteState(tc,st);return json(res,200,{ok:true,completedAt})}catch(e){return json(res,400,{ok:false,error:e.message})}})
+ if(u.pathname==='/api/public/packing/tracking'&&req.method==='POST')return readBody(req).then(body=>{try{const d=JSON.parse(body||'{}'),code=String(d.code||'').trim().toUpperCase(),tc=String(d.tenantCode||''),trackingNumber=String(d.trackingNumber||'').replace(/\s+/g,'').trim();if(!code||!tc)return json(res,400,{ok:false,error:'QR 코드 또는 거래처 코드가 없습니다.'});if(!validPackingTokenV750(tc,d.token))return json(res,403,{ok:false,error:'포장팀 접근키가 올바르지 않습니다.'});if(!trackingNumber)return json(res,400,{ok:false,error:'송장번호를 입력하거나 스캔해 주세요.'});if(trackingNumber.length<6||trackingNumber.length>40)return json(res,400,{ok:false,error:'송장번호 형식을 확인해 주세요.'});const st=tenantReadState(tc);st.shippingScans=st.shippingScans||{};const prev=st.shippingScans[code]||{};const trackingUpdatedAt=new Date().toISOString();st.shippingScans[code]={...prev,trackingNumber,trackingUpdatedAt};tenantWriteState(tc,st);return json(res,200,{ok:true,trackingNumber,trackingUpdatedAt})}catch(e){return json(res,400,{ok:false,error:e.message})}})
 
 
  if(u.pathname==='/api/packing/tracking/bulk'&&req.method==='POST')return readBody(req,5*1024*1024).then(body=>{try{const d=JSON.parse(body||'{}'),updates=Array.isArray(d.updates)?d.updates:[];if(!updates.length)return json(res,400,{ok:false,error:'등록할 송장정보가 없습니다.'});const st=tenantReadState(tenantCode);st.shippingScans=st.shippingScans||{};let updated=0,skipped=0;for(const u of updates){const code=String(u.code||'').trim().toUpperCase(),trackingNumber=String(u.trackingNumber||'').replace(/\s+/g,'').trim(),courier=String(u.courier||'파일접수').trim();if(!code||!trackingNumber){skipped++;continue}const prev=st.shippingScans[code]||{};if(prev.trackingNumber&&prev.trackingNumber!==trackingNumber){skipped++;continue}st.shippingScans[code]={...prev,trackingNumber,courier,trackingUpdatedAt:new Date().toISOString(),trackingSource:'file-upload'};updated++}tenantWriteState(tenantCode,st);return json(res,200,{ok:true,updated,skipped})}catch(e){return json(res,400,{ok:false,error:e.message})}})
@@ -779,6 +876,18 @@ const server=http.createServer((req,res)=>{
  }
 
 
+
+ // v7.49 관리자 배송문자 재발송
+ if(u.pathname==='/api/packing/delivery-sms/resend'&&req.method==='POST')return readBody(req).then(async body=>{try{
+  const d=JSON.parse(body||'{}'),code=String(d.code||'').trim().toUpperCase();if(!code)return json(res,400,{ok:false,error:'택배코드가 없습니다.'});
+  const job=packingJobsV749(tenantCode).find(x=>x.code===code);if(!job)return json(res,404,{ok:false,error:'택배 고객을 찾지 못했습니다.'});
+  const st=tenantReadState(tenantCode),scan=st.shippingScans?.[code]||{};if(!scan.trackingNumber)return json(res,400,{ok:false,error:'송장번호가 없습니다.'});
+  const company=tenantCompanyV749(tenantCode),courier=scan.courier||'CJ대한통운',now=new Date().toISOString();
+  const text=`[${company} 배송안내]\n\n${job.name||job.nick}님, 주문하신 상품의 포장이 완료되었습니다.\n\n📦 송장번호: ${scan.trackingNumber}\n🚚 택배사: ${courier}\n\n안전하게 배송될 수 있도록 준비하였습니다.\n감사합니다.`;
+  try{await sendSolapiSms(job.phone,text,tenantCode)}catch(e){scan.deliverySmsError=e.message;st.shippingScans[code]=scan;tenantWriteState(tenantCode,st);tenantAppendSendHistory(tenantCode,{at:now,sentAt:now,date:localBusinessDate(),type:'배송문자 재발송',name:job.name||'',nickname:job.nick||'',ok:false,error:e.message});return json(res,500,{ok:false,error:e.message})}
+  scan.deliverySmsSentAt=now;scan.deliverySmsError='';st.shippingScans[code]=scan;tenantWriteState(tenantCode,st);tenantAppendSendHistory(tenantCode,{at:now,sentAt:now,date:localBusinessDate(),type:'배송문자 재발송',name:job.name||'',nickname:job.nick||'',ok:true,trackingNumber:scan.trackingNumber});
+  return json(res,200,{ok:true,sentAt:now})
+ }catch(e){return json(res,400,{ok:false,error:e.message})}})
  if(u.pathname==='/api/search-log'&&req.method==='POST')return readBody(req).then(body=>{try{const d=JSON.parse(body||'{}'),v={at:new Date().toISOString(),date:localBusinessDate(),page:String(d.page||''),query:String(d.query||'').trim()};if(v.query)tenantAppendSearch(tenantCode,v);return json(res,200,{ok:true})}catch(e){return json(res,400,{ok:false,error:e.message})}});
  if(u.pathname==='/api/search-log'&&req.method==='GET'){const date=String(u.query.date||''),q=String(u.query.q||'').toLowerCase();const history=tenantSearchHistory(tenantCode).filter(x=>(!date||x.date===date)&&(!q||String(x.query||'').toLowerCase().includes(q)));return json(res,200,{ok:true,history})}
  if(u.pathname==='/api/archive'&&req.method==='GET'){const date=String(u.query.date||localBusinessDate()).replace(/[^0-9-]/g,'');if(date===localBusinessDate())return json(res,200,{ok:true,state:tenantReadState(tenantCode),current:true});const f=path.join(tenantDailyDir(tenantCode),date+'.json');if(!fs.existsSync(f))return json(res,200,{ok:true,archive:null});return json(res,200,{ok:true,archive:readJsonObject(f,null)})}
@@ -839,7 +948,7 @@ const server=http.createServer((req,res)=>{
  p=path.normalize(p).replace(/^(\.\.[\/\\])+/, '');
  let f=path.join(ROOT,p);
  if(!f.startsWith(ROOT))return res.end('forbidden');
- fs.readFile(f,(e,data)=>{if(e){res.writeHead(404);return res.end('Not found')}res.writeHead(200,{'Content-Type':mime[path.extname(f).toLowerCase()]||'application/octet-stream'});res.end(data)})
+ fs.readFile(f,(e,data)=>{if(e){res.writeHead(404);return res.end('Not found')}res.writeHead(200,{'Content-Type':mime[path.extname(f).toLowerCase()]||'application/octet-stream','Cache-Control':path.extname(f).toLowerCase()==='.html'?'no-store':'public, max-age=300'});res.end(data)})
 });
 const PORT=process.env.PORT||3010;
 server.listen(PORT,'0.0.0.0',()=>console.log(`FIRST OMS emergency server: http://localhost:${PORT}`));

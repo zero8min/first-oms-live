@@ -174,7 +174,7 @@ main{padding-top:18px}
 </head>
 <body><div id="tenantGuard" style="display:none;position:sticky;top:0;z-index:99999;background:#7b2d2d;color:#fff;padding:10px 16px;font-weight:900;text-align:center;box-shadow:0 2px 8px #0005"></div>
 <header>
-  <div><div class="brand"><b>FIRST OMS</b> 땡라이브 정산서버 v7.48</div><div class="sub">고객DB·판매리스트 3중 자동보존 · 정산 · 입금 · 택배</div></div>
+  <div><div class="brand"><b>FIRST OMS</b> 땡라이브 정산서버 v7.50</div><div class="sub">고객DB·판매리스트 3중 자동보존 · 정산 · 입금 · 택배</div></div>
   <div class="actions no-print">
     <span id="loginUser" class="sub">로그인 확인 중</span><button id="accountAdminBtn" class="btn secondary" style="display:none" onclick="location.href='/superadmin.html'">거래처 계정관리</button><button class="btn secondary" onclick="location.href='/change-password.html'">비밀번호 변경</button><button class="btn secondary" onclick="runFunctionCheck()">기능점검</button><button class="btn secondary" onclick="logoutNow()">로그아웃</button>
     <button class="btn secondary" onclick="recoverOldData()">이전 고객DB 복구</button>
@@ -277,7 +277,7 @@ main{padding-top:18px}
       <div class="actions">
         <button class="btn" onclick="sendAllMms(this)">전체 정산서 이미지 전송</button>
         <button class="btn secondary" onclick="loadSendHistory()">전송기록 보기</button>
-        <button class="btn" onclick="printSelectedReceiptsV747()">선택 정산서 인쇄/PDF</button><button class="btn secondary" onclick="toggleAllReceiptPrintV747(true)">전체선택</button><button class="btn secondary" onclick="toggleAllReceiptPrintV747(false)">선택해제</button>
+        <button class="btn" onclick="printSelectedReceiptsV747()">선택 정산서 인쇄/PDF</button><button class="btn secondary" onclick="printClassifiedReceiptsV750()">색상구분 정산서 인쇄</button><button class="btn secondary" onclick="toggleAllReceiptPrintV747(true)">전체선택</button><button class="btn secondary" onclick="toggleAllReceiptPrintV747(false)">선택해제</button>
         <button class="btn secondary" onclick="downloadReceiptList()">정산서 목록 엑셀</button>
       </div>
     </div>
@@ -344,10 +344,25 @@ main{padding-top:18px}
         <div><label>품번</label><input id="omitNumber" placeholder="#1"></div>
         <div><label>품명/옵션</label><input id="omitItem" placeholder="예: 파우치 / 색상 랜덤"></div>
         <div><label>누락 수량</label><input id="omitQty" type="number" min="1" value="1"></div>
-        <div><label>메모</label><input id="omitNote" placeholder="예: 재포장 필요"></div>
+        <div><label>메모</label><input id="omitNote" placeholder="예: 재포장 필요"></div><div><label>해당 고객/닉네임 (선택)</label><input id="omitCustomer" placeholder="비우면 전체 누락건"></div>
       </div>
       <div class="actions" style="margin-top:8px"><button class="btn bad" onclick="addShippingOmissionV748()">누락건 추가</button><button class="btn secondary" onclick="clearShippingOmissionsV748()">누락건 전체삭제</button></div>
       <div id="shippingOmissionList" style="margin-top:10px"></div>
+    </div>
+    <div class="card no-print" id="v750PackingRulesBox">
+      <div class="section-title" style="margin-top:0"><h3>🧮 상품 포장단위 자동환산</h3><div class="actions"><button class="btn" onclick="savePackingRuleV750()">포장구성 저장</button></div></div>
+      <div class="note">관리자가 상품별 포장구성을 한 번만 저장하면 주문수량을 <b>택배팀이 실제로 집어야 하는 수량</b>으로 자동 계산합니다.</div>
+      <div class="form-grid" style="margin-top:12px">
+        <div><label>현재 주문상품 불러오기</label><select id="packRuleProduct" onchange="pickPackingProductV750(this.value)"><option value="">직접 입력</option></select></div>
+        <div><label>품번</label><input id="packRuleNumber" placeholder="#21"></div>
+        <div><label>상품명</label><input id="packRuleName" placeholder="양말"></div>
+        <div><label>판매단위</label><select id="packRuleSaleUnit"><option>개</option><option>세트</option><option>묶음</option><option>봉</option><option>봉지</option><option>박스</option><option>팩</option><option>켤레</option><option>기타</option></select></div>
+        <div><label>1판매단위 구성수량</label><input id="packRuleComponentQty" type="number" min="1" value="1"></div>
+        <div><label>구성단위</label><select id="packRuleComponentUnit"><option>개</option><option>켤레</option><option>봉</option><option>봉지</option><option>묶음</option><option>팩</option><option>박스</option><option>세트</option><option>기타</option></select></div>
+        <div><label>실제 포장단위</label><select id="packRuleActualUnit"><option>개</option><option>켤레</option><option>봉</option><option>봉지</option><option>묶음</option><option>팩</option><option>박스</option><option>세트</option><option>기타</option></select></div>
+      </div>
+      <div class="note" style="margin-top:10px">예) 양말: 판매단위=세트 / 구성수량=6 / 구성단위=켤레 / 실제포장단위=묶음 → 2세트 주문 시 <b>2묶음 넣기</b>. 만두: 1세트=3봉지 / 실제포장단위=봉지 → 2세트 주문 시 <b>6봉지 넣기</b>.</div>
+      <div id="packingRulesListV750" style="margin-top:12px"></div>
     </div>
     <div class="card no-print v723-courier-panel">
       <div class="section-title" style="margin-top:0"><h3>택배사·송장 자동화 설정</h3><div class="actions"><button class="btn" onclick="saveCourierSettings()">택배 설정 저장</button></div></div>
@@ -373,7 +388,7 @@ main{padding-top:18px}
       <div class="shipping-scan-row">
         <div><label>휴대폰 QR 포장작업</label><input id="shippingScanInput" placeholder="QR 용지의 코드를 직접 입력할 때 사용" autocomplete="off"></div>
         <button class="btn" type="button" onclick="processShippingScan()">코드 확인</button>
-        <button class="btn secondary" type="button" onclick="window.open('/packing.html','_blank')">휴대폰 포장화면</button>
+        <button class="btn secondary" type="button" onclick="openPackingTeamV750()">휴대폰 포장화면</button>
       </div>
       <div id="shippingScanStatus" class="shipping-scan-status muted">직원은 별도 설치·로그인 없이 휴대폰 카메라로 출력물의 QR을 찍으면 포장리스트를 확인할 수 있습니다.</div>
       <video id="shippingScanVideo" playsinline style="display:none;width:100%;max-width:520px;margin-top:10px;border-radius:12px"></video>
@@ -1042,6 +1057,81 @@ main{padding-top:18px}
 
 
 
+
+<!-- v7.49 화면안정화 + 택배팀 송장스캔 관리자 연동 -->
+<style id="v749-screen-stability">
+html,body,.page,.scroll,table,tbody,tr{overflow-anchor:none!important}
+.v749-ship-meta{font-size:12px;line-height:1.55;white-space:nowrap}.v749-ship-ready{color:#0b6bcb;font-weight:900}.v749-ship-packed{color:#16803b;font-weight:900}.v749-ship-wait{color:#8a5a00;font-weight:900}.v749-sms-fail{color:#c62828;font-weight:900}.v749-sms-ok{color:#16803b;font-weight:900}
+</style>
+<script id="v749-screen-shipping">
+(()=>{
+ const esc9=v=>String(v??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+ const mon9=v=>(Number(v)||0).toLocaleString('ko-KR')+'원';
+ const sigCustomers=list=>JSON.stringify((list||[]).map(c=>[c.id,c.name,c.nickname||c.nick,c.phone,c.postalCode,c.address,c.detailAddress,c.memo,c.active]).sort((a,b)=>String(a[0]).localeCompare(String(b[0]))));
+ function viewState9(){
+  const active=document.activeElement,sc=[...document.querySelectorAll('.scroll')].map((x,i)=>({i,top:x.scrollTop,left:x.scrollLeft}));
+  return {y:window.scrollY,x:window.scrollX,activeId:active?.id||'',selStart:active?.selectionStart,selEnd:active?.selectionEnd,sc}
+ }
+ function restore9(v){
+  requestAnimationFrame(()=>{document.querySelectorAll('.scroll').forEach((x,i)=>{const s=v.sc.find(z=>z.i===i);if(s){x.scrollTop=s.top;x.scrollLeft=s.left}});
+   window.scrollTo({top:v.y,left:v.x,behavior:'auto'});if(v.activeId){const a=document.getElementById(v.activeId);if(a){try{a.focus({preventScroll:true});if(Number.isInteger(v.selStart))a.setSelectionRange(v.selStart,v.selEnd)}catch(e){}}}})
+ }
+ function renderActive9(){
+  const a=document.querySelector('.page.active,[data-page].active'),id=a?.id||a?.dataset?.page||'';
+  if(id==='customers'||id==='customer')window.renderCustomers?.();
+  else if(id==='receipts'||id==='receipt')window.renderReceipts?.();
+  else if(id==='payments'||id==='payment')window.renderPayments?.();
+  else if(id==='shipping')window.renderShipping?.();
+  window.updateKpi?.()
+ }
+ // 기존 SSE는 같은 목록을 받아도 화면 전체를 재그리는 원인이 될 수 있으므로 종료.
+ setTimeout(()=>{try{window.customerEventSource?.close()}catch(e){}},300);
+ // 10초 폴링은 데이터가 실제 변경될 때만 현재 화면만 다시 그림.
+ window.syncServerCustomers=async function(showMessage=false){
+  try{
+   const r=await fetch('/api/customers?ts='+Date.now(),{cache:'no-store'});if(!r.ok)throw new Error('HTTP '+r.status);const list=await r.json();
+   const before=sigCustomers(state.customers||[]),after=sigCustomers(list||[]);
+   if(before!==after){
+    const v=viewState9();state.customers=(list||[]).map(c=>({...c,nickname:c.nickname||c.nick||'',nick:c.nickname||c.nick||''}));
+    try{dedupeCustomers?.();autoMatchAll?.();localStorage.setItem(KEY,JSON.stringify(state))}catch(e){}
+    renderActive9();restore9(v)
+   }
+   if(showMessage)alert(`고객DB ${state.customers?.length||0}명을 확인했습니다.`);
+   return true
+  }catch(e){console.warn('고객DB 동기화 실패',e);if(showMessage)alert('고객DB 동기화 실패: '+e.message);return false}
+ };
+ window.applyServerCustomers=function(list){
+  const before=sigCustomers(state.customers||[]),after=sigCustomers(list||[]);if(before===after)return;
+  const v=viewState9();state.customers=(list||[]).map(c=>({...c,nickname:c.nickname||c.nick||'',nick:c.nickname||c.nick||''}));
+  try{dedupeCustomers?.();autoMatchAll?.();localStorage.setItem(KEY,JSON.stringify(state))}catch(e){}renderActive9();restore9(v)
+ };
+ // 택배 상태도 변경됐을 때만 현재 택배 화면을 갱신하고 위치를 고정.
+ window.syncShippingScans=async function(renderAfter=false){
+  try{
+   const r=await fetch('/api/packing/scans?ts='+Date.now(),{cache:'no-store'}),d=await r.json();if(!r.ok||!d.ok)throw new Error(d.error||'조회 실패');
+   const b=JSON.stringify(state.shippingScans||{}),a=JSON.stringify(d.shippingScans||{});if(b===a)return true;
+   const v=viewState9();state.shippingScans=d.shippingScans||{};try{localStorage.setItem(KEY,JSON.stringify(state))}catch(e){}
+   if(renderAfter&&document.querySelector('[data-page=shipping]')?.classList.contains('active')){window.renderShipping?.();restore9(v)}return true
+  }catch(e){console.warn('택배 상태 동기화 실패',e);return false}
+ };
+ window.resendDeliverySmsV749=async function(code,btn){
+  const old=btn?.textContent;if(btn){btn.disabled=true;btn.textContent='전송중...'}
+  try{const r=await fetch('/api/packing/delivery-sms/resend',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({code})}),d=await r.json();if(!r.ok||!d.ok)throw new Error(d.error||'재발송 실패');alert('배송문자를 재발송했습니다.');await window.syncShippingScans(true)}
+  catch(e){alert('배송문자 재발송 실패: '+e.message)}finally{if(btn){btn.disabled=false;btn.textContent=old}}
+ };
+ window.renderShipping=function(){
+  const filter=document.getElementById('shippingFilter')?.value||'paid',bundle=document.getElementById('bundleMode')?.value||'date';let rs=getReceipts();if(filter==='paid')rs=rs.filter(r=>r.payment?.status==='paid');
+  const groups=new Map();rs.forEach(r=>{const c=r.customer||{},k=bundle==='customer'?(c.id||r.nick):r.key;if(!groups.has(k))groups.set(k,{name:c.name||'',nick:r.nick,phone:c.phone||'',postalCode:c.postalCode||'',address:[c.address,c.detailAddress].filter(Boolean).join(' '),memo:c.memo||'',dates:new Set(),items:[],subtotal:0,fee:0,total:0,status:r.payment?.status||'unpaid'});const g=groups.get(k);g.dates.add(r.date);g.items.push(...r.items.map(x=>({...x})));g.subtotal+=Number(r.subtotal)||0;g.fee+=Number(r.fee)||0;g.total+=Number(r.total)||0});
+  const arr=[...groups.values()].map(g=>({...g,code:shippingCodeFor(g)}));window.currentShipping=arr;state.shippingScans=state.shippingScans||{};const box=document.getElementById('shippingTable');if(!box)return;
+  box.innerHTML=arr.length?`<div class="scroll"><table class="shipping-table"><thead><tr><th>상태</th><th>택배코드</th><th>고객명</th><th>닉네임</th><th>연락처</th><th>주소</th><th>상품내역</th><th>포장자/시간</th><th>택배사/송장</th><th>송장스캔</th><th>배송문자</th><th>총금액</th></tr></thead><tbody>${arr.map(g=>{const s=state.shippingScans[g.code]||{},ready=!!s.shipmentScanAt,packed=!!(s.packingCompletedAt||s.at),smsFail=!!s.deliverySmsError;
+    const status=ready?'<span class="v749-ship-ready">🚚 출고준비완료</span>':packed?'<span class="v749-ship-packed">🟢 포장완료</span>':'<span class="v749-ship-wait">⏳ 포장대기</span>';
+    const sms=s.deliverySmsSentAt?`<span class="v749-sms-ok">✅ 발송완료</span><br><small>${new Date(s.deliverySmsSentAt).toLocaleString('ko-KR')}</small>`:smsFail?`<span class="v749-sms-fail">⚠️ 발송실패</span><br><small>${esc9(s.deliverySmsError)}</small><br><button class="btn secondary" style="padding:5px 8px" onclick="resendDeliverySmsV749('${esc9(g.code)}',this)">재발송</button>`:'<span class="muted">미발송</span>';
+    return `<tr class="${packed?'packed-row':''}"><td>${status}</td><td class="shipping-code">${esc9(g.code)}</td><td>${esc9(g.name)}</td><td>${esc9(g.nick)}</td><td>${esc9(g.phone)}</td><td class="address-cell">${esc9(g.address)}</td><td>${g.items.map((x,i)=>`#${esc9(x.number||i+1)} ${esc9(x.item)} ×${Number(x.qty)||0}`).join('<br>')}</td><td class="v749-ship-meta">${esc9(s.worker||'-')}<br>${packed?new Date(s.packingCompletedAt||s.at).toLocaleString('ko-KR'):'-'}</td><td class="v749-ship-meta">${esc9(s.courier||'CJ대한통운')}<br><b>${esc9(s.trackingNumber||'-')}</b></td><td class="v749-ship-meta">${s.shipmentScanAt?new Date(s.shipmentScanAt).toLocaleString('ko-KR'):'-'}</td><td class="v749-ship-meta">${sms}</td><td><b>${mon9(g.total)}</b></td></tr>`}).join('')}</tbody></table></div>`:'<div class="empty">출력할 택배 대상이 없습니다.</div>';
+  setTimeout(()=>window.decorateShippingV747?.(),0);window.renderShippingOmissionsV748?.()
+ };
+})();
+</script>
+
 </body></html>`);w.document.close();w.print();
 }
 const paymentAliases={payer:['입금자','입금자명','보낸분','거래내용','내용','적요','성명'],amount:['입금액','금액','거래금액','입금'],date:['거래일시','거래일','날짜','시간']};
@@ -1213,6 +1303,81 @@ function printShipping(){renderShipping();const arr=window.currentShipping||[];i
 }
 </style>
 
+
+
+<!-- v7.49 화면안정화 + 택배팀 송장스캔 관리자 연동 -->
+<style id="v749-screen-stability">
+html,body,.page,.scroll,table,tbody,tr{overflow-anchor:none!important}
+.v749-ship-meta{font-size:12px;line-height:1.55;white-space:nowrap}.v749-ship-ready{color:#0b6bcb;font-weight:900}.v749-ship-packed{color:#16803b;font-weight:900}.v749-ship-wait{color:#8a5a00;font-weight:900}.v749-sms-fail{color:#c62828;font-weight:900}.v749-sms-ok{color:#16803b;font-weight:900}
+</style>
+<script id="v749-screen-shipping">
+(()=>{
+ const esc9=v=>String(v??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+ const mon9=v=>(Number(v)||0).toLocaleString('ko-KR')+'원';
+ const sigCustomers=list=>JSON.stringify((list||[]).map(c=>[c.id,c.name,c.nickname||c.nick,c.phone,c.postalCode,c.address,c.detailAddress,c.memo,c.active]).sort((a,b)=>String(a[0]).localeCompare(String(b[0]))));
+ function viewState9(){
+  const active=document.activeElement,sc=[...document.querySelectorAll('.scroll')].map((x,i)=>({i,top:x.scrollTop,left:x.scrollLeft}));
+  return {y:window.scrollY,x:window.scrollX,activeId:active?.id||'',selStart:active?.selectionStart,selEnd:active?.selectionEnd,sc}
+ }
+ function restore9(v){
+  requestAnimationFrame(()=>{document.querySelectorAll('.scroll').forEach((x,i)=>{const s=v.sc.find(z=>z.i===i);if(s){x.scrollTop=s.top;x.scrollLeft=s.left}});
+   window.scrollTo({top:v.y,left:v.x,behavior:'auto'});if(v.activeId){const a=document.getElementById(v.activeId);if(a){try{a.focus({preventScroll:true});if(Number.isInteger(v.selStart))a.setSelectionRange(v.selStart,v.selEnd)}catch(e){}}}})
+ }
+ function renderActive9(){
+  const a=document.querySelector('.page.active,[data-page].active'),id=a?.id||a?.dataset?.page||'';
+  if(id==='customers'||id==='customer')window.renderCustomers?.();
+  else if(id==='receipts'||id==='receipt')window.renderReceipts?.();
+  else if(id==='payments'||id==='payment')window.renderPayments?.();
+  else if(id==='shipping')window.renderShipping?.();
+  window.updateKpi?.()
+ }
+ // 기존 SSE는 같은 목록을 받아도 화면 전체를 재그리는 원인이 될 수 있으므로 종료.
+ setTimeout(()=>{try{window.customerEventSource?.close()}catch(e){}},300);
+ // 10초 폴링은 데이터가 실제 변경될 때만 현재 화면만 다시 그림.
+ window.syncServerCustomers=async function(showMessage=false){
+  try{
+   const r=await fetch('/api/customers?ts='+Date.now(),{cache:'no-store'});if(!r.ok)throw new Error('HTTP '+r.status);const list=await r.json();
+   const before=sigCustomers(state.customers||[]),after=sigCustomers(list||[]);
+   if(before!==after){
+    const v=viewState9();state.customers=(list||[]).map(c=>({...c,nickname:c.nickname||c.nick||'',nick:c.nickname||c.nick||''}));
+    try{dedupeCustomers?.();autoMatchAll?.();localStorage.setItem(KEY,JSON.stringify(state))}catch(e){}
+    renderActive9();restore9(v)
+   }
+   if(showMessage)alert(`고객DB ${state.customers?.length||0}명을 확인했습니다.`);
+   return true
+  }catch(e){console.warn('고객DB 동기화 실패',e);if(showMessage)alert('고객DB 동기화 실패: '+e.message);return false}
+ };
+ window.applyServerCustomers=function(list){
+  const before=sigCustomers(state.customers||[]),after=sigCustomers(list||[]);if(before===after)return;
+  const v=viewState9();state.customers=(list||[]).map(c=>({...c,nickname:c.nickname||c.nick||'',nick:c.nickname||c.nick||''}));
+  try{dedupeCustomers?.();autoMatchAll?.();localStorage.setItem(KEY,JSON.stringify(state))}catch(e){}renderActive9();restore9(v)
+ };
+ // 택배 상태도 변경됐을 때만 현재 택배 화면을 갱신하고 위치를 고정.
+ window.syncShippingScans=async function(renderAfter=false){
+  try{
+   const r=await fetch('/api/packing/scans?ts='+Date.now(),{cache:'no-store'}),d=await r.json();if(!r.ok||!d.ok)throw new Error(d.error||'조회 실패');
+   const b=JSON.stringify(state.shippingScans||{}),a=JSON.stringify(d.shippingScans||{});if(b===a)return true;
+   const v=viewState9();state.shippingScans=d.shippingScans||{};try{localStorage.setItem(KEY,JSON.stringify(state))}catch(e){}
+   if(renderAfter&&document.querySelector('[data-page=shipping]')?.classList.contains('active')){window.renderShipping?.();restore9(v)}return true
+  }catch(e){console.warn('택배 상태 동기화 실패',e);return false}
+ };
+ window.resendDeliverySmsV749=async function(code,btn){
+  const old=btn?.textContent;if(btn){btn.disabled=true;btn.textContent='전송중...'}
+  try{const r=await fetch('/api/packing/delivery-sms/resend',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({code})}),d=await r.json();if(!r.ok||!d.ok)throw new Error(d.error||'재발송 실패');alert('배송문자를 재발송했습니다.');await window.syncShippingScans(true)}
+  catch(e){alert('배송문자 재발송 실패: '+e.message)}finally{if(btn){btn.disabled=false;btn.textContent=old}}
+ };
+ window.renderShipping=function(){
+  const filter=document.getElementById('shippingFilter')?.value||'paid',bundle=document.getElementById('bundleMode')?.value||'date';let rs=getReceipts();if(filter==='paid')rs=rs.filter(r=>r.payment?.status==='paid');
+  const groups=new Map();rs.forEach(r=>{const c=r.customer||{},k=bundle==='customer'?(c.id||r.nick):r.key;if(!groups.has(k))groups.set(k,{name:c.name||'',nick:r.nick,phone:c.phone||'',postalCode:c.postalCode||'',address:[c.address,c.detailAddress].filter(Boolean).join(' '),memo:c.memo||'',dates:new Set(),items:[],subtotal:0,fee:0,total:0,status:r.payment?.status||'unpaid'});const g=groups.get(k);g.dates.add(r.date);g.items.push(...r.items.map(x=>({...x})));g.subtotal+=Number(r.subtotal)||0;g.fee+=Number(r.fee)||0;g.total+=Number(r.total)||0});
+  const arr=[...groups.values()].map(g=>({...g,code:shippingCodeFor(g)}));window.currentShipping=arr;state.shippingScans=state.shippingScans||{};const box=document.getElementById('shippingTable');if(!box)return;
+  box.innerHTML=arr.length?`<div class="scroll"><table class="shipping-table"><thead><tr><th>상태</th><th>택배코드</th><th>고객명</th><th>닉네임</th><th>연락처</th><th>주소</th><th>상품내역</th><th>포장자/시간</th><th>택배사/송장</th><th>송장스캔</th><th>배송문자</th><th>총금액</th></tr></thead><tbody>${arr.map(g=>{const s=state.shippingScans[g.code]||{},ready=!!s.shipmentScanAt,packed=!!(s.packingCompletedAt||s.at),smsFail=!!s.deliverySmsError;
+    const status=ready?'<span class="v749-ship-ready">🚚 출고준비완료</span>':packed?'<span class="v749-ship-packed">🟢 포장완료</span>':'<span class="v749-ship-wait">⏳ 포장대기</span>';
+    const sms=s.deliverySmsSentAt?`<span class="v749-sms-ok">✅ 발송완료</span><br><small>${new Date(s.deliverySmsSentAt).toLocaleString('ko-KR')}</small>`:smsFail?`<span class="v749-sms-fail">⚠️ 발송실패</span><br><small>${esc9(s.deliverySmsError)}</small><br><button class="btn secondary" style="padding:5px 8px" onclick="resendDeliverySmsV749('${esc9(g.code)}',this)">재발송</button>`:'<span class="muted">미발송</span>';
+    return `<tr class="${packed?'packed-row':''}"><td>${status}</td><td class="shipping-code">${esc9(g.code)}</td><td>${esc9(g.name)}</td><td>${esc9(g.nick)}</td><td>${esc9(g.phone)}</td><td class="address-cell">${esc9(g.address)}</td><td>${g.items.map((x,i)=>`#${esc9(x.number||i+1)} ${esc9(x.item)} ×${Number(x.qty)||0}`).join('<br>')}</td><td class="v749-ship-meta">${esc9(s.worker||'-')}<br>${packed?new Date(s.packingCompletedAt||s.at).toLocaleString('ko-KR'):'-'}</td><td class="v749-ship-meta">${esc9(s.courier||'CJ대한통운')}<br><b>${esc9(s.trackingNumber||'-')}</b></td><td class="v749-ship-meta">${s.shipmentScanAt?new Date(s.shipmentScanAt).toLocaleString('ko-KR'):'-'}</td><td class="v749-ship-meta">${sms}</td><td><b>${mon9(g.total)}</b></td></tr>`}).join('')}</tbody></table></div>`:'<div class="empty">출력할 택배 대상이 없습니다.</div>';
+  setTimeout(()=>window.decorateShippingV747?.(),0);window.renderShippingOmissionsV748?.()
+ };
+})();
+</script>
 
 </body></html>`);w.document.close()}
 function downloadReceiptList(){
@@ -1431,7 +1596,7 @@ async function runFunctionCheck(){
  try{
   const r=await fetch('/api/admin/current-tenant',{credentials:'same-origin',cache:'no-store'});
   if(!r.ok)return;
-  const d=await r.json(),b=document.getElementById('tenantGuard');if(d.tenant?.company){window.__tenantCompany=d.tenant.company;state.settings=state.settings||{};state.settings.company=d.tenant.company;}
+  const d=await r.json(),b=document.getElementById('tenantGuard');if(d.tenant?.company){window.__tenantCompany=d.tenant.company;window.__tenantCode=d.tenant.code||window.__tenantCode||'FIRST-0001';state.settings=state.settings||{};state.settings.company=d.tenant.company;}
   if(d.actingAs&&b){
    b.style.display='flex';b.style.alignItems='center';b.style.justifyContent='center';b.style.gap='12px';b.style.flexWrap='wrap';
    const text=document.createElement('span');text.textContent=`현재 거래처: ${d.tenant.company} (${d.tenant.code}) · 이 화면의 저장 내용은 해당 거래처에만 반영됩니다.`;
@@ -1591,6 +1756,81 @@ tr:hover td{background:#f6f7f9!important;color:inherit!important}.exact-receipt 
 </style>
 
 
+
+<!-- v7.49 화면안정화 + 택배팀 송장스캔 관리자 연동 -->
+<style id="v749-screen-stability">
+html,body,.page,.scroll,table,tbody,tr{overflow-anchor:none!important}
+.v749-ship-meta{font-size:12px;line-height:1.55;white-space:nowrap}.v749-ship-ready{color:#0b6bcb;font-weight:900}.v749-ship-packed{color:#16803b;font-weight:900}.v749-ship-wait{color:#8a5a00;font-weight:900}.v749-sms-fail{color:#c62828;font-weight:900}.v749-sms-ok{color:#16803b;font-weight:900}
+</style>
+<script id="v749-screen-shipping">
+(()=>{
+ const esc9=v=>String(v??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+ const mon9=v=>(Number(v)||0).toLocaleString('ko-KR')+'원';
+ const sigCustomers=list=>JSON.stringify((list||[]).map(c=>[c.id,c.name,c.nickname||c.nick,c.phone,c.postalCode,c.address,c.detailAddress,c.memo,c.active]).sort((a,b)=>String(a[0]).localeCompare(String(b[0]))));
+ function viewState9(){
+  const active=document.activeElement,sc=[...document.querySelectorAll('.scroll')].map((x,i)=>({i,top:x.scrollTop,left:x.scrollLeft}));
+  return {y:window.scrollY,x:window.scrollX,activeId:active?.id||'',selStart:active?.selectionStart,selEnd:active?.selectionEnd,sc}
+ }
+ function restore9(v){
+  requestAnimationFrame(()=>{document.querySelectorAll('.scroll').forEach((x,i)=>{const s=v.sc.find(z=>z.i===i);if(s){x.scrollTop=s.top;x.scrollLeft=s.left}});
+   window.scrollTo({top:v.y,left:v.x,behavior:'auto'});if(v.activeId){const a=document.getElementById(v.activeId);if(a){try{a.focus({preventScroll:true});if(Number.isInteger(v.selStart))a.setSelectionRange(v.selStart,v.selEnd)}catch(e){}}}})
+ }
+ function renderActive9(){
+  const a=document.querySelector('.page.active,[data-page].active'),id=a?.id||a?.dataset?.page||'';
+  if(id==='customers'||id==='customer')window.renderCustomers?.();
+  else if(id==='receipts'||id==='receipt')window.renderReceipts?.();
+  else if(id==='payments'||id==='payment')window.renderPayments?.();
+  else if(id==='shipping')window.renderShipping?.();
+  window.updateKpi?.()
+ }
+ // 기존 SSE는 같은 목록을 받아도 화면 전체를 재그리는 원인이 될 수 있으므로 종료.
+ setTimeout(()=>{try{window.customerEventSource?.close()}catch(e){}},300);
+ // 10초 폴링은 데이터가 실제 변경될 때만 현재 화면만 다시 그림.
+ window.syncServerCustomers=async function(showMessage=false){
+  try{
+   const r=await fetch('/api/customers?ts='+Date.now(),{cache:'no-store'});if(!r.ok)throw new Error('HTTP '+r.status);const list=await r.json();
+   const before=sigCustomers(state.customers||[]),after=sigCustomers(list||[]);
+   if(before!==after){
+    const v=viewState9();state.customers=(list||[]).map(c=>({...c,nickname:c.nickname||c.nick||'',nick:c.nickname||c.nick||''}));
+    try{dedupeCustomers?.();autoMatchAll?.();localStorage.setItem(KEY,JSON.stringify(state))}catch(e){}
+    renderActive9();restore9(v)
+   }
+   if(showMessage)alert(`고객DB ${state.customers?.length||0}명을 확인했습니다.`);
+   return true
+  }catch(e){console.warn('고객DB 동기화 실패',e);if(showMessage)alert('고객DB 동기화 실패: '+e.message);return false}
+ };
+ window.applyServerCustomers=function(list){
+  const before=sigCustomers(state.customers||[]),after=sigCustomers(list||[]);if(before===after)return;
+  const v=viewState9();state.customers=(list||[]).map(c=>({...c,nickname:c.nickname||c.nick||'',nick:c.nickname||c.nick||''}));
+  try{dedupeCustomers?.();autoMatchAll?.();localStorage.setItem(KEY,JSON.stringify(state))}catch(e){}renderActive9();restore9(v)
+ };
+ // 택배 상태도 변경됐을 때만 현재 택배 화면을 갱신하고 위치를 고정.
+ window.syncShippingScans=async function(renderAfter=false){
+  try{
+   const r=await fetch('/api/packing/scans?ts='+Date.now(),{cache:'no-store'}),d=await r.json();if(!r.ok||!d.ok)throw new Error(d.error||'조회 실패');
+   const b=JSON.stringify(state.shippingScans||{}),a=JSON.stringify(d.shippingScans||{});if(b===a)return true;
+   const v=viewState9();state.shippingScans=d.shippingScans||{};try{localStorage.setItem(KEY,JSON.stringify(state))}catch(e){}
+   if(renderAfter&&document.querySelector('[data-page=shipping]')?.classList.contains('active')){window.renderShipping?.();restore9(v)}return true
+  }catch(e){console.warn('택배 상태 동기화 실패',e);return false}
+ };
+ window.resendDeliverySmsV749=async function(code,btn){
+  const old=btn?.textContent;if(btn){btn.disabled=true;btn.textContent='전송중...'}
+  try{const r=await fetch('/api/packing/delivery-sms/resend',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({code})}),d=await r.json();if(!r.ok||!d.ok)throw new Error(d.error||'재발송 실패');alert('배송문자를 재발송했습니다.');await window.syncShippingScans(true)}
+  catch(e){alert('배송문자 재발송 실패: '+e.message)}finally{if(btn){btn.disabled=false;btn.textContent=old}}
+ };
+ window.renderShipping=function(){
+  const filter=document.getElementById('shippingFilter')?.value||'paid',bundle=document.getElementById('bundleMode')?.value||'date';let rs=getReceipts();if(filter==='paid')rs=rs.filter(r=>r.payment?.status==='paid');
+  const groups=new Map();rs.forEach(r=>{const c=r.customer||{},k=bundle==='customer'?(c.id||r.nick):r.key;if(!groups.has(k))groups.set(k,{name:c.name||'',nick:r.nick,phone:c.phone||'',postalCode:c.postalCode||'',address:[c.address,c.detailAddress].filter(Boolean).join(' '),memo:c.memo||'',dates:new Set(),items:[],subtotal:0,fee:0,total:0,status:r.payment?.status||'unpaid'});const g=groups.get(k);g.dates.add(r.date);g.items.push(...r.items.map(x=>({...x})));g.subtotal+=Number(r.subtotal)||0;g.fee+=Number(r.fee)||0;g.total+=Number(r.total)||0});
+  const arr=[...groups.values()].map(g=>({...g,code:shippingCodeFor(g)}));window.currentShipping=arr;state.shippingScans=state.shippingScans||{};const box=document.getElementById('shippingTable');if(!box)return;
+  box.innerHTML=arr.length?`<div class="scroll"><table class="shipping-table"><thead><tr><th>상태</th><th>택배코드</th><th>고객명</th><th>닉네임</th><th>연락처</th><th>주소</th><th>상품내역</th><th>포장자/시간</th><th>택배사/송장</th><th>송장스캔</th><th>배송문자</th><th>총금액</th></tr></thead><tbody>${arr.map(g=>{const s=state.shippingScans[g.code]||{},ready=!!s.shipmentScanAt,packed=!!(s.packingCompletedAt||s.at),smsFail=!!s.deliverySmsError;
+    const status=ready?'<span class="v749-ship-ready">🚚 출고준비완료</span>':packed?'<span class="v749-ship-packed">🟢 포장완료</span>':'<span class="v749-ship-wait">⏳ 포장대기</span>';
+    const sms=s.deliverySmsSentAt?`<span class="v749-sms-ok">✅ 발송완료</span><br><small>${new Date(s.deliverySmsSentAt).toLocaleString('ko-KR')}</small>`:smsFail?`<span class="v749-sms-fail">⚠️ 발송실패</span><br><small>${esc9(s.deliverySmsError)}</small><br><button class="btn secondary" style="padding:5px 8px" onclick="resendDeliverySmsV749('${esc9(g.code)}',this)">재발송</button>`:'<span class="muted">미발송</span>';
+    return `<tr class="${packed?'packed-row':''}"><td>${status}</td><td class="shipping-code">${esc9(g.code)}</td><td>${esc9(g.name)}</td><td>${esc9(g.nick)}</td><td>${esc9(g.phone)}</td><td class="address-cell">${esc9(g.address)}</td><td>${g.items.map((x,i)=>`#${esc9(x.number||i+1)} ${esc9(x.item)} ×${Number(x.qty)||0}`).join('<br>')}</td><td class="v749-ship-meta">${esc9(s.worker||'-')}<br>${packed?new Date(s.packingCompletedAt||s.at).toLocaleString('ko-KR'):'-'}</td><td class="v749-ship-meta">${esc9(s.courier||'CJ대한통운')}<br><b>${esc9(s.trackingNumber||'-')}</b></td><td class="v749-ship-meta">${s.shipmentScanAt?new Date(s.shipmentScanAt).toLocaleString('ko-KR'):'-'}</td><td class="v749-ship-meta">${sms}</td><td><b>${mon9(g.total)}</b></td></tr>`}).join('')}</tbody></table></div>`:'<div class="empty">출력할 택배 대상이 없습니다.</div>';
+  setTimeout(()=>window.decorateShippingV747?.(),0);window.renderShippingOmissionsV748?.()
+ };
+})();
+</script>
+
 </body></html>`);w.document.close();
  };
 })();
@@ -1729,7 +1969,82 @@ tr:hover td{background:#f6f7f9!important;color:inherit!important}.exact-receipt 
   if(!modal){modal=document.createElement('div');modal.id='receiptDetailModal';modal.className='receipt-detail-modal';modal.innerHTML='<div class="receipt-detail-box" style="max-width:960px"><div class="receipt-detail-actions no-print"><button class="btn warn" id="detailEditBtn">수정</button><button class="btn secondary" id="detailPrintBtn">인쇄</button><button class="btn bad" onclick="closeReceiptDetail()">닫기</button></div><div id="receiptDetailBody"></div></div>';document.body.appendChild(modal)}
   modal.classList.add('show');document.getElementById('detailEditBtn').onclick=()=>openReceiptEditByKey(key);document.getElementById('detailPrintBtn').onclick=()=>window.print();document.getElementById('receiptDetailBody').innerHTML=window.v736ReceiptHTML(r,indexOfReceiptKey(key));
  };
- window.printOne=function(i){const r=getReceipts()[i];if(!r)return;const css=document.getElementById('v736-receipt-design').outerHTML;const w=window.open('','_blank');w.document.write('<!doctype html><html><head><meta charset="utf-8"><title>정산서</title>'+css+'</head><body>'+window.v736ReceiptHTML(r,i)+'<script>window.onload=()=>setTimeout(()=>window.print(),350)<\\/script></body></html>');w.document.close()};
+ window.printOne=function(i){const r=getReceipts()[i];if(!r)return;const css=document.getElementById('v736-receipt-design').outerHTML;const w=window.open('','_blank');w.document.write('<!doctype html><html><head><meta charset="utf-8"><title>정산서</title>'+css+'</head><body>'+window.v736ReceiptHTML(r,i)+'<script>window.onload=()=>setTimeout(()=>window.print(),350)<\\/script>
+<!-- v7.49 화면안정화 + 택배팀 송장스캔 관리자 연동 -->
+<style id="v749-screen-stability">
+html,body,.page,.scroll,table,tbody,tr{overflow-anchor:none!important}
+.v749-ship-meta{font-size:12px;line-height:1.55;white-space:nowrap}.v749-ship-ready{color:#0b6bcb;font-weight:900}.v749-ship-packed{color:#16803b;font-weight:900}.v749-ship-wait{color:#8a5a00;font-weight:900}.v749-sms-fail{color:#c62828;font-weight:900}.v749-sms-ok{color:#16803b;font-weight:900}
+</style>
+<script id="v749-screen-shipping">
+(()=>{
+ const esc9=v=>String(v??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+ const mon9=v=>(Number(v)||0).toLocaleString('ko-KR')+'원';
+ const sigCustomers=list=>JSON.stringify((list||[]).map(c=>[c.id,c.name,c.nickname||c.nick,c.phone,c.postalCode,c.address,c.detailAddress,c.memo,c.active]).sort((a,b)=>String(a[0]).localeCompare(String(b[0]))));
+ function viewState9(){
+  const active=document.activeElement,sc=[...document.querySelectorAll('.scroll')].map((x,i)=>({i,top:x.scrollTop,left:x.scrollLeft}));
+  return {y:window.scrollY,x:window.scrollX,activeId:active?.id||'',selStart:active?.selectionStart,selEnd:active?.selectionEnd,sc}
+ }
+ function restore9(v){
+  requestAnimationFrame(()=>{document.querySelectorAll('.scroll').forEach((x,i)=>{const s=v.sc.find(z=>z.i===i);if(s){x.scrollTop=s.top;x.scrollLeft=s.left}});
+   window.scrollTo({top:v.y,left:v.x,behavior:'auto'});if(v.activeId){const a=document.getElementById(v.activeId);if(a){try{a.focus({preventScroll:true});if(Number.isInteger(v.selStart))a.setSelectionRange(v.selStart,v.selEnd)}catch(e){}}}})
+ }
+ function renderActive9(){
+  const a=document.querySelector('.page.active,[data-page].active'),id=a?.id||a?.dataset?.page||'';
+  if(id==='customers'||id==='customer')window.renderCustomers?.();
+  else if(id==='receipts'||id==='receipt')window.renderReceipts?.();
+  else if(id==='payments'||id==='payment')window.renderPayments?.();
+  else if(id==='shipping')window.renderShipping?.();
+  window.updateKpi?.()
+ }
+ // 기존 SSE는 같은 목록을 받아도 화면 전체를 재그리는 원인이 될 수 있으므로 종료.
+ setTimeout(()=>{try{window.customerEventSource?.close()}catch(e){}},300);
+ // 10초 폴링은 데이터가 실제 변경될 때만 현재 화면만 다시 그림.
+ window.syncServerCustomers=async function(showMessage=false){
+  try{
+   const r=await fetch('/api/customers?ts='+Date.now(),{cache:'no-store'});if(!r.ok)throw new Error('HTTP '+r.status);const list=await r.json();
+   const before=sigCustomers(state.customers||[]),after=sigCustomers(list||[]);
+   if(before!==after){
+    const v=viewState9();state.customers=(list||[]).map(c=>({...c,nickname:c.nickname||c.nick||'',nick:c.nickname||c.nick||''}));
+    try{dedupeCustomers?.();autoMatchAll?.();localStorage.setItem(KEY,JSON.stringify(state))}catch(e){}
+    renderActive9();restore9(v)
+   }
+   if(showMessage)alert(`고객DB ${state.customers?.length||0}명을 확인했습니다.`);
+   return true
+  }catch(e){console.warn('고객DB 동기화 실패',e);if(showMessage)alert('고객DB 동기화 실패: '+e.message);return false}
+ };
+ window.applyServerCustomers=function(list){
+  const before=sigCustomers(state.customers||[]),after=sigCustomers(list||[]);if(before===after)return;
+  const v=viewState9();state.customers=(list||[]).map(c=>({...c,nickname:c.nickname||c.nick||'',nick:c.nickname||c.nick||''}));
+  try{dedupeCustomers?.();autoMatchAll?.();localStorage.setItem(KEY,JSON.stringify(state))}catch(e){}renderActive9();restore9(v)
+ };
+ // 택배 상태도 변경됐을 때만 현재 택배 화면을 갱신하고 위치를 고정.
+ window.syncShippingScans=async function(renderAfter=false){
+  try{
+   const r=await fetch('/api/packing/scans?ts='+Date.now(),{cache:'no-store'}),d=await r.json();if(!r.ok||!d.ok)throw new Error(d.error||'조회 실패');
+   const b=JSON.stringify(state.shippingScans||{}),a=JSON.stringify(d.shippingScans||{});if(b===a)return true;
+   const v=viewState9();state.shippingScans=d.shippingScans||{};try{localStorage.setItem(KEY,JSON.stringify(state))}catch(e){}
+   if(renderAfter&&document.querySelector('[data-page=shipping]')?.classList.contains('active')){window.renderShipping?.();restore9(v)}return true
+  }catch(e){console.warn('택배 상태 동기화 실패',e);return false}
+ };
+ window.resendDeliverySmsV749=async function(code,btn){
+  const old=btn?.textContent;if(btn){btn.disabled=true;btn.textContent='전송중...'}
+  try{const r=await fetch('/api/packing/delivery-sms/resend',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({code})}),d=await r.json();if(!r.ok||!d.ok)throw new Error(d.error||'재발송 실패');alert('배송문자를 재발송했습니다.');await window.syncShippingScans(true)}
+  catch(e){alert('배송문자 재발송 실패: '+e.message)}finally{if(btn){btn.disabled=false;btn.textContent=old}}
+ };
+ window.renderShipping=function(){
+  const filter=document.getElementById('shippingFilter')?.value||'paid',bundle=document.getElementById('bundleMode')?.value||'date';let rs=getReceipts();if(filter==='paid')rs=rs.filter(r=>r.payment?.status==='paid');
+  const groups=new Map();rs.forEach(r=>{const c=r.customer||{},k=bundle==='customer'?(c.id||r.nick):r.key;if(!groups.has(k))groups.set(k,{name:c.name||'',nick:r.nick,phone:c.phone||'',postalCode:c.postalCode||'',address:[c.address,c.detailAddress].filter(Boolean).join(' '),memo:c.memo||'',dates:new Set(),items:[],subtotal:0,fee:0,total:0,status:r.payment?.status||'unpaid'});const g=groups.get(k);g.dates.add(r.date);g.items.push(...r.items.map(x=>({...x})));g.subtotal+=Number(r.subtotal)||0;g.fee+=Number(r.fee)||0;g.total+=Number(r.total)||0});
+  const arr=[...groups.values()].map(g=>({...g,code:shippingCodeFor(g)}));window.currentShipping=arr;state.shippingScans=state.shippingScans||{};const box=document.getElementById('shippingTable');if(!box)return;
+  box.innerHTML=arr.length?`<div class="scroll"><table class="shipping-table"><thead><tr><th>상태</th><th>택배코드</th><th>고객명</th><th>닉네임</th><th>연락처</th><th>주소</th><th>상품내역</th><th>포장자/시간</th><th>택배사/송장</th><th>송장스캔</th><th>배송문자</th><th>총금액</th></tr></thead><tbody>${arr.map(g=>{const s=state.shippingScans[g.code]||{},ready=!!s.shipmentScanAt,packed=!!(s.packingCompletedAt||s.at),smsFail=!!s.deliverySmsError;
+    const status=ready?'<span class="v749-ship-ready">🚚 출고준비완료</span>':packed?'<span class="v749-ship-packed">🟢 포장완료</span>':'<span class="v749-ship-wait">⏳ 포장대기</span>';
+    const sms=s.deliverySmsSentAt?`<span class="v749-sms-ok">✅ 발송완료</span><br><small>${new Date(s.deliverySmsSentAt).toLocaleString('ko-KR')}</small>`:smsFail?`<span class="v749-sms-fail">⚠️ 발송실패</span><br><small>${esc9(s.deliverySmsError)}</small><br><button class="btn secondary" style="padding:5px 8px" onclick="resendDeliverySmsV749('${esc9(g.code)}',this)">재발송</button>`:'<span class="muted">미발송</span>';
+    return `<tr class="${packed?'packed-row':''}"><td>${status}</td><td class="shipping-code">${esc9(g.code)}</td><td>${esc9(g.name)}</td><td>${esc9(g.nick)}</td><td>${esc9(g.phone)}</td><td class="address-cell">${esc9(g.address)}</td><td>${g.items.map((x,i)=>`#${esc9(x.number||i+1)} ${esc9(x.item)} ×${Number(x.qty)||0}`).join('<br>')}</td><td class="v749-ship-meta">${esc9(s.worker||'-')}<br>${packed?new Date(s.packingCompletedAt||s.at).toLocaleString('ko-KR'):'-'}</td><td class="v749-ship-meta">${esc9(s.courier||'CJ대한통운')}<br><b>${esc9(s.trackingNumber||'-')}</b></td><td class="v749-ship-meta">${s.shipmentScanAt?new Date(s.shipmentScanAt).toLocaleString('ko-KR'):'-'}</td><td class="v749-ship-meta">${sms}</td><td><b>${mon9(g.total)}</b></td></tr>`}).join('')}</tbody></table></div>`:'<div class="empty">출력할 택배 대상이 없습니다.</div>';
+  setTimeout(()=>window.decorateShippingV747?.(),0);window.renderShippingOmissionsV748?.()
+ };
+})();
+</script>
+
+</body></html>');w.document.close()};
  // 문자 이미지도 화면/출력과 같은 HTML 디자인을 그대로 렌더링합니다.
  window.receiptImageBase64=async function(r){
   const host=document.createElement('div');host.style.cssText='position:fixed;left:-10000px;top:0;width:794px;background:#fff;z-index:-1';host.innerHTML=window.v736ReceiptHTML(r,indexOfReceiptKey(r.key));document.body.appendChild(host);
@@ -1791,7 +2106,82 @@ tr:hover td{background:#f6f7f9!important;color:inherit!important}.exact-receipt 
   const r=getReceipts()[i];if(!r)return;
   const css1=document.getElementById('v722-exact-ui')?.outerHTML||'';
   const css2=document.getElementById('v738-template1-only-style')?.outerHTML||'';
-  const w=window.open('','_blank');w.document.write('<!doctype html><html><head><meta charset="utf-8"><title>정산서</title>'+css1+css2+'</head><body>'+template1ReceiptHTML(r,i)+'<script>window.onload=()=>setTimeout(()=>window.print(),350)<\\/script></body></html>');w.document.close();
+  const w=window.open('','_blank');w.document.write('<!doctype html><html><head><meta charset="utf-8"><title>정산서</title>'+css1+css2+'</head><body>'+template1ReceiptHTML(r,i)+'<script>window.onload=()=>setTimeout(()=>window.print(),350)<\\/script>
+<!-- v7.49 화면안정화 + 택배팀 송장스캔 관리자 연동 -->
+<style id="v749-screen-stability">
+html,body,.page,.scroll,table,tbody,tr{overflow-anchor:none!important}
+.v749-ship-meta{font-size:12px;line-height:1.55;white-space:nowrap}.v749-ship-ready{color:#0b6bcb;font-weight:900}.v749-ship-packed{color:#16803b;font-weight:900}.v749-ship-wait{color:#8a5a00;font-weight:900}.v749-sms-fail{color:#c62828;font-weight:900}.v749-sms-ok{color:#16803b;font-weight:900}
+</style>
+<script id="v749-screen-shipping">
+(()=>{
+ const esc9=v=>String(v??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+ const mon9=v=>(Number(v)||0).toLocaleString('ko-KR')+'원';
+ const sigCustomers=list=>JSON.stringify((list||[]).map(c=>[c.id,c.name,c.nickname||c.nick,c.phone,c.postalCode,c.address,c.detailAddress,c.memo,c.active]).sort((a,b)=>String(a[0]).localeCompare(String(b[0]))));
+ function viewState9(){
+  const active=document.activeElement,sc=[...document.querySelectorAll('.scroll')].map((x,i)=>({i,top:x.scrollTop,left:x.scrollLeft}));
+  return {y:window.scrollY,x:window.scrollX,activeId:active?.id||'',selStart:active?.selectionStart,selEnd:active?.selectionEnd,sc}
+ }
+ function restore9(v){
+  requestAnimationFrame(()=>{document.querySelectorAll('.scroll').forEach((x,i)=>{const s=v.sc.find(z=>z.i===i);if(s){x.scrollTop=s.top;x.scrollLeft=s.left}});
+   window.scrollTo({top:v.y,left:v.x,behavior:'auto'});if(v.activeId){const a=document.getElementById(v.activeId);if(a){try{a.focus({preventScroll:true});if(Number.isInteger(v.selStart))a.setSelectionRange(v.selStart,v.selEnd)}catch(e){}}}})
+ }
+ function renderActive9(){
+  const a=document.querySelector('.page.active,[data-page].active'),id=a?.id||a?.dataset?.page||'';
+  if(id==='customers'||id==='customer')window.renderCustomers?.();
+  else if(id==='receipts'||id==='receipt')window.renderReceipts?.();
+  else if(id==='payments'||id==='payment')window.renderPayments?.();
+  else if(id==='shipping')window.renderShipping?.();
+  window.updateKpi?.()
+ }
+ // 기존 SSE는 같은 목록을 받아도 화면 전체를 재그리는 원인이 될 수 있으므로 종료.
+ setTimeout(()=>{try{window.customerEventSource?.close()}catch(e){}},300);
+ // 10초 폴링은 데이터가 실제 변경될 때만 현재 화면만 다시 그림.
+ window.syncServerCustomers=async function(showMessage=false){
+  try{
+   const r=await fetch('/api/customers?ts='+Date.now(),{cache:'no-store'});if(!r.ok)throw new Error('HTTP '+r.status);const list=await r.json();
+   const before=sigCustomers(state.customers||[]),after=sigCustomers(list||[]);
+   if(before!==after){
+    const v=viewState9();state.customers=(list||[]).map(c=>({...c,nickname:c.nickname||c.nick||'',nick:c.nickname||c.nick||''}));
+    try{dedupeCustomers?.();autoMatchAll?.();localStorage.setItem(KEY,JSON.stringify(state))}catch(e){}
+    renderActive9();restore9(v)
+   }
+   if(showMessage)alert(`고객DB ${state.customers?.length||0}명을 확인했습니다.`);
+   return true
+  }catch(e){console.warn('고객DB 동기화 실패',e);if(showMessage)alert('고객DB 동기화 실패: '+e.message);return false}
+ };
+ window.applyServerCustomers=function(list){
+  const before=sigCustomers(state.customers||[]),after=sigCustomers(list||[]);if(before===after)return;
+  const v=viewState9();state.customers=(list||[]).map(c=>({...c,nickname:c.nickname||c.nick||'',nick:c.nickname||c.nick||''}));
+  try{dedupeCustomers?.();autoMatchAll?.();localStorage.setItem(KEY,JSON.stringify(state))}catch(e){}renderActive9();restore9(v)
+ };
+ // 택배 상태도 변경됐을 때만 현재 택배 화면을 갱신하고 위치를 고정.
+ window.syncShippingScans=async function(renderAfter=false){
+  try{
+   const r=await fetch('/api/packing/scans?ts='+Date.now(),{cache:'no-store'}),d=await r.json();if(!r.ok||!d.ok)throw new Error(d.error||'조회 실패');
+   const b=JSON.stringify(state.shippingScans||{}),a=JSON.stringify(d.shippingScans||{});if(b===a)return true;
+   const v=viewState9();state.shippingScans=d.shippingScans||{};try{localStorage.setItem(KEY,JSON.stringify(state))}catch(e){}
+   if(renderAfter&&document.querySelector('[data-page=shipping]')?.classList.contains('active')){window.renderShipping?.();restore9(v)}return true
+  }catch(e){console.warn('택배 상태 동기화 실패',e);return false}
+ };
+ window.resendDeliverySmsV749=async function(code,btn){
+  const old=btn?.textContent;if(btn){btn.disabled=true;btn.textContent='전송중...'}
+  try{const r=await fetch('/api/packing/delivery-sms/resend',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({code})}),d=await r.json();if(!r.ok||!d.ok)throw new Error(d.error||'재발송 실패');alert('배송문자를 재발송했습니다.');await window.syncShippingScans(true)}
+  catch(e){alert('배송문자 재발송 실패: '+e.message)}finally{if(btn){btn.disabled=false;btn.textContent=old}}
+ };
+ window.renderShipping=function(){
+  const filter=document.getElementById('shippingFilter')?.value||'paid',bundle=document.getElementById('bundleMode')?.value||'date';let rs=getReceipts();if(filter==='paid')rs=rs.filter(r=>r.payment?.status==='paid');
+  const groups=new Map();rs.forEach(r=>{const c=r.customer||{},k=bundle==='customer'?(c.id||r.nick):r.key;if(!groups.has(k))groups.set(k,{name:c.name||'',nick:r.nick,phone:c.phone||'',postalCode:c.postalCode||'',address:[c.address,c.detailAddress].filter(Boolean).join(' '),memo:c.memo||'',dates:new Set(),items:[],subtotal:0,fee:0,total:0,status:r.payment?.status||'unpaid'});const g=groups.get(k);g.dates.add(r.date);g.items.push(...r.items.map(x=>({...x})));g.subtotal+=Number(r.subtotal)||0;g.fee+=Number(r.fee)||0;g.total+=Number(r.total)||0});
+  const arr=[...groups.values()].map(g=>({...g,code:shippingCodeFor(g)}));window.currentShipping=arr;state.shippingScans=state.shippingScans||{};const box=document.getElementById('shippingTable');if(!box)return;
+  box.innerHTML=arr.length?`<div class="scroll"><table class="shipping-table"><thead><tr><th>상태</th><th>택배코드</th><th>고객명</th><th>닉네임</th><th>연락처</th><th>주소</th><th>상품내역</th><th>포장자/시간</th><th>택배사/송장</th><th>송장스캔</th><th>배송문자</th><th>총금액</th></tr></thead><tbody>${arr.map(g=>{const s=state.shippingScans[g.code]||{},ready=!!s.shipmentScanAt,packed=!!(s.packingCompletedAt||s.at),smsFail=!!s.deliverySmsError;
+    const status=ready?'<span class="v749-ship-ready">🚚 출고준비완료</span>':packed?'<span class="v749-ship-packed">🟢 포장완료</span>':'<span class="v749-ship-wait">⏳ 포장대기</span>';
+    const sms=s.deliverySmsSentAt?`<span class="v749-sms-ok">✅ 발송완료</span><br><small>${new Date(s.deliverySmsSentAt).toLocaleString('ko-KR')}</small>`:smsFail?`<span class="v749-sms-fail">⚠️ 발송실패</span><br><small>${esc9(s.deliverySmsError)}</small><br><button class="btn secondary" style="padding:5px 8px" onclick="resendDeliverySmsV749('${esc9(g.code)}',this)">재발송</button>`:'<span class="muted">미발송</span>';
+    return `<tr class="${packed?'packed-row':''}"><td>${status}</td><td class="shipping-code">${esc9(g.code)}</td><td>${esc9(g.name)}</td><td>${esc9(g.nick)}</td><td>${esc9(g.phone)}</td><td class="address-cell">${esc9(g.address)}</td><td>${g.items.map((x,i)=>`#${esc9(x.number||i+1)} ${esc9(x.item)} ×${Number(x.qty)||0}`).join('<br>')}</td><td class="v749-ship-meta">${esc9(s.worker||'-')}<br>${packed?new Date(s.packingCompletedAt||s.at).toLocaleString('ko-KR'):'-'}</td><td class="v749-ship-meta">${esc9(s.courier||'CJ대한통운')}<br><b>${esc9(s.trackingNumber||'-')}</b></td><td class="v749-ship-meta">${s.shipmentScanAt?new Date(s.shipmentScanAt).toLocaleString('ko-KR'):'-'}</td><td class="v749-ship-meta">${sms}</td><td><b>${mon9(g.total)}</b></td></tr>`}).join('')}</tbody></table></div>`:'<div class="empty">출력할 택배 대상이 없습니다.</div>';
+  setTimeout(()=>window.decorateShippingV747?.(),0);window.renderShippingOmissionsV748?.()
+ };
+})();
+</script>
+
+</body></html>');w.document.close();
  };
  // 문자 전송 이미지는 화면과 같은 1번 정산서로 생성합니다.
  window.receiptImageBase64=async function(r){
@@ -1853,7 +2243,82 @@ tr:hover td{background:#f6f7f9!important;color:inherit!important}.exact-receipt 
     const w=window.open('','_blank'); if(!w){alert('팝업이 차단되었습니다. 팝업 허용 후 다시 눌러주세요.');return;}
     w.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>택배리스트 전체 출력</title><script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"><\/script><style>
     *{box-sizing:border-box}body{margin:0;font-family:Arial,'Noto Sans KR',sans-serif;color:#111;background:#fff}.ship-page{width:210mm;min-height:297mm;padding:12mm 13mm;page-break-after:always;position:relative}.ship-page:last-child{page-break-after:auto}header{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:3px solid #111;padding-bottom:10px}.brand{font-weight:900;font-size:15px}.identity h1{font-size:34px;margin:12px 0 2px;line-height:1}.identity h2{font-size:25px;margin:5px 0}.qr img,.qr canvas{width:115px!important;height:115px!important}.info{display:grid;grid-template-columns:1fr 1fr;border:1px solid #555;margin:14px 0}.info>div{display:grid;grid-template-columns:92px 1fr;border-bottom:1px solid #888}.info>div:nth-last-child(-n+2){border-bottom:0}.info .wide{grid-column:1/-1}.info b,.info span{padding:9px;border-right:1px solid #888}.info span{border-right:0;word-break:break-all}table{width:100%;border-collapse:collapse;table-layout:fixed}th,td{border:1px solid #666;padding:8px 6px;text-align:center;font-size:13px}th{background:#eee;-webkit-print-color-adjust:exact;print-color-adjust:exact}th:nth-child(2),td:nth-child(2){text-align:left;width:39%}.totals{width:360px;margin:15px 0 0 auto;border:2px solid #111}.totals>div{display:flex;justify-content:space-between;padding:8px 12px;border-bottom:1px solid #777}.totals>div:last-child{border-bottom:0}.grand{font-size:21px}footer{position:absolute;bottom:9mm;left:13mm;right:13mm;text-align:center;font-size:12px;color:#555}@page{size:A4 portrait;margin:0}@media print{body{background:#fff}}
-    </style></head><body>${pages}<script>const data=${qrData};window.onload=()=>{data.forEach((x,i)=>{if(window.QRCode)new QRCode(document.getElementById('shipqr-'+i),{text:x.url,width:180,height:180});});setTimeout(()=>window.print(),900)};<\/script></body></html>`);w.document.close();
+    </style></head><body>${pages}<script>const data=${qrData};window.onload=()=>{data.forEach((x,i)=>{if(window.QRCode)new QRCode(document.getElementById('shipqr-'+i),{text:x.url,width:180,height:180});});setTimeout(()=>window.print(),900)};<\/script>
+<!-- v7.49 화면안정화 + 택배팀 송장스캔 관리자 연동 -->
+<style id="v749-screen-stability">
+html,body,.page,.scroll,table,tbody,tr{overflow-anchor:none!important}
+.v749-ship-meta{font-size:12px;line-height:1.55;white-space:nowrap}.v749-ship-ready{color:#0b6bcb;font-weight:900}.v749-ship-packed{color:#16803b;font-weight:900}.v749-ship-wait{color:#8a5a00;font-weight:900}.v749-sms-fail{color:#c62828;font-weight:900}.v749-sms-ok{color:#16803b;font-weight:900}
+</style>
+<script id="v749-screen-shipping">
+(()=>{
+ const esc9=v=>String(v??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+ const mon9=v=>(Number(v)||0).toLocaleString('ko-KR')+'원';
+ const sigCustomers=list=>JSON.stringify((list||[]).map(c=>[c.id,c.name,c.nickname||c.nick,c.phone,c.postalCode,c.address,c.detailAddress,c.memo,c.active]).sort((a,b)=>String(a[0]).localeCompare(String(b[0]))));
+ function viewState9(){
+  const active=document.activeElement,sc=[...document.querySelectorAll('.scroll')].map((x,i)=>({i,top:x.scrollTop,left:x.scrollLeft}));
+  return {y:window.scrollY,x:window.scrollX,activeId:active?.id||'',selStart:active?.selectionStart,selEnd:active?.selectionEnd,sc}
+ }
+ function restore9(v){
+  requestAnimationFrame(()=>{document.querySelectorAll('.scroll').forEach((x,i)=>{const s=v.sc.find(z=>z.i===i);if(s){x.scrollTop=s.top;x.scrollLeft=s.left}});
+   window.scrollTo({top:v.y,left:v.x,behavior:'auto'});if(v.activeId){const a=document.getElementById(v.activeId);if(a){try{a.focus({preventScroll:true});if(Number.isInteger(v.selStart))a.setSelectionRange(v.selStart,v.selEnd)}catch(e){}}}})
+ }
+ function renderActive9(){
+  const a=document.querySelector('.page.active,[data-page].active'),id=a?.id||a?.dataset?.page||'';
+  if(id==='customers'||id==='customer')window.renderCustomers?.();
+  else if(id==='receipts'||id==='receipt')window.renderReceipts?.();
+  else if(id==='payments'||id==='payment')window.renderPayments?.();
+  else if(id==='shipping')window.renderShipping?.();
+  window.updateKpi?.()
+ }
+ // 기존 SSE는 같은 목록을 받아도 화면 전체를 재그리는 원인이 될 수 있으므로 종료.
+ setTimeout(()=>{try{window.customerEventSource?.close()}catch(e){}},300);
+ // 10초 폴링은 데이터가 실제 변경될 때만 현재 화면만 다시 그림.
+ window.syncServerCustomers=async function(showMessage=false){
+  try{
+   const r=await fetch('/api/customers?ts='+Date.now(),{cache:'no-store'});if(!r.ok)throw new Error('HTTP '+r.status);const list=await r.json();
+   const before=sigCustomers(state.customers||[]),after=sigCustomers(list||[]);
+   if(before!==after){
+    const v=viewState9();state.customers=(list||[]).map(c=>({...c,nickname:c.nickname||c.nick||'',nick:c.nickname||c.nick||''}));
+    try{dedupeCustomers?.();autoMatchAll?.();localStorage.setItem(KEY,JSON.stringify(state))}catch(e){}
+    renderActive9();restore9(v)
+   }
+   if(showMessage)alert(`고객DB ${state.customers?.length||0}명을 확인했습니다.`);
+   return true
+  }catch(e){console.warn('고객DB 동기화 실패',e);if(showMessage)alert('고객DB 동기화 실패: '+e.message);return false}
+ };
+ window.applyServerCustomers=function(list){
+  const before=sigCustomers(state.customers||[]),after=sigCustomers(list||[]);if(before===after)return;
+  const v=viewState9();state.customers=(list||[]).map(c=>({...c,nickname:c.nickname||c.nick||'',nick:c.nickname||c.nick||''}));
+  try{dedupeCustomers?.();autoMatchAll?.();localStorage.setItem(KEY,JSON.stringify(state))}catch(e){}renderActive9();restore9(v)
+ };
+ // 택배 상태도 변경됐을 때만 현재 택배 화면을 갱신하고 위치를 고정.
+ window.syncShippingScans=async function(renderAfter=false){
+  try{
+   const r=await fetch('/api/packing/scans?ts='+Date.now(),{cache:'no-store'}),d=await r.json();if(!r.ok||!d.ok)throw new Error(d.error||'조회 실패');
+   const b=JSON.stringify(state.shippingScans||{}),a=JSON.stringify(d.shippingScans||{});if(b===a)return true;
+   const v=viewState9();state.shippingScans=d.shippingScans||{};try{localStorage.setItem(KEY,JSON.stringify(state))}catch(e){}
+   if(renderAfter&&document.querySelector('[data-page=shipping]')?.classList.contains('active')){window.renderShipping?.();restore9(v)}return true
+  }catch(e){console.warn('택배 상태 동기화 실패',e);return false}
+ };
+ window.resendDeliverySmsV749=async function(code,btn){
+  const old=btn?.textContent;if(btn){btn.disabled=true;btn.textContent='전송중...'}
+  try{const r=await fetch('/api/packing/delivery-sms/resend',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({code})}),d=await r.json();if(!r.ok||!d.ok)throw new Error(d.error||'재발송 실패');alert('배송문자를 재발송했습니다.');await window.syncShippingScans(true)}
+  catch(e){alert('배송문자 재발송 실패: '+e.message)}finally{if(btn){btn.disabled=false;btn.textContent=old}}
+ };
+ window.renderShipping=function(){
+  const filter=document.getElementById('shippingFilter')?.value||'paid',bundle=document.getElementById('bundleMode')?.value||'date';let rs=getReceipts();if(filter==='paid')rs=rs.filter(r=>r.payment?.status==='paid');
+  const groups=new Map();rs.forEach(r=>{const c=r.customer||{},k=bundle==='customer'?(c.id||r.nick):r.key;if(!groups.has(k))groups.set(k,{name:c.name||'',nick:r.nick,phone:c.phone||'',postalCode:c.postalCode||'',address:[c.address,c.detailAddress].filter(Boolean).join(' '),memo:c.memo||'',dates:new Set(),items:[],subtotal:0,fee:0,total:0,status:r.payment?.status||'unpaid'});const g=groups.get(k);g.dates.add(r.date);g.items.push(...r.items.map(x=>({...x})));g.subtotal+=Number(r.subtotal)||0;g.fee+=Number(r.fee)||0;g.total+=Number(r.total)||0});
+  const arr=[...groups.values()].map(g=>({...g,code:shippingCodeFor(g)}));window.currentShipping=arr;state.shippingScans=state.shippingScans||{};const box=document.getElementById('shippingTable');if(!box)return;
+  box.innerHTML=arr.length?`<div class="scroll"><table class="shipping-table"><thead><tr><th>상태</th><th>택배코드</th><th>고객명</th><th>닉네임</th><th>연락처</th><th>주소</th><th>상품내역</th><th>포장자/시간</th><th>택배사/송장</th><th>송장스캔</th><th>배송문자</th><th>총금액</th></tr></thead><tbody>${arr.map(g=>{const s=state.shippingScans[g.code]||{},ready=!!s.shipmentScanAt,packed=!!(s.packingCompletedAt||s.at),smsFail=!!s.deliverySmsError;
+    const status=ready?'<span class="v749-ship-ready">🚚 출고준비완료</span>':packed?'<span class="v749-ship-packed">🟢 포장완료</span>':'<span class="v749-ship-wait">⏳ 포장대기</span>';
+    const sms=s.deliverySmsSentAt?`<span class="v749-sms-ok">✅ 발송완료</span><br><small>${new Date(s.deliverySmsSentAt).toLocaleString('ko-KR')}</small>`:smsFail?`<span class="v749-sms-fail">⚠️ 발송실패</span><br><small>${esc9(s.deliverySmsError)}</small><br><button class="btn secondary" style="padding:5px 8px" onclick="resendDeliverySmsV749('${esc9(g.code)}',this)">재발송</button>`:'<span class="muted">미발송</span>';
+    return `<tr class="${packed?'packed-row':''}"><td>${status}</td><td class="shipping-code">${esc9(g.code)}</td><td>${esc9(g.name)}</td><td>${esc9(g.nick)}</td><td>${esc9(g.phone)}</td><td class="address-cell">${esc9(g.address)}</td><td>${g.items.map((x,i)=>`#${esc9(x.number||i+1)} ${esc9(x.item)} ×${Number(x.qty)||0}`).join('<br>')}</td><td class="v749-ship-meta">${esc9(s.worker||'-')}<br>${packed?new Date(s.packingCompletedAt||s.at).toLocaleString('ko-KR'):'-'}</td><td class="v749-ship-meta">${esc9(s.courier||'CJ대한통운')}<br><b>${esc9(s.trackingNumber||'-')}</b></td><td class="v749-ship-meta">${s.shipmentScanAt?new Date(s.shipmentScanAt).toLocaleString('ko-KR'):'-'}</td><td class="v749-ship-meta">${sms}</td><td><b>${mon9(g.total)}</b></td></tr>`}).join('')}</tbody></table></div>`:'<div class="empty">출력할 택배 대상이 없습니다.</div>';
+  setTimeout(()=>window.decorateShippingV747?.(),0);window.renderShippingOmissionsV748?.()
+ };
+})();
+</script>
+
+</body></html>`);w.document.close();
   };
 
   window.printAllReceiptsExact=function(mode='all'){
@@ -1873,7 +2338,82 @@ tr:hover td{background:#f6f7f9!important;color:inherit!important}.exact-receipt 
     });
     const styles=[...document.querySelectorAll('head style')].map(s=>s.outerHTML).join('');
     const w=window.open('','_blank'); if(!w){alert('팝업이 차단되었습니다.');return;}
-    w.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>정산서 전체 출력</title>${styles}<style>body{background:#fff!important;margin:0!important}.receipt-print-page{width:210mm;min-height:297mm;page-break-after:always;background:#fff}.receipt-print-page:last-child{page-break-after:auto}.no-print,.receipt-detail-actions,button{display:none!important}.exact-receipt{margin:0!important;box-shadow:none!important}@page{size:A4 portrait;margin:0}</style></head><body>${parts.join('')}<script>window.onload=()=>setTimeout(()=>window.print(),500)<\/script></body></html>`);w.document.close();
+    w.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>정산서 전체 출력</title>${styles}<style>body{background:#fff!important;margin:0!important}.receipt-print-page{width:210mm;min-height:297mm;page-break-after:always;background:#fff}.receipt-print-page:last-child{page-break-after:auto}.no-print,.receipt-detail-actions,button{display:none!important}.exact-receipt{margin:0!important;box-shadow:none!important}@page{size:A4 portrait;margin:0}</style></head><body>${parts.join('')}<script>window.onload=()=>setTimeout(()=>window.print(),500)<\/script>
+<!-- v7.49 화면안정화 + 택배팀 송장스캔 관리자 연동 -->
+<style id="v749-screen-stability">
+html,body,.page,.scroll,table,tbody,tr{overflow-anchor:none!important}
+.v749-ship-meta{font-size:12px;line-height:1.55;white-space:nowrap}.v749-ship-ready{color:#0b6bcb;font-weight:900}.v749-ship-packed{color:#16803b;font-weight:900}.v749-ship-wait{color:#8a5a00;font-weight:900}.v749-sms-fail{color:#c62828;font-weight:900}.v749-sms-ok{color:#16803b;font-weight:900}
+</style>
+<script id="v749-screen-shipping">
+(()=>{
+ const esc9=v=>String(v??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+ const mon9=v=>(Number(v)||0).toLocaleString('ko-KR')+'원';
+ const sigCustomers=list=>JSON.stringify((list||[]).map(c=>[c.id,c.name,c.nickname||c.nick,c.phone,c.postalCode,c.address,c.detailAddress,c.memo,c.active]).sort((a,b)=>String(a[0]).localeCompare(String(b[0]))));
+ function viewState9(){
+  const active=document.activeElement,sc=[...document.querySelectorAll('.scroll')].map((x,i)=>({i,top:x.scrollTop,left:x.scrollLeft}));
+  return {y:window.scrollY,x:window.scrollX,activeId:active?.id||'',selStart:active?.selectionStart,selEnd:active?.selectionEnd,sc}
+ }
+ function restore9(v){
+  requestAnimationFrame(()=>{document.querySelectorAll('.scroll').forEach((x,i)=>{const s=v.sc.find(z=>z.i===i);if(s){x.scrollTop=s.top;x.scrollLeft=s.left}});
+   window.scrollTo({top:v.y,left:v.x,behavior:'auto'});if(v.activeId){const a=document.getElementById(v.activeId);if(a){try{a.focus({preventScroll:true});if(Number.isInteger(v.selStart))a.setSelectionRange(v.selStart,v.selEnd)}catch(e){}}}})
+ }
+ function renderActive9(){
+  const a=document.querySelector('.page.active,[data-page].active'),id=a?.id||a?.dataset?.page||'';
+  if(id==='customers'||id==='customer')window.renderCustomers?.();
+  else if(id==='receipts'||id==='receipt')window.renderReceipts?.();
+  else if(id==='payments'||id==='payment')window.renderPayments?.();
+  else if(id==='shipping')window.renderShipping?.();
+  window.updateKpi?.()
+ }
+ // 기존 SSE는 같은 목록을 받아도 화면 전체를 재그리는 원인이 될 수 있으므로 종료.
+ setTimeout(()=>{try{window.customerEventSource?.close()}catch(e){}},300);
+ // 10초 폴링은 데이터가 실제 변경될 때만 현재 화면만 다시 그림.
+ window.syncServerCustomers=async function(showMessage=false){
+  try{
+   const r=await fetch('/api/customers?ts='+Date.now(),{cache:'no-store'});if(!r.ok)throw new Error('HTTP '+r.status);const list=await r.json();
+   const before=sigCustomers(state.customers||[]),after=sigCustomers(list||[]);
+   if(before!==after){
+    const v=viewState9();state.customers=(list||[]).map(c=>({...c,nickname:c.nickname||c.nick||'',nick:c.nickname||c.nick||''}));
+    try{dedupeCustomers?.();autoMatchAll?.();localStorage.setItem(KEY,JSON.stringify(state))}catch(e){}
+    renderActive9();restore9(v)
+   }
+   if(showMessage)alert(`고객DB ${state.customers?.length||0}명을 확인했습니다.`);
+   return true
+  }catch(e){console.warn('고객DB 동기화 실패',e);if(showMessage)alert('고객DB 동기화 실패: '+e.message);return false}
+ };
+ window.applyServerCustomers=function(list){
+  const before=sigCustomers(state.customers||[]),after=sigCustomers(list||[]);if(before===after)return;
+  const v=viewState9();state.customers=(list||[]).map(c=>({...c,nickname:c.nickname||c.nick||'',nick:c.nickname||c.nick||''}));
+  try{dedupeCustomers?.();autoMatchAll?.();localStorage.setItem(KEY,JSON.stringify(state))}catch(e){}renderActive9();restore9(v)
+ };
+ // 택배 상태도 변경됐을 때만 현재 택배 화면을 갱신하고 위치를 고정.
+ window.syncShippingScans=async function(renderAfter=false){
+  try{
+   const r=await fetch('/api/packing/scans?ts='+Date.now(),{cache:'no-store'}),d=await r.json();if(!r.ok||!d.ok)throw new Error(d.error||'조회 실패');
+   const b=JSON.stringify(state.shippingScans||{}),a=JSON.stringify(d.shippingScans||{});if(b===a)return true;
+   const v=viewState9();state.shippingScans=d.shippingScans||{};try{localStorage.setItem(KEY,JSON.stringify(state))}catch(e){}
+   if(renderAfter&&document.querySelector('[data-page=shipping]')?.classList.contains('active')){window.renderShipping?.();restore9(v)}return true
+  }catch(e){console.warn('택배 상태 동기화 실패',e);return false}
+ };
+ window.resendDeliverySmsV749=async function(code,btn){
+  const old=btn?.textContent;if(btn){btn.disabled=true;btn.textContent='전송중...'}
+  try{const r=await fetch('/api/packing/delivery-sms/resend',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({code})}),d=await r.json();if(!r.ok||!d.ok)throw new Error(d.error||'재발송 실패');alert('배송문자를 재발송했습니다.');await window.syncShippingScans(true)}
+  catch(e){alert('배송문자 재발송 실패: '+e.message)}finally{if(btn){btn.disabled=false;btn.textContent=old}}
+ };
+ window.renderShipping=function(){
+  const filter=document.getElementById('shippingFilter')?.value||'paid',bundle=document.getElementById('bundleMode')?.value||'date';let rs=getReceipts();if(filter==='paid')rs=rs.filter(r=>r.payment?.status==='paid');
+  const groups=new Map();rs.forEach(r=>{const c=r.customer||{},k=bundle==='customer'?(c.id||r.nick):r.key;if(!groups.has(k))groups.set(k,{name:c.name||'',nick:r.nick,phone:c.phone||'',postalCode:c.postalCode||'',address:[c.address,c.detailAddress].filter(Boolean).join(' '),memo:c.memo||'',dates:new Set(),items:[],subtotal:0,fee:0,total:0,status:r.payment?.status||'unpaid'});const g=groups.get(k);g.dates.add(r.date);g.items.push(...r.items.map(x=>({...x})));g.subtotal+=Number(r.subtotal)||0;g.fee+=Number(r.fee)||0;g.total+=Number(r.total)||0});
+  const arr=[...groups.values()].map(g=>({...g,code:shippingCodeFor(g)}));window.currentShipping=arr;state.shippingScans=state.shippingScans||{};const box=document.getElementById('shippingTable');if(!box)return;
+  box.innerHTML=arr.length?`<div class="scroll"><table class="shipping-table"><thead><tr><th>상태</th><th>택배코드</th><th>고객명</th><th>닉네임</th><th>연락처</th><th>주소</th><th>상품내역</th><th>포장자/시간</th><th>택배사/송장</th><th>송장스캔</th><th>배송문자</th><th>총금액</th></tr></thead><tbody>${arr.map(g=>{const s=state.shippingScans[g.code]||{},ready=!!s.shipmentScanAt,packed=!!(s.packingCompletedAt||s.at),smsFail=!!s.deliverySmsError;
+    const status=ready?'<span class="v749-ship-ready">🚚 출고준비완료</span>':packed?'<span class="v749-ship-packed">🟢 포장완료</span>':'<span class="v749-ship-wait">⏳ 포장대기</span>';
+    const sms=s.deliverySmsSentAt?`<span class="v749-sms-ok">✅ 발송완료</span><br><small>${new Date(s.deliverySmsSentAt).toLocaleString('ko-KR')}</small>`:smsFail?`<span class="v749-sms-fail">⚠️ 발송실패</span><br><small>${esc9(s.deliverySmsError)}</small><br><button class="btn secondary" style="padding:5px 8px" onclick="resendDeliverySmsV749('${esc9(g.code)}',this)">재발송</button>`:'<span class="muted">미발송</span>';
+    return `<tr class="${packed?'packed-row':''}"><td>${status}</td><td class="shipping-code">${esc9(g.code)}</td><td>${esc9(g.name)}</td><td>${esc9(g.nick)}</td><td>${esc9(g.phone)}</td><td class="address-cell">${esc9(g.address)}</td><td>${g.items.map((x,i)=>`#${esc9(x.number||i+1)} ${esc9(x.item)} ×${Number(x.qty)||0}`).join('<br>')}</td><td class="v749-ship-meta">${esc9(s.worker||'-')}<br>${packed?new Date(s.packingCompletedAt||s.at).toLocaleString('ko-KR'):'-'}</td><td class="v749-ship-meta">${esc9(s.courier||'CJ대한통운')}<br><b>${esc9(s.trackingNumber||'-')}</b></td><td class="v749-ship-meta">${s.shipmentScanAt?new Date(s.shipmentScanAt).toLocaleString('ko-KR'):'-'}</td><td class="v749-ship-meta">${sms}</td><td><b>${mon9(g.total)}</b></td></tr>`}).join('')}</tbody></table></div>`:'<div class="empty">출력할 택배 대상이 없습니다.</div>';
+  setTimeout(()=>window.decorateShippingV747?.(),0);window.renderShippingOmissionsV748?.()
+ };
+})();
+</script>
+
+</body></html>`);w.document.close();
   };
   document.addEventListener('DOMContentLoaded',()=>{
     const allBtn=[...document.querySelectorAll('#receipts button')].find(b=>b.textContent.includes('전체 정산서 인쇄'));
@@ -1980,7 +2520,82 @@ function decorateReceiptsV747(){
 }
 const oldRR=window.renderReceipts;window.renderReceipts=function(){const z=oldRR.apply(this,arguments);setTimeout(decorateReceiptsV747,0);refreshTestReceiptListV747();return z};
 window.toggleAllReceiptPrintV747=v=>{getReceipts().forEach(r=>v?receiptSelectedV747.add(r.key):receiptSelectedV747.delete(r.key));decorateReceiptsV747();document.querySelectorAll('.v747-receipt-check').forEach(x=>x.checked=v)};
-window.printSelectedReceiptsV747=()=>{const rs=getReceipts().filter(r=>receiptSelectedV747.has(r.key));if(!rs.length)return alert('출력할 고객을 체크해 주세요.');const css=document.getElementById('v736-receipt-design')?.outerHTML||'';const body=rs.map((r,i)=>window.v736ReceiptHTML?window.v736ReceiptHTML(r,i):receiptHTML(r,i)).join('');const w=window.open('','_blank');w.document.write('<!doctype html><html><head><meta charset="utf-8"><title>선택 정산서 출력</title>'+css+'<style>.receipt-sheet{page-break-after:always}.receipt-sheet:last-child{page-break-after:auto}</style></head><body>'+body+'<script>window.onload=()=>setTimeout(()=>window.print(),350)<\\/script></body></html>');w.document.close()};
+window.printSelectedReceiptsV747=()=>{const rs=getReceipts().filter(r=>receiptSelectedV747.has(r.key));if(!rs.length)return alert('출력할 고객을 체크해 주세요.');const css=document.getElementById('v736-receipt-design')?.outerHTML||'';const body=rs.map((r,i)=>window.v736ReceiptHTML?window.v736ReceiptHTML(r,i):receiptHTML(r,i)).join('');const w=window.open('','_blank');w.document.write('<!doctype html><html><head><meta charset="utf-8"><title>선택 정산서 출력</title>'+css+'<style>.receipt-sheet{page-break-after:always}.receipt-sheet:last-child{page-break-after:auto}</style></head><body>'+body+'<script>window.onload=()=>setTimeout(()=>window.print(),350)<\\/script>
+<!-- v7.49 화면안정화 + 택배팀 송장스캔 관리자 연동 -->
+<style id="v749-screen-stability">
+html,body,.page,.scroll,table,tbody,tr{overflow-anchor:none!important}
+.v749-ship-meta{font-size:12px;line-height:1.55;white-space:nowrap}.v749-ship-ready{color:#0b6bcb;font-weight:900}.v749-ship-packed{color:#16803b;font-weight:900}.v749-ship-wait{color:#8a5a00;font-weight:900}.v749-sms-fail{color:#c62828;font-weight:900}.v749-sms-ok{color:#16803b;font-weight:900}
+</style>
+<script id="v749-screen-shipping">
+(()=>{
+ const esc9=v=>String(v??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+ const mon9=v=>(Number(v)||0).toLocaleString('ko-KR')+'원';
+ const sigCustomers=list=>JSON.stringify((list||[]).map(c=>[c.id,c.name,c.nickname||c.nick,c.phone,c.postalCode,c.address,c.detailAddress,c.memo,c.active]).sort((a,b)=>String(a[0]).localeCompare(String(b[0]))));
+ function viewState9(){
+  const active=document.activeElement,sc=[...document.querySelectorAll('.scroll')].map((x,i)=>({i,top:x.scrollTop,left:x.scrollLeft}));
+  return {y:window.scrollY,x:window.scrollX,activeId:active?.id||'',selStart:active?.selectionStart,selEnd:active?.selectionEnd,sc}
+ }
+ function restore9(v){
+  requestAnimationFrame(()=>{document.querySelectorAll('.scroll').forEach((x,i)=>{const s=v.sc.find(z=>z.i===i);if(s){x.scrollTop=s.top;x.scrollLeft=s.left}});
+   window.scrollTo({top:v.y,left:v.x,behavior:'auto'});if(v.activeId){const a=document.getElementById(v.activeId);if(a){try{a.focus({preventScroll:true});if(Number.isInteger(v.selStart))a.setSelectionRange(v.selStart,v.selEnd)}catch(e){}}}})
+ }
+ function renderActive9(){
+  const a=document.querySelector('.page.active,[data-page].active'),id=a?.id||a?.dataset?.page||'';
+  if(id==='customers'||id==='customer')window.renderCustomers?.();
+  else if(id==='receipts'||id==='receipt')window.renderReceipts?.();
+  else if(id==='payments'||id==='payment')window.renderPayments?.();
+  else if(id==='shipping')window.renderShipping?.();
+  window.updateKpi?.()
+ }
+ // 기존 SSE는 같은 목록을 받아도 화면 전체를 재그리는 원인이 될 수 있으므로 종료.
+ setTimeout(()=>{try{window.customerEventSource?.close()}catch(e){}},300);
+ // 10초 폴링은 데이터가 실제 변경될 때만 현재 화면만 다시 그림.
+ window.syncServerCustomers=async function(showMessage=false){
+  try{
+   const r=await fetch('/api/customers?ts='+Date.now(),{cache:'no-store'});if(!r.ok)throw new Error('HTTP '+r.status);const list=await r.json();
+   const before=sigCustomers(state.customers||[]),after=sigCustomers(list||[]);
+   if(before!==after){
+    const v=viewState9();state.customers=(list||[]).map(c=>({...c,nickname:c.nickname||c.nick||'',nick:c.nickname||c.nick||''}));
+    try{dedupeCustomers?.();autoMatchAll?.();localStorage.setItem(KEY,JSON.stringify(state))}catch(e){}
+    renderActive9();restore9(v)
+   }
+   if(showMessage)alert(`고객DB ${state.customers?.length||0}명을 확인했습니다.`);
+   return true
+  }catch(e){console.warn('고객DB 동기화 실패',e);if(showMessage)alert('고객DB 동기화 실패: '+e.message);return false}
+ };
+ window.applyServerCustomers=function(list){
+  const before=sigCustomers(state.customers||[]),after=sigCustomers(list||[]);if(before===after)return;
+  const v=viewState9();state.customers=(list||[]).map(c=>({...c,nickname:c.nickname||c.nick||'',nick:c.nickname||c.nick||''}));
+  try{dedupeCustomers?.();autoMatchAll?.();localStorage.setItem(KEY,JSON.stringify(state))}catch(e){}renderActive9();restore9(v)
+ };
+ // 택배 상태도 변경됐을 때만 현재 택배 화면을 갱신하고 위치를 고정.
+ window.syncShippingScans=async function(renderAfter=false){
+  try{
+   const r=await fetch('/api/packing/scans?ts='+Date.now(),{cache:'no-store'}),d=await r.json();if(!r.ok||!d.ok)throw new Error(d.error||'조회 실패');
+   const b=JSON.stringify(state.shippingScans||{}),a=JSON.stringify(d.shippingScans||{});if(b===a)return true;
+   const v=viewState9();state.shippingScans=d.shippingScans||{};try{localStorage.setItem(KEY,JSON.stringify(state))}catch(e){}
+   if(renderAfter&&document.querySelector('[data-page=shipping]')?.classList.contains('active')){window.renderShipping?.();restore9(v)}return true
+  }catch(e){console.warn('택배 상태 동기화 실패',e);return false}
+ };
+ window.resendDeliverySmsV749=async function(code,btn){
+  const old=btn?.textContent;if(btn){btn.disabled=true;btn.textContent='전송중...'}
+  try{const r=await fetch('/api/packing/delivery-sms/resend',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({code})}),d=await r.json();if(!r.ok||!d.ok)throw new Error(d.error||'재발송 실패');alert('배송문자를 재발송했습니다.');await window.syncShippingScans(true)}
+  catch(e){alert('배송문자 재발송 실패: '+e.message)}finally{if(btn){btn.disabled=false;btn.textContent=old}}
+ };
+ window.renderShipping=function(){
+  const filter=document.getElementById('shippingFilter')?.value||'paid',bundle=document.getElementById('bundleMode')?.value||'date';let rs=getReceipts();if(filter==='paid')rs=rs.filter(r=>r.payment?.status==='paid');
+  const groups=new Map();rs.forEach(r=>{const c=r.customer||{},k=bundle==='customer'?(c.id||r.nick):r.key;if(!groups.has(k))groups.set(k,{name:c.name||'',nick:r.nick,phone:c.phone||'',postalCode:c.postalCode||'',address:[c.address,c.detailAddress].filter(Boolean).join(' '),memo:c.memo||'',dates:new Set(),items:[],subtotal:0,fee:0,total:0,status:r.payment?.status||'unpaid'});const g=groups.get(k);g.dates.add(r.date);g.items.push(...r.items.map(x=>({...x})));g.subtotal+=Number(r.subtotal)||0;g.fee+=Number(r.fee)||0;g.total+=Number(r.total)||0});
+  const arr=[...groups.values()].map(g=>({...g,code:shippingCodeFor(g)}));window.currentShipping=arr;state.shippingScans=state.shippingScans||{};const box=document.getElementById('shippingTable');if(!box)return;
+  box.innerHTML=arr.length?`<div class="scroll"><table class="shipping-table"><thead><tr><th>상태</th><th>택배코드</th><th>고객명</th><th>닉네임</th><th>연락처</th><th>주소</th><th>상품내역</th><th>포장자/시간</th><th>택배사/송장</th><th>송장스캔</th><th>배송문자</th><th>총금액</th></tr></thead><tbody>${arr.map(g=>{const s=state.shippingScans[g.code]||{},ready=!!s.shipmentScanAt,packed=!!(s.packingCompletedAt||s.at),smsFail=!!s.deliverySmsError;
+    const status=ready?'<span class="v749-ship-ready">🚚 출고준비완료</span>':packed?'<span class="v749-ship-packed">🟢 포장완료</span>':'<span class="v749-ship-wait">⏳ 포장대기</span>';
+    const sms=s.deliverySmsSentAt?`<span class="v749-sms-ok">✅ 발송완료</span><br><small>${new Date(s.deliverySmsSentAt).toLocaleString('ko-KR')}</small>`:smsFail?`<span class="v749-sms-fail">⚠️ 발송실패</span><br><small>${esc9(s.deliverySmsError)}</small><br><button class="btn secondary" style="padding:5px 8px" onclick="resendDeliverySmsV749('${esc9(g.code)}',this)">재발송</button>`:'<span class="muted">미발송</span>';
+    return `<tr class="${packed?'packed-row':''}"><td>${status}</td><td class="shipping-code">${esc9(g.code)}</td><td>${esc9(g.name)}</td><td>${esc9(g.nick)}</td><td>${esc9(g.phone)}</td><td class="address-cell">${esc9(g.address)}</td><td>${g.items.map((x,i)=>`#${esc9(x.number||i+1)} ${esc9(x.item)} ×${Number(x.qty)||0}`).join('<br>')}</td><td class="v749-ship-meta">${esc9(s.worker||'-')}<br>${packed?new Date(s.packingCompletedAt||s.at).toLocaleString('ko-KR'):'-'}</td><td class="v749-ship-meta">${esc9(s.courier||'CJ대한통운')}<br><b>${esc9(s.trackingNumber||'-')}</b></td><td class="v749-ship-meta">${s.shipmentScanAt?new Date(s.shipmentScanAt).toLocaleString('ko-KR'):'-'}</td><td class="v749-ship-meta">${sms}</td><td><b>${mon9(g.total)}</b></td></tr>`}).join('')}</tbody></table></div>`:'<div class="empty">출력할 택배 대상이 없습니다.</div>';
+  setTimeout(()=>window.decorateShippingV747?.(),0);window.renderShippingOmissionsV748?.()
+ };
+})();
+</script>
+
+</body></html>');w.document.close()};
 
 function decorateShippingV747(){
  const table=$v('shippingTable')?.querySelector('table');if(!table)return;const hr=table.querySelector('thead tr');if(hr&&!hr.querySelector('.v747-ship-head')){const th=document.createElement('th');th.className='v747-ship-head v747-select-cell';th.textContent='출력';hr.prepend(th)}
@@ -2062,7 +2677,82 @@ window.renderReceipts=function(){
 window.toggleAllReceiptPrintV747=v=>{document.querySelectorAll('.v7474-receipt-check').forEach(cb=>{cb.checked=v;v?receiptSelectedV7474.add(cb.dataset.key):receiptSelectedV7474.delete(cb.dataset.key)})};
 window.printSelectedReceiptsV747=()=>{
   const keys=[...receiptSelectedV7474];const rs=getReceipts().filter(r=>keys.includes(r.key));if(!rs.length)return alert('출력할 고객을 체크해 주세요.');
-  const body=rs.map((r,i)=>receiptHTML(r,i)).join('');const styles=[...document.querySelectorAll('style')].map(x=>x.outerHTML).join('');const w=window.open('','_blank');if(!w)return alert('팝업이 차단되었습니다. 팝업을 허용해 주세요.');w.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>${esc4(tenant4())} 선택 정산서</title>${styles}<style>body{background:#fff!important}.exact-receipt{page-break-after:always!important;box-shadow:none!important}.exact-receipt:last-child{page-break-after:auto!important}</style></head><body>${body}<script>window.onload=()=>setTimeout(()=>window.print(),500)<\/script></body></html>`);w.document.close();
+  const body=rs.map((r,i)=>receiptHTML(r,i)).join('');const styles=[...document.querySelectorAll('style')].map(x=>x.outerHTML).join('');const w=window.open('','_blank');if(!w)return alert('팝업이 차단되었습니다. 팝업을 허용해 주세요.');w.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>${esc4(tenant4())} 선택 정산서</title>${styles}<style>body{background:#fff!important}.exact-receipt{page-break-after:always!important;box-shadow:none!important}.exact-receipt:last-child{page-break-after:auto!important}</style></head><body>${body}<script>window.onload=()=>setTimeout(()=>window.print(),500)<\/script>
+<!-- v7.49 화면안정화 + 택배팀 송장스캔 관리자 연동 -->
+<style id="v749-screen-stability">
+html,body,.page,.scroll,table,tbody,tr{overflow-anchor:none!important}
+.v749-ship-meta{font-size:12px;line-height:1.55;white-space:nowrap}.v749-ship-ready{color:#0b6bcb;font-weight:900}.v749-ship-packed{color:#16803b;font-weight:900}.v749-ship-wait{color:#8a5a00;font-weight:900}.v749-sms-fail{color:#c62828;font-weight:900}.v749-sms-ok{color:#16803b;font-weight:900}
+</style>
+<script id="v749-screen-shipping">
+(()=>{
+ const esc9=v=>String(v??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+ const mon9=v=>(Number(v)||0).toLocaleString('ko-KR')+'원';
+ const sigCustomers=list=>JSON.stringify((list||[]).map(c=>[c.id,c.name,c.nickname||c.nick,c.phone,c.postalCode,c.address,c.detailAddress,c.memo,c.active]).sort((a,b)=>String(a[0]).localeCompare(String(b[0]))));
+ function viewState9(){
+  const active=document.activeElement,sc=[...document.querySelectorAll('.scroll')].map((x,i)=>({i,top:x.scrollTop,left:x.scrollLeft}));
+  return {y:window.scrollY,x:window.scrollX,activeId:active?.id||'',selStart:active?.selectionStart,selEnd:active?.selectionEnd,sc}
+ }
+ function restore9(v){
+  requestAnimationFrame(()=>{document.querySelectorAll('.scroll').forEach((x,i)=>{const s=v.sc.find(z=>z.i===i);if(s){x.scrollTop=s.top;x.scrollLeft=s.left}});
+   window.scrollTo({top:v.y,left:v.x,behavior:'auto'});if(v.activeId){const a=document.getElementById(v.activeId);if(a){try{a.focus({preventScroll:true});if(Number.isInteger(v.selStart))a.setSelectionRange(v.selStart,v.selEnd)}catch(e){}}}})
+ }
+ function renderActive9(){
+  const a=document.querySelector('.page.active,[data-page].active'),id=a?.id||a?.dataset?.page||'';
+  if(id==='customers'||id==='customer')window.renderCustomers?.();
+  else if(id==='receipts'||id==='receipt')window.renderReceipts?.();
+  else if(id==='payments'||id==='payment')window.renderPayments?.();
+  else if(id==='shipping')window.renderShipping?.();
+  window.updateKpi?.()
+ }
+ // 기존 SSE는 같은 목록을 받아도 화면 전체를 재그리는 원인이 될 수 있으므로 종료.
+ setTimeout(()=>{try{window.customerEventSource?.close()}catch(e){}},300);
+ // 10초 폴링은 데이터가 실제 변경될 때만 현재 화면만 다시 그림.
+ window.syncServerCustomers=async function(showMessage=false){
+  try{
+   const r=await fetch('/api/customers?ts='+Date.now(),{cache:'no-store'});if(!r.ok)throw new Error('HTTP '+r.status);const list=await r.json();
+   const before=sigCustomers(state.customers||[]),after=sigCustomers(list||[]);
+   if(before!==after){
+    const v=viewState9();state.customers=(list||[]).map(c=>({...c,nickname:c.nickname||c.nick||'',nick:c.nickname||c.nick||''}));
+    try{dedupeCustomers?.();autoMatchAll?.();localStorage.setItem(KEY,JSON.stringify(state))}catch(e){}
+    renderActive9();restore9(v)
+   }
+   if(showMessage)alert(`고객DB ${state.customers?.length||0}명을 확인했습니다.`);
+   return true
+  }catch(e){console.warn('고객DB 동기화 실패',e);if(showMessage)alert('고객DB 동기화 실패: '+e.message);return false}
+ };
+ window.applyServerCustomers=function(list){
+  const before=sigCustomers(state.customers||[]),after=sigCustomers(list||[]);if(before===after)return;
+  const v=viewState9();state.customers=(list||[]).map(c=>({...c,nickname:c.nickname||c.nick||'',nick:c.nickname||c.nick||''}));
+  try{dedupeCustomers?.();autoMatchAll?.();localStorage.setItem(KEY,JSON.stringify(state))}catch(e){}renderActive9();restore9(v)
+ };
+ // 택배 상태도 변경됐을 때만 현재 택배 화면을 갱신하고 위치를 고정.
+ window.syncShippingScans=async function(renderAfter=false){
+  try{
+   const r=await fetch('/api/packing/scans?ts='+Date.now(),{cache:'no-store'}),d=await r.json();if(!r.ok||!d.ok)throw new Error(d.error||'조회 실패');
+   const b=JSON.stringify(state.shippingScans||{}),a=JSON.stringify(d.shippingScans||{});if(b===a)return true;
+   const v=viewState9();state.shippingScans=d.shippingScans||{};try{localStorage.setItem(KEY,JSON.stringify(state))}catch(e){}
+   if(renderAfter&&document.querySelector('[data-page=shipping]')?.classList.contains('active')){window.renderShipping?.();restore9(v)}return true
+  }catch(e){console.warn('택배 상태 동기화 실패',e);return false}
+ };
+ window.resendDeliverySmsV749=async function(code,btn){
+  const old=btn?.textContent;if(btn){btn.disabled=true;btn.textContent='전송중...'}
+  try{const r=await fetch('/api/packing/delivery-sms/resend',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({code})}),d=await r.json();if(!r.ok||!d.ok)throw new Error(d.error||'재발송 실패');alert('배송문자를 재발송했습니다.');await window.syncShippingScans(true)}
+  catch(e){alert('배송문자 재발송 실패: '+e.message)}finally{if(btn){btn.disabled=false;btn.textContent=old}}
+ };
+ window.renderShipping=function(){
+  const filter=document.getElementById('shippingFilter')?.value||'paid',bundle=document.getElementById('bundleMode')?.value||'date';let rs=getReceipts();if(filter==='paid')rs=rs.filter(r=>r.payment?.status==='paid');
+  const groups=new Map();rs.forEach(r=>{const c=r.customer||{},k=bundle==='customer'?(c.id||r.nick):r.key;if(!groups.has(k))groups.set(k,{name:c.name||'',nick:r.nick,phone:c.phone||'',postalCode:c.postalCode||'',address:[c.address,c.detailAddress].filter(Boolean).join(' '),memo:c.memo||'',dates:new Set(),items:[],subtotal:0,fee:0,total:0,status:r.payment?.status||'unpaid'});const g=groups.get(k);g.dates.add(r.date);g.items.push(...r.items.map(x=>({...x})));g.subtotal+=Number(r.subtotal)||0;g.fee+=Number(r.fee)||0;g.total+=Number(r.total)||0});
+  const arr=[...groups.values()].map(g=>({...g,code:shippingCodeFor(g)}));window.currentShipping=arr;state.shippingScans=state.shippingScans||{};const box=document.getElementById('shippingTable');if(!box)return;
+  box.innerHTML=arr.length?`<div class="scroll"><table class="shipping-table"><thead><tr><th>상태</th><th>택배코드</th><th>고객명</th><th>닉네임</th><th>연락처</th><th>주소</th><th>상품내역</th><th>포장자/시간</th><th>택배사/송장</th><th>송장스캔</th><th>배송문자</th><th>총금액</th></tr></thead><tbody>${arr.map(g=>{const s=state.shippingScans[g.code]||{},ready=!!s.shipmentScanAt,packed=!!(s.packingCompletedAt||s.at),smsFail=!!s.deliverySmsError;
+    const status=ready?'<span class="v749-ship-ready">🚚 출고준비완료</span>':packed?'<span class="v749-ship-packed">🟢 포장완료</span>':'<span class="v749-ship-wait">⏳ 포장대기</span>';
+    const sms=s.deliverySmsSentAt?`<span class="v749-sms-ok">✅ 발송완료</span><br><small>${new Date(s.deliverySmsSentAt).toLocaleString('ko-KR')}</small>`:smsFail?`<span class="v749-sms-fail">⚠️ 발송실패</span><br><small>${esc9(s.deliverySmsError)}</small><br><button class="btn secondary" style="padding:5px 8px" onclick="resendDeliverySmsV749('${esc9(g.code)}',this)">재발송</button>`:'<span class="muted">미발송</span>';
+    return `<tr class="${packed?'packed-row':''}"><td>${status}</td><td class="shipping-code">${esc9(g.code)}</td><td>${esc9(g.name)}</td><td>${esc9(g.nick)}</td><td>${esc9(g.phone)}</td><td class="address-cell">${esc9(g.address)}</td><td>${g.items.map((x,i)=>`#${esc9(x.number||i+1)} ${esc9(x.item)} ×${Number(x.qty)||0}`).join('<br>')}</td><td class="v749-ship-meta">${esc9(s.worker||'-')}<br>${packed?new Date(s.packingCompletedAt||s.at).toLocaleString('ko-KR'):'-'}</td><td class="v749-ship-meta">${esc9(s.courier||'CJ대한통운')}<br><b>${esc9(s.trackingNumber||'-')}</b></td><td class="v749-ship-meta">${s.shipmentScanAt?new Date(s.shipmentScanAt).toLocaleString('ko-KR'):'-'}</td><td class="v749-ship-meta">${sms}</td><td><b>${mon9(g.total)}</b></td></tr>`}).join('')}</tbody></table></div>`:'<div class="empty">출력할 택배 대상이 없습니다.</div>';
+  setTimeout(()=>window.decorateShippingV747?.(),0);window.renderShippingOmissionsV748?.()
+ };
+})();
+</script>
+
+</body></html>`);w.document.close();
 };
 
 // 정산 수정 즉시 택배실 반영
@@ -2084,7 +2774,82 @@ window.toggleAllShippingPrintV747=v=>{document.querySelectorAll('.v7474-ship-che
 window.printShippingSelectedV747=()=>{
   const arr=(window.currentShipping||[]).filter(g=>shippingSelectedV7474.has(g.code));if(!arr.length)return alert('출력할 고객을 체크해 주세요.');
   const pages=arr.map((g,i)=>`<section class="page"><header><div><h1>${esc4(tenant4())} 고객별 포장리스트</h1><b>${esc4(g.name||g.nick)}</b> · ${esc4(g.nick)}</div><div id="qr-${i}" class="qr"></div></header><div class="meta"><div><b>연락처</b> ${esc4(g.phone||'')}</div><div><b>방송일</b> ${esc4([...(g.dates||[])].join(', '))}</div><div class="address"><b>주소</b> ${esc4(g.address||'')}</div><div><b>택배코드</b> ${esc4(g.code||'')}</div></div><table><thead><tr><th>번호</th><th>상품명</th><th>수량</th><th>단가</th><th>금액</th><th>확인</th></tr></thead><tbody>${(g.items||[]).map((x,j)=>`<tr><td>#${esc4(x.number||j+1)}</td><td>${esc4(x.item)}</td><td>${Number(x.qty)||0}</td><td>${money4(x.unit)}</td><td>${money4(x.amount)}</td><td>□</td></tr>`).join('')}</tbody></table><div class="totals"><div>상품 합계 <b>${money4(g.subtotal)}</b></div><div>택배비 <b>${money4(g.fee)}</b></div><div class="grand">토탈 금액 <b>${money4(g.total)}</b></div></div></section>`).join('');
-  const data=JSON.stringify(arr.map(g=>({url:location.origin+'/packing.html?code='+encodeURIComponent(g.code)})));const w=window.open('','_blank');if(!w)return alert('팝업이 차단되었습니다. 팝업을 허용해 주세요.');w.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>${esc4(tenant4())} 선택 택배리스트</title><script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"><\/script><style>*{box-sizing:border-box}body{margin:0;font-family:Arial,'Noto Sans KR',sans-serif;color:#111}.page{width:210mm;min-height:297mm;padding:14mm;page-break-after:always;position:relative}.page:last-child{page-break-after:auto}header{display:flex;justify-content:space-between;border-bottom:3px solid #111;padding-bottom:12px}h1{font-size:25px;margin:0 0 8px}.qr img,.qr canvas{width:110px!important;height:110px!important}.meta{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:18px 0;font-size:14px}.address{grid-column:1/-1}table{width:100%;border-collapse:collapse;table-layout:fixed}th,td{border:1px solid #555;padding:11px 8px;text-align:center}th:nth-child(2),td:nth-child(2){text-align:left;width:42%}.totals{margin:18px 0 0 auto;width:330px;font-size:16px;line-height:2;text-align:right}.grand{font-size:23px;border-top:2px solid #111}@page{size:A4 portrait;margin:0}</style></head><body>${pages}<script>const d=${data};window.onload=()=>{d.forEach((x,i)=>new QRCode(document.getElementById('qr-'+i),{text:x.url,width:180,height:180}));setTimeout(()=>window.print(),700)};<\/script></body></html>`);w.document.close();
+  const data=JSON.stringify(arr.map(g=>({url:location.origin+'/packing.html?code='+encodeURIComponent(g.code)})));const w=window.open('','_blank');if(!w)return alert('팝업이 차단되었습니다. 팝업을 허용해 주세요.');w.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>${esc4(tenant4())} 선택 택배리스트</title><script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"><\/script><style>*{box-sizing:border-box}body{margin:0;font-family:Arial,'Noto Sans KR',sans-serif;color:#111}.page{width:210mm;min-height:297mm;padding:14mm;page-break-after:always;position:relative}.page:last-child{page-break-after:auto}header{display:flex;justify-content:space-between;border-bottom:3px solid #111;padding-bottom:12px}h1{font-size:25px;margin:0 0 8px}.qr img,.qr canvas{width:110px!important;height:110px!important}.meta{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:18px 0;font-size:14px}.address{grid-column:1/-1}table{width:100%;border-collapse:collapse;table-layout:fixed}th,td{border:1px solid #555;padding:11px 8px;text-align:center}th:nth-child(2),td:nth-child(2){text-align:left;width:42%}.totals{margin:18px 0 0 auto;width:330px;font-size:16px;line-height:2;text-align:right}.grand{font-size:23px;border-top:2px solid #111}@page{size:A4 portrait;margin:0}</style></head><body>${pages}<script>const d=${data};window.onload=()=>{d.forEach((x,i)=>new QRCode(document.getElementById('qr-'+i),{text:x.url,width:180,height:180}));setTimeout(()=>window.print(),700)};<\/script>
+<!-- v7.49 화면안정화 + 택배팀 송장스캔 관리자 연동 -->
+<style id="v749-screen-stability">
+html,body,.page,.scroll,table,tbody,tr{overflow-anchor:none!important}
+.v749-ship-meta{font-size:12px;line-height:1.55;white-space:nowrap}.v749-ship-ready{color:#0b6bcb;font-weight:900}.v749-ship-packed{color:#16803b;font-weight:900}.v749-ship-wait{color:#8a5a00;font-weight:900}.v749-sms-fail{color:#c62828;font-weight:900}.v749-sms-ok{color:#16803b;font-weight:900}
+</style>
+<script id="v749-screen-shipping">
+(()=>{
+ const esc9=v=>String(v??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+ const mon9=v=>(Number(v)||0).toLocaleString('ko-KR')+'원';
+ const sigCustomers=list=>JSON.stringify((list||[]).map(c=>[c.id,c.name,c.nickname||c.nick,c.phone,c.postalCode,c.address,c.detailAddress,c.memo,c.active]).sort((a,b)=>String(a[0]).localeCompare(String(b[0]))));
+ function viewState9(){
+  const active=document.activeElement,sc=[...document.querySelectorAll('.scroll')].map((x,i)=>({i,top:x.scrollTop,left:x.scrollLeft}));
+  return {y:window.scrollY,x:window.scrollX,activeId:active?.id||'',selStart:active?.selectionStart,selEnd:active?.selectionEnd,sc}
+ }
+ function restore9(v){
+  requestAnimationFrame(()=>{document.querySelectorAll('.scroll').forEach((x,i)=>{const s=v.sc.find(z=>z.i===i);if(s){x.scrollTop=s.top;x.scrollLeft=s.left}});
+   window.scrollTo({top:v.y,left:v.x,behavior:'auto'});if(v.activeId){const a=document.getElementById(v.activeId);if(a){try{a.focus({preventScroll:true});if(Number.isInteger(v.selStart))a.setSelectionRange(v.selStart,v.selEnd)}catch(e){}}}})
+ }
+ function renderActive9(){
+  const a=document.querySelector('.page.active,[data-page].active'),id=a?.id||a?.dataset?.page||'';
+  if(id==='customers'||id==='customer')window.renderCustomers?.();
+  else if(id==='receipts'||id==='receipt')window.renderReceipts?.();
+  else if(id==='payments'||id==='payment')window.renderPayments?.();
+  else if(id==='shipping')window.renderShipping?.();
+  window.updateKpi?.()
+ }
+ // 기존 SSE는 같은 목록을 받아도 화면 전체를 재그리는 원인이 될 수 있으므로 종료.
+ setTimeout(()=>{try{window.customerEventSource?.close()}catch(e){}},300);
+ // 10초 폴링은 데이터가 실제 변경될 때만 현재 화면만 다시 그림.
+ window.syncServerCustomers=async function(showMessage=false){
+  try{
+   const r=await fetch('/api/customers?ts='+Date.now(),{cache:'no-store'});if(!r.ok)throw new Error('HTTP '+r.status);const list=await r.json();
+   const before=sigCustomers(state.customers||[]),after=sigCustomers(list||[]);
+   if(before!==after){
+    const v=viewState9();state.customers=(list||[]).map(c=>({...c,nickname:c.nickname||c.nick||'',nick:c.nickname||c.nick||''}));
+    try{dedupeCustomers?.();autoMatchAll?.();localStorage.setItem(KEY,JSON.stringify(state))}catch(e){}
+    renderActive9();restore9(v)
+   }
+   if(showMessage)alert(`고객DB ${state.customers?.length||0}명을 확인했습니다.`);
+   return true
+  }catch(e){console.warn('고객DB 동기화 실패',e);if(showMessage)alert('고객DB 동기화 실패: '+e.message);return false}
+ };
+ window.applyServerCustomers=function(list){
+  const before=sigCustomers(state.customers||[]),after=sigCustomers(list||[]);if(before===after)return;
+  const v=viewState9();state.customers=(list||[]).map(c=>({...c,nickname:c.nickname||c.nick||'',nick:c.nickname||c.nick||''}));
+  try{dedupeCustomers?.();autoMatchAll?.();localStorage.setItem(KEY,JSON.stringify(state))}catch(e){}renderActive9();restore9(v)
+ };
+ // 택배 상태도 변경됐을 때만 현재 택배 화면을 갱신하고 위치를 고정.
+ window.syncShippingScans=async function(renderAfter=false){
+  try{
+   const r=await fetch('/api/packing/scans?ts='+Date.now(),{cache:'no-store'}),d=await r.json();if(!r.ok||!d.ok)throw new Error(d.error||'조회 실패');
+   const b=JSON.stringify(state.shippingScans||{}),a=JSON.stringify(d.shippingScans||{});if(b===a)return true;
+   const v=viewState9();state.shippingScans=d.shippingScans||{};try{localStorage.setItem(KEY,JSON.stringify(state))}catch(e){}
+   if(renderAfter&&document.querySelector('[data-page=shipping]')?.classList.contains('active')){window.renderShipping?.();restore9(v)}return true
+  }catch(e){console.warn('택배 상태 동기화 실패',e);return false}
+ };
+ window.resendDeliverySmsV749=async function(code,btn){
+  const old=btn?.textContent;if(btn){btn.disabled=true;btn.textContent='전송중...'}
+  try{const r=await fetch('/api/packing/delivery-sms/resend',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({code})}),d=await r.json();if(!r.ok||!d.ok)throw new Error(d.error||'재발송 실패');alert('배송문자를 재발송했습니다.');await window.syncShippingScans(true)}
+  catch(e){alert('배송문자 재발송 실패: '+e.message)}finally{if(btn){btn.disabled=false;btn.textContent=old}}
+ };
+ window.renderShipping=function(){
+  const filter=document.getElementById('shippingFilter')?.value||'paid',bundle=document.getElementById('bundleMode')?.value||'date';let rs=getReceipts();if(filter==='paid')rs=rs.filter(r=>r.payment?.status==='paid');
+  const groups=new Map();rs.forEach(r=>{const c=r.customer||{},k=bundle==='customer'?(c.id||r.nick):r.key;if(!groups.has(k))groups.set(k,{name:c.name||'',nick:r.nick,phone:c.phone||'',postalCode:c.postalCode||'',address:[c.address,c.detailAddress].filter(Boolean).join(' '),memo:c.memo||'',dates:new Set(),items:[],subtotal:0,fee:0,total:0,status:r.payment?.status||'unpaid'});const g=groups.get(k);g.dates.add(r.date);g.items.push(...r.items.map(x=>({...x})));g.subtotal+=Number(r.subtotal)||0;g.fee+=Number(r.fee)||0;g.total+=Number(r.total)||0});
+  const arr=[...groups.values()].map(g=>({...g,code:shippingCodeFor(g)}));window.currentShipping=arr;state.shippingScans=state.shippingScans||{};const box=document.getElementById('shippingTable');if(!box)return;
+  box.innerHTML=arr.length?`<div class="scroll"><table class="shipping-table"><thead><tr><th>상태</th><th>택배코드</th><th>고객명</th><th>닉네임</th><th>연락처</th><th>주소</th><th>상품내역</th><th>포장자/시간</th><th>택배사/송장</th><th>송장스캔</th><th>배송문자</th><th>총금액</th></tr></thead><tbody>${arr.map(g=>{const s=state.shippingScans[g.code]||{},ready=!!s.shipmentScanAt,packed=!!(s.packingCompletedAt||s.at),smsFail=!!s.deliverySmsError;
+    const status=ready?'<span class="v749-ship-ready">🚚 출고준비완료</span>':packed?'<span class="v749-ship-packed">🟢 포장완료</span>':'<span class="v749-ship-wait">⏳ 포장대기</span>';
+    const sms=s.deliverySmsSentAt?`<span class="v749-sms-ok">✅ 발송완료</span><br><small>${new Date(s.deliverySmsSentAt).toLocaleString('ko-KR')}</small>`:smsFail?`<span class="v749-sms-fail">⚠️ 발송실패</span><br><small>${esc9(s.deliverySmsError)}</small><br><button class="btn secondary" style="padding:5px 8px" onclick="resendDeliverySmsV749('${esc9(g.code)}',this)">재발송</button>`:'<span class="muted">미발송</span>';
+    return `<tr class="${packed?'packed-row':''}"><td>${status}</td><td class="shipping-code">${esc9(g.code)}</td><td>${esc9(g.name)}</td><td>${esc9(g.nick)}</td><td>${esc9(g.phone)}</td><td class="address-cell">${esc9(g.address)}</td><td>${g.items.map((x,i)=>`#${esc9(x.number||i+1)} ${esc9(x.item)} ×${Number(x.qty)||0}`).join('<br>')}</td><td class="v749-ship-meta">${esc9(s.worker||'-')}<br>${packed?new Date(s.packingCompletedAt||s.at).toLocaleString('ko-KR'):'-'}</td><td class="v749-ship-meta">${esc9(s.courier||'CJ대한통운')}<br><b>${esc9(s.trackingNumber||'-')}</b></td><td class="v749-ship-meta">${s.shipmentScanAt?new Date(s.shipmentScanAt).toLocaleString('ko-KR'):'-'}</td><td class="v749-ship-meta">${sms}</td><td><b>${mon9(g.total)}</b></td></tr>`}).join('')}</tbody></table></div>`:'<div class="empty">출력할 택배 대상이 없습니다.</div>';
+  setTimeout(()=>window.decorateShippingV747?.(),0);window.renderShippingOmissionsV748?.()
+ };
+})();
+</script>
+
+</body></html>`);w.document.close();
 };
 
 // 거래처 이름을 정산서 이미지에도 항상 반영
@@ -2224,7 +2989,82 @@ setTimeout(()=>{try{renderCustomers();renderReceipts();renderShipping()}catch(e)
  window.removeShippingOmissionV748=id=>{state.shippingOmissions=omission8().filter(x=>x.id!==id);saveSilently();renderShippingOmissionsV748()};
  window.clearShippingOmissionsV748=()=>{if(!omission8().length)return;if(confirm('등록된 누락건을 모두 지울까요?')){state.shippingOmissions=[];saveSilently();renderShippingOmissionsV748()}};
  window.renderShippingOmissionsV748=()=>{const b=$8('shippingOmissionList');if(!b)return;const a=omission8();b.innerHTML=a.length?'<div class="scroll"><table class="v748-omission-table"><thead><tr><th>품번</th><th>품명/옵션</th><th>수량</th><th>메모</th><th></th></tr></thead><tbody>'+a.map(x=>`<tr class="v748-omission-row"><td>#${esc8(x.number||'-')}</td><td>${esc8(x.item)}</td><td>${x.qty}</td><td>${esc8(x.note)}</td><td><button class="btn bad" onclick="removeShippingOmissionV748('${esc8(x.id)}')">삭제</button></td></tr>`).join('')+'</tbody></table></div>':'<div class="muted">등록된 누락건 없음</div>'};
- function packingPrint8(arr,title){if(!arr.length)return alert('출력할 택배 대상이 없습니다.');const sku=skuSummary8(arr),omis=omission8(),company=window.__tenantCompany||state.settings?.company||'땡라이브';const summary=`<section class="page summary"><h1>${esc8(company)} 포장 총괄표</h1><div class="date">출력 ${new Date().toLocaleString('ko-KR')}</div><h2>품번별 총 포장수량</h2><table><thead><tr><th>품번</th><th>품명</th><th>옵션/향/색상</th><th>단가</th><th>총 합계수량</th><th>확인</th></tr></thead><tbody>${sku.map(x=>`<tr><td>#${esc8(x.number)}</td><td>${esc8(x.item)}</td><td>${esc8(opt8(x.item)||'-')}</td><td>${m8(x.unit)}</td><td class="qty">${x.qty}</td><td>□</td></tr>`).join('')}</tbody></table><h2 class="omit-title">누락건</h2>${omis.length?`<table class="omit"><thead><tr><th>품번</th><th>품명</th><th>누락수량</th><th>메모</th><th>확인</th></tr></thead><tbody>${omis.map(x=>`<tr><td>#${esc8(x.number||'-')}</td><td>${esc8(x.item)}</td><td>${x.qty}</td><td>${esc8(x.note)}</td><td>□</td></tr>`).join('')}</tbody></table>`:'<div class="no-omit">현재 등록된 누락건 없음</div>'}</section>`;const data=JSON.stringify(arr.map(g=>({code:g.code,url:location.origin+'/packing.html?code='+encodeURIComponent(g.code)})));const pages=arr.map((g,i)=>`<section class="page"><header><div><h1>${esc8(company)} 고객별 포장리스트</h1><b>${esc8(g.name||g.nick)}</b> · ${esc8(g.nick)}</div><div id="qr8-${i}" class="qr"></div></header><div class="meta"><div><b>연락처</b> ${esc8(g.phone)}</div><div><b>방송일</b> ${[...g.dates].join(', ')}</div><div class="address"><b>주소</b> ${esc8(g.address)}</div><div><b>택배코드</b> ${esc8(g.code)}</div></div><table><thead><tr><th>품번</th><th>상품명/옵션</th><th>수량</th><th>단가</th><th>금액</th><th>확인</th></tr></thead><tbody>${g.items.map((x,j)=>`<tr><td>#${esc8(x.number||j+1)}</td><td>${esc8(x.item)}</td><td class="qty">${x.qty}</td><td>${m8(x.unit)}</td><td>${m8(x.amount)}</td><td>□</td></tr>`).join('')}</tbody></table><div class="totals">상품합계 <b>${m8(g.subtotal)}</b> · 배송비 <b>${m8(g.fee)}</b> · 총 <b>${m8(g.total)}</b></div></section>`).join('');const w=window.open('','_blank');w.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>${esc8(title)}</title><script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"><\/script><style>*{box-sizing:border-box}body{margin:0;font-family:Arial,'Noto Sans KR',sans-serif;color:#111}.page{width:210mm;min-height:297mm;padding:12mm;page-break-after:always}.page:last-child{page-break-after:auto}h1{margin:0 0 6px;font-size:25px}h2{font-size:19px;margin:20px 0 8px}.date{color:#666}header{display:flex;justify-content:space-between;border-bottom:3px solid #111;padding-bottom:10px}.qr img,.qr canvas{width:100px!important;height:100px!important}.meta{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:15px 0}.address{grid-column:1/-1}table{width:100%;border-collapse:collapse;table-layout:fixed}th,td{border:1px solid #555;padding:9px 7px;text-align:center;word-break:keep-all}th:nth-child(2),td:nth-child(2){text-align:left}.qty{font-size:19px;font-weight:900}.totals{margin-top:16px;text-align:right;font-size:17px}.omit-title{color:#c00;border-top:3px solid #c00;padding-top:12px}.omit th,.omit td{border-color:#c00}.omit td{color:#a00;font-weight:700}.no-omit{border:1px solid #aaa;padding:12px;color:#666}@page{size:A4 portrait;margin:0}</style></head><body>${summary+pages}<script>const d=${data};window.onload=()=>{d.forEach((x,i)=>new QRCode(document.getElementById('qr8-'+i),{text:x.url,width:160,height:160}));setTimeout(()=>window.print(),650)};<\/script></body></html>`);w.document.close()}
+ function packingPrint8(arr,title){if(!arr.length)return alert('출력할 택배 대상이 없습니다.');const sku=skuSummary8(arr),omis=omission8(),company=window.__tenantCompany||state.settings?.company||'땡라이브';const summary=`<section class="page summary"><h1>${esc8(company)} 포장 총괄표</h1><div class="date">출력 ${new Date().toLocaleString('ko-KR')}</div><h2>품번별 총 포장수량</h2><table><thead><tr><th>품번</th><th>품명</th><th>옵션/향/색상</th><th>단가</th><th>총 합계수량</th><th>확인</th></tr></thead><tbody>${sku.map(x=>`<tr><td>#${esc8(x.number)}</td><td>${esc8(x.item)}</td><td>${esc8(opt8(x.item)||'-')}</td><td>${m8(x.unit)}</td><td class="qty">${x.qty}</td><td>□</td></tr>`).join('')}</tbody></table><h2 class="omit-title">누락건</h2>${omis.length?`<table class="omit"><thead><tr><th>품번</th><th>품명</th><th>누락수량</th><th>메모</th><th>확인</th></tr></thead><tbody>${omis.map(x=>`<tr><td>#${esc8(x.number||'-')}</td><td>${esc8(x.item)}</td><td>${x.qty}</td><td>${esc8(x.note)}</td><td>□</td></tr>`).join('')}</tbody></table>`:'<div class="no-omit">현재 등록된 누락건 없음</div>'}</section>`;const data=JSON.stringify(arr.map(g=>({code:g.code,url:location.origin+'/packing.html?code='+encodeURIComponent(g.code)})));const pages=arr.map((g,i)=>`<section class="page"><header><div><h1>${esc8(company)} 고객별 포장리스트</h1><b>${esc8(g.name||g.nick)}</b> · ${esc8(g.nick)}</div><div id="qr8-${i}" class="qr"></div></header><div class="meta"><div><b>연락처</b> ${esc8(g.phone)}</div><div><b>방송일</b> ${[...g.dates].join(', ')}</div><div class="address"><b>주소</b> ${esc8(g.address)}</div><div><b>택배코드</b> ${esc8(g.code)}</div></div><table><thead><tr><th>품번</th><th>상품명/옵션</th><th>수량</th><th>단가</th><th>금액</th><th>확인</th></tr></thead><tbody>${g.items.map((x,j)=>`<tr><td>#${esc8(x.number||j+1)}</td><td>${esc8(x.item)}</td><td class="qty">${x.qty}</td><td>${m8(x.unit)}</td><td>${m8(x.amount)}</td><td>□</td></tr>`).join('')}</tbody></table><div class="totals">상품합계 <b>${m8(g.subtotal)}</b> · 배송비 <b>${m8(g.fee)}</b> · 총 <b>${m8(g.total)}</b></div></section>`).join('');const w=window.open('','_blank');w.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>${esc8(title)}</title><script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"><\/script><style>*{box-sizing:border-box}body{margin:0;font-family:Arial,'Noto Sans KR',sans-serif;color:#111}.page{width:210mm;min-height:297mm;padding:12mm;page-break-after:always}.page:last-child{page-break-after:auto}h1{margin:0 0 6px;font-size:25px}h2{font-size:19px;margin:20px 0 8px}.date{color:#666}header{display:flex;justify-content:space-between;border-bottom:3px solid #111;padding-bottom:10px}.qr img,.qr canvas{width:100px!important;height:100px!important}.meta{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:15px 0}.address{grid-column:1/-1}table{width:100%;border-collapse:collapse;table-layout:fixed}th,td{border:1px solid #555;padding:9px 7px;text-align:center;word-break:keep-all}th:nth-child(2),td:nth-child(2){text-align:left}.qty{font-size:19px;font-weight:900}.totals{margin-top:16px;text-align:right;font-size:17px}.omit-title{color:#c00;border-top:3px solid #c00;padding-top:12px}.omit th,.omit td{border-color:#c00}.omit td{color:#a00;font-weight:700}.no-omit{border:1px solid #aaa;padding:12px;color:#666}@page{size:A4 portrait;margin:0}</style></head><body>${summary+pages}<script>const d=${data};window.onload=()=>{d.forEach((x,i)=>new QRCode(document.getElementById('qr8-'+i),{text:x.url,width:160,height:160}));setTimeout(()=>window.print(),650)};<\/script>
+<!-- v7.49 화면안정화 + 택배팀 송장스캔 관리자 연동 -->
+<style id="v749-screen-stability">
+html,body,.page,.scroll,table,tbody,tr{overflow-anchor:none!important}
+.v749-ship-meta{font-size:12px;line-height:1.55;white-space:nowrap}.v749-ship-ready{color:#0b6bcb;font-weight:900}.v749-ship-packed{color:#16803b;font-weight:900}.v749-ship-wait{color:#8a5a00;font-weight:900}.v749-sms-fail{color:#c62828;font-weight:900}.v749-sms-ok{color:#16803b;font-weight:900}
+</style>
+<script id="v749-screen-shipping">
+(()=>{
+ const esc9=v=>String(v??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+ const mon9=v=>(Number(v)||0).toLocaleString('ko-KR')+'원';
+ const sigCustomers=list=>JSON.stringify((list||[]).map(c=>[c.id,c.name,c.nickname||c.nick,c.phone,c.postalCode,c.address,c.detailAddress,c.memo,c.active]).sort((a,b)=>String(a[0]).localeCompare(String(b[0]))));
+ function viewState9(){
+  const active=document.activeElement,sc=[...document.querySelectorAll('.scroll')].map((x,i)=>({i,top:x.scrollTop,left:x.scrollLeft}));
+  return {y:window.scrollY,x:window.scrollX,activeId:active?.id||'',selStart:active?.selectionStart,selEnd:active?.selectionEnd,sc}
+ }
+ function restore9(v){
+  requestAnimationFrame(()=>{document.querySelectorAll('.scroll').forEach((x,i)=>{const s=v.sc.find(z=>z.i===i);if(s){x.scrollTop=s.top;x.scrollLeft=s.left}});
+   window.scrollTo({top:v.y,left:v.x,behavior:'auto'});if(v.activeId){const a=document.getElementById(v.activeId);if(a){try{a.focus({preventScroll:true});if(Number.isInteger(v.selStart))a.setSelectionRange(v.selStart,v.selEnd)}catch(e){}}}})
+ }
+ function renderActive9(){
+  const a=document.querySelector('.page.active,[data-page].active'),id=a?.id||a?.dataset?.page||'';
+  if(id==='customers'||id==='customer')window.renderCustomers?.();
+  else if(id==='receipts'||id==='receipt')window.renderReceipts?.();
+  else if(id==='payments'||id==='payment')window.renderPayments?.();
+  else if(id==='shipping')window.renderShipping?.();
+  window.updateKpi?.()
+ }
+ // 기존 SSE는 같은 목록을 받아도 화면 전체를 재그리는 원인이 될 수 있으므로 종료.
+ setTimeout(()=>{try{window.customerEventSource?.close()}catch(e){}},300);
+ // 10초 폴링은 데이터가 실제 변경될 때만 현재 화면만 다시 그림.
+ window.syncServerCustomers=async function(showMessage=false){
+  try{
+   const r=await fetch('/api/customers?ts='+Date.now(),{cache:'no-store'});if(!r.ok)throw new Error('HTTP '+r.status);const list=await r.json();
+   const before=sigCustomers(state.customers||[]),after=sigCustomers(list||[]);
+   if(before!==after){
+    const v=viewState9();state.customers=(list||[]).map(c=>({...c,nickname:c.nickname||c.nick||'',nick:c.nickname||c.nick||''}));
+    try{dedupeCustomers?.();autoMatchAll?.();localStorage.setItem(KEY,JSON.stringify(state))}catch(e){}
+    renderActive9();restore9(v)
+   }
+   if(showMessage)alert(`고객DB ${state.customers?.length||0}명을 확인했습니다.`);
+   return true
+  }catch(e){console.warn('고객DB 동기화 실패',e);if(showMessage)alert('고객DB 동기화 실패: '+e.message);return false}
+ };
+ window.applyServerCustomers=function(list){
+  const before=sigCustomers(state.customers||[]),after=sigCustomers(list||[]);if(before===after)return;
+  const v=viewState9();state.customers=(list||[]).map(c=>({...c,nickname:c.nickname||c.nick||'',nick:c.nickname||c.nick||''}));
+  try{dedupeCustomers?.();autoMatchAll?.();localStorage.setItem(KEY,JSON.stringify(state))}catch(e){}renderActive9();restore9(v)
+ };
+ // 택배 상태도 변경됐을 때만 현재 택배 화면을 갱신하고 위치를 고정.
+ window.syncShippingScans=async function(renderAfter=false){
+  try{
+   const r=await fetch('/api/packing/scans?ts='+Date.now(),{cache:'no-store'}),d=await r.json();if(!r.ok||!d.ok)throw new Error(d.error||'조회 실패');
+   const b=JSON.stringify(state.shippingScans||{}),a=JSON.stringify(d.shippingScans||{});if(b===a)return true;
+   const v=viewState9();state.shippingScans=d.shippingScans||{};try{localStorage.setItem(KEY,JSON.stringify(state))}catch(e){}
+   if(renderAfter&&document.querySelector('[data-page=shipping]')?.classList.contains('active')){window.renderShipping?.();restore9(v)}return true
+  }catch(e){console.warn('택배 상태 동기화 실패',e);return false}
+ };
+ window.resendDeliverySmsV749=async function(code,btn){
+  const old=btn?.textContent;if(btn){btn.disabled=true;btn.textContent='전송중...'}
+  try{const r=await fetch('/api/packing/delivery-sms/resend',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({code})}),d=await r.json();if(!r.ok||!d.ok)throw new Error(d.error||'재발송 실패');alert('배송문자를 재발송했습니다.');await window.syncShippingScans(true)}
+  catch(e){alert('배송문자 재발송 실패: '+e.message)}finally{if(btn){btn.disabled=false;btn.textContent=old}}
+ };
+ window.renderShipping=function(){
+  const filter=document.getElementById('shippingFilter')?.value||'paid',bundle=document.getElementById('bundleMode')?.value||'date';let rs=getReceipts();if(filter==='paid')rs=rs.filter(r=>r.payment?.status==='paid');
+  const groups=new Map();rs.forEach(r=>{const c=r.customer||{},k=bundle==='customer'?(c.id||r.nick):r.key;if(!groups.has(k))groups.set(k,{name:c.name||'',nick:r.nick,phone:c.phone||'',postalCode:c.postalCode||'',address:[c.address,c.detailAddress].filter(Boolean).join(' '),memo:c.memo||'',dates:new Set(),items:[],subtotal:0,fee:0,total:0,status:r.payment?.status||'unpaid'});const g=groups.get(k);g.dates.add(r.date);g.items.push(...r.items.map(x=>({...x})));g.subtotal+=Number(r.subtotal)||0;g.fee+=Number(r.fee)||0;g.total+=Number(r.total)||0});
+  const arr=[...groups.values()].map(g=>({...g,code:shippingCodeFor(g)}));window.currentShipping=arr;state.shippingScans=state.shippingScans||{};const box=document.getElementById('shippingTable');if(!box)return;
+  box.innerHTML=arr.length?`<div class="scroll"><table class="shipping-table"><thead><tr><th>상태</th><th>택배코드</th><th>고객명</th><th>닉네임</th><th>연락처</th><th>주소</th><th>상품내역</th><th>포장자/시간</th><th>택배사/송장</th><th>송장스캔</th><th>배송문자</th><th>총금액</th></tr></thead><tbody>${arr.map(g=>{const s=state.shippingScans[g.code]||{},ready=!!s.shipmentScanAt,packed=!!(s.packingCompletedAt||s.at),smsFail=!!s.deliverySmsError;
+    const status=ready?'<span class="v749-ship-ready">🚚 출고준비완료</span>':packed?'<span class="v749-ship-packed">🟢 포장완료</span>':'<span class="v749-ship-wait">⏳ 포장대기</span>';
+    const sms=s.deliverySmsSentAt?`<span class="v749-sms-ok">✅ 발송완료</span><br><small>${new Date(s.deliverySmsSentAt).toLocaleString('ko-KR')}</small>`:smsFail?`<span class="v749-sms-fail">⚠️ 발송실패</span><br><small>${esc9(s.deliverySmsError)}</small><br><button class="btn secondary" style="padding:5px 8px" onclick="resendDeliverySmsV749('${esc9(g.code)}',this)">재발송</button>`:'<span class="muted">미발송</span>';
+    return `<tr class="${packed?'packed-row':''}"><td>${status}</td><td class="shipping-code">${esc9(g.code)}</td><td>${esc9(g.name)}</td><td>${esc9(g.nick)}</td><td>${esc9(g.phone)}</td><td class="address-cell">${esc9(g.address)}</td><td>${g.items.map((x,i)=>`#${esc9(x.number||i+1)} ${esc9(x.item)} ×${Number(x.qty)||0}`).join('<br>')}</td><td class="v749-ship-meta">${esc9(s.worker||'-')}<br>${packed?new Date(s.packingCompletedAt||s.at).toLocaleString('ko-KR'):'-'}</td><td class="v749-ship-meta">${esc9(s.courier||'CJ대한통운')}<br><b>${esc9(s.trackingNumber||'-')}</b></td><td class="v749-ship-meta">${s.shipmentScanAt?new Date(s.shipmentScanAt).toLocaleString('ko-KR'):'-'}</td><td class="v749-ship-meta">${sms}</td><td><b>${mon9(g.total)}</b></td></tr>`}).join('')}</tbody></table></div>`:'<div class="empty">출력할 택배 대상이 없습니다.</div>';
+  setTimeout(()=>window.decorateShippingV747?.(),0);window.renderShippingOmissionsV748?.()
+ };
+})();
+</script>
+
+</body></html>`);w.document.close()}
  window.printPackingSummaryV748=()=>{renderShipping();packingPrint8([...(window.currentShipping||[])],'품번 총수량 + 고객별 포장리스트')};
  function isKimchi8(x){return /(김치|깍두기|총각|열무|배추|파김치|갓김치|백김치|동치미|겉절이)/i.test(String(x?.item||''))}
  window.printKimchiListV748=()=>{renderShipping();const src=window.currentShipping||[],arr=src.map(g=>{const items=(g.items||[]).filter(isKimchi8);if(!items.length)return null;const subtotal=items.reduce((a,x)=>a+(Number(x.amount)||0),0);return {...g,items,subtotal,total:subtotal+(Number(g.fee)||0)}}).filter(Boolean);if(!arr.length)return alert('김치로 분류된 상품이 없습니다. 품명에 김치/깍두기/열무/총각/파김치 등이 포함되면 자동 분리됩니다.');packingPrint8(arr,'김치 전용 포장리스트')};
@@ -2271,6 +3111,149 @@ setTimeout(()=>{try{renderCustomers();renderReceipts();renderShipping()}catch(e)
  window.addEventListener('pagehide',()=>{try{const blob=new Blob([JSON.stringify(state)],{type:'application/json'});navigator.sendBeacon?.('/api/state',blob)}catch(e){}});
  window.addEventListener('online',()=>{try{saveSilently()}catch(e){}});
  setTimeout(()=>{renderShippingOmissionsV748();markPhones8();if(live&&state.settings?.preLiveSmsText)live.value=state.settings.preLiveSmsText;renderShipping()},600);
+})();
+</script>
+
+<!-- v7.49 화면안정화 + 택배팀 송장스캔 관리자 연동 -->
+<style id="v749-screen-stability">
+html,body,.page,.scroll,table,tbody,tr{overflow-anchor:none!important}
+.v749-ship-meta{font-size:12px;line-height:1.55;white-space:nowrap}.v749-ship-ready{color:#0b6bcb;font-weight:900}.v749-ship-packed{color:#16803b;font-weight:900}.v749-ship-wait{color:#8a5a00;font-weight:900}.v749-sms-fail{color:#c62828;font-weight:900}.v749-sms-ok{color:#16803b;font-weight:900}
+</style>
+<script id="v749-screen-shipping">
+(()=>{
+ const esc9=v=>String(v??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+ const mon9=v=>(Number(v)||0).toLocaleString('ko-KR')+'원';
+ const sigCustomers=list=>JSON.stringify((list||[]).map(c=>[c.id,c.name,c.nickname||c.nick,c.phone,c.postalCode,c.address,c.detailAddress,c.memo,c.active]).sort((a,b)=>String(a[0]).localeCompare(String(b[0]))));
+ function viewState9(){
+  const active=document.activeElement,sc=[...document.querySelectorAll('.scroll')].map((x,i)=>({i,top:x.scrollTop,left:x.scrollLeft}));
+  return {y:window.scrollY,x:window.scrollX,activeId:active?.id||'',selStart:active?.selectionStart,selEnd:active?.selectionEnd,sc}
+ }
+ function restore9(v){
+  requestAnimationFrame(()=>{document.querySelectorAll('.scroll').forEach((x,i)=>{const s=v.sc.find(z=>z.i===i);if(s){x.scrollTop=s.top;x.scrollLeft=s.left}});
+   window.scrollTo({top:v.y,left:v.x,behavior:'auto'});if(v.activeId){const a=document.getElementById(v.activeId);if(a){try{a.focus({preventScroll:true});if(Number.isInteger(v.selStart))a.setSelectionRange(v.selStart,v.selEnd)}catch(e){}}}})
+ }
+ function renderActive9(){
+  const a=document.querySelector('.page.active,[data-page].active'),id=a?.id||a?.dataset?.page||'';
+  if(id==='customers'||id==='customer')window.renderCustomers?.();
+  else if(id==='receipts'||id==='receipt')window.renderReceipts?.();
+  else if(id==='payments'||id==='payment')window.renderPayments?.();
+  else if(id==='shipping')window.renderShipping?.();
+  window.updateKpi?.()
+ }
+ // 기존 SSE는 같은 목록을 받아도 화면 전체를 재그리는 원인이 될 수 있으므로 종료.
+ setTimeout(()=>{try{window.customerEventSource?.close()}catch(e){}},300);
+ // 10초 폴링은 데이터가 실제 변경될 때만 현재 화면만 다시 그림.
+ window.syncServerCustomers=async function(showMessage=false){
+  try{
+   const r=await fetch('/api/customers?ts='+Date.now(),{cache:'no-store'});if(!r.ok)throw new Error('HTTP '+r.status);const list=await r.json();
+   const before=sigCustomers(state.customers||[]),after=sigCustomers(list||[]);
+   if(before!==after){
+    const v=viewState9();state.customers=(list||[]).map(c=>({...c,nickname:c.nickname||c.nick||'',nick:c.nickname||c.nick||''}));
+    try{dedupeCustomers?.();autoMatchAll?.();localStorage.setItem(KEY,JSON.stringify(state))}catch(e){}
+    renderActive9();restore9(v)
+   }
+   if(showMessage)alert(`고객DB ${state.customers?.length||0}명을 확인했습니다.`);
+   return true
+  }catch(e){console.warn('고객DB 동기화 실패',e);if(showMessage)alert('고객DB 동기화 실패: '+e.message);return false}
+ };
+ window.applyServerCustomers=function(list){
+  const before=sigCustomers(state.customers||[]),after=sigCustomers(list||[]);if(before===after)return;
+  const v=viewState9();state.customers=(list||[]).map(c=>({...c,nickname:c.nickname||c.nick||'',nick:c.nickname||c.nick||''}));
+  try{dedupeCustomers?.();autoMatchAll?.();localStorage.setItem(KEY,JSON.stringify(state))}catch(e){}renderActive9();restore9(v)
+ };
+ // 택배 상태도 변경됐을 때만 현재 택배 화면을 갱신하고 위치를 고정.
+ window.syncShippingScans=async function(renderAfter=false){
+  try{
+   const r=await fetch('/api/packing/scans?ts='+Date.now(),{cache:'no-store'}),d=await r.json();if(!r.ok||!d.ok)throw new Error(d.error||'조회 실패');
+   const b=JSON.stringify(state.shippingScans||{}),a=JSON.stringify(d.shippingScans||{});if(b===a)return true;
+   const v=viewState9();state.shippingScans=d.shippingScans||{};try{localStorage.setItem(KEY,JSON.stringify(state))}catch(e){}
+   if(renderAfter&&document.querySelector('[data-page=shipping]')?.classList.contains('active')){window.renderShipping?.();restore9(v)}return true
+  }catch(e){console.warn('택배 상태 동기화 실패',e);return false}
+ };
+ window.resendDeliverySmsV749=async function(code,btn){
+  const old=btn?.textContent;if(btn){btn.disabled=true;btn.textContent='전송중...'}
+  try{const r=await fetch('/api/packing/delivery-sms/resend',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({code})}),d=await r.json();if(!r.ok||!d.ok)throw new Error(d.error||'재발송 실패');alert('배송문자를 재발송했습니다.');await window.syncShippingScans(true)}
+  catch(e){alert('배송문자 재발송 실패: '+e.message)}finally{if(btn){btn.disabled=false;btn.textContent=old}}
+ };
+ window.renderShipping=function(){
+  const filter=document.getElementById('shippingFilter')?.value||'paid',bundle=document.getElementById('bundleMode')?.value||'date';let rs=getReceipts();if(filter==='paid')rs=rs.filter(r=>r.payment?.status==='paid');
+  const groups=new Map();rs.forEach(r=>{const c=r.customer||{},k=bundle==='customer'?(c.id||r.nick):r.key;if(!groups.has(k))groups.set(k,{name:c.name||'',nick:r.nick,phone:c.phone||'',postalCode:c.postalCode||'',address:[c.address,c.detailAddress].filter(Boolean).join(' '),memo:c.memo||'',dates:new Set(),items:[],subtotal:0,fee:0,total:0,status:r.payment?.status||'unpaid'});const g=groups.get(k);g.dates.add(r.date);g.items.push(...r.items.map(x=>({...x})));g.subtotal+=Number(r.subtotal)||0;g.fee+=Number(r.fee)||0;g.total+=Number(r.total)||0});
+  const arr=[...groups.values()].map(g=>({...g,code:shippingCodeFor(g)}));window.currentShipping=arr;state.shippingScans=state.shippingScans||{};const box=document.getElementById('shippingTable');if(!box)return;
+  box.innerHTML=arr.length?`<div class="scroll"><table class="shipping-table"><thead><tr><th>상태</th><th>택배코드</th><th>고객명</th><th>닉네임</th><th>연락처</th><th>주소</th><th>상품내역</th><th>포장자/시간</th><th>택배사/송장</th><th>송장스캔</th><th>배송문자</th><th>총금액</th></tr></thead><tbody>${arr.map(g=>{const s=state.shippingScans[g.code]||{},ready=!!s.shipmentScanAt,packed=!!(s.packingCompletedAt||s.at),smsFail=!!s.deliverySmsError;
+    const status=ready?'<span class="v749-ship-ready">🚚 출고준비완료</span>':packed?'<span class="v749-ship-packed">🟢 포장완료</span>':'<span class="v749-ship-wait">⏳ 포장대기</span>';
+    const sms=s.deliverySmsSentAt?`<span class="v749-sms-ok">✅ 발송완료</span><br><small>${new Date(s.deliverySmsSentAt).toLocaleString('ko-KR')}</small>`:smsFail?`<span class="v749-sms-fail">⚠️ 발송실패</span><br><small>${esc9(s.deliverySmsError)}</small><br><button class="btn secondary" style="padding:5px 8px" onclick="resendDeliverySmsV749('${esc9(g.code)}',this)">재발송</button>`:'<span class="muted">미발송</span>';
+    return `<tr class="${packed?'packed-row':''}"><td>${status}</td><td class="shipping-code">${esc9(g.code)}</td><td>${esc9(g.name)}</td><td>${esc9(g.nick)}</td><td>${esc9(g.phone)}</td><td class="address-cell">${esc9(g.address)}</td><td>${g.items.map((x,i)=>`#${esc9(x.number||i+1)} ${esc9(x.item)} ×${Number(x.qty)||0}`).join('<br>')}</td><td class="v749-ship-meta">${esc9(s.worker||'-')}<br>${packed?new Date(s.packingCompletedAt||s.at).toLocaleString('ko-KR'):'-'}</td><td class="v749-ship-meta">${esc9(s.courier||'CJ대한통운')}<br><b>${esc9(s.trackingNumber||'-')}</b></td><td class="v749-ship-meta">${s.shipmentScanAt?new Date(s.shipmentScanAt).toLocaleString('ko-KR'):'-'}</td><td class="v749-ship-meta">${sms}</td><td><b>${mon9(g.total)}</b></td></tr>`}).join('')}</tbody></table></div>`:'<div class="empty">출력할 택배 대상이 없습니다.</div>';
+  setTimeout(()=>window.decorateShippingV747?.(),0);window.renderShippingOmissionsV748?.()
+ };
+})();
+</script>
+
+
+<!-- v7.50 포장단위 자동환산 · 색상구분 종이포장표 · QR · 화면고정 · 보안접속 -->
+<style id="v750-style">
+#v750PackingRulesBox .pack-rule-table{width:100%;border-collapse:collapse;margin-top:8px}.pack-rule-table th,.pack-rule-table td{border:1px solid var(--line);padding:8px}.pack-rule-table th{background:#171b20}.v750-pack-preview{font-weight:900}.v750-sync-toast{position:fixed;right:18px;bottom:18px;z-index:9999;background:#171717;color:#fff;padding:10px 14px;border-radius:12px;box-shadow:0 8px 24px #0004;display:none}
+</style>
+<div id="v750SyncToast" class="v750-sync-toast">서버 데이터가 갱신되었습니다.</div>
+<script id="v750-final-patch">
+(()=>{
+ const $50=id=>document.getElementById(id), esc50=v=>String(v??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+ const normNum=v=>String(v??'').replace(/^#/,'').trim();
+ const unitOptions=['개','세트','묶음','봉','봉지','박스','팩','켤레','기타'];
+ function toast50(t='서버 데이터가 갱신되었습니다.'){const b=$50('v750SyncToast');if(!b)return;b.textContent=t;b.style.display='block';clearTimeout(window.__v750ToastTimer);window.__v750ToastTimer=setTimeout(()=>b.style.display='none',1300)}
+ function rules50(){state.packingRules=(state.packingRules&&typeof state.packingRules==='object')?state.packingRules:{};return state.packingRules}
+ function ruleFor50(x){const n=normNum(x?.number);return rules50()[n]||null}
+ function isService50(x){return !!x?.service||/서비스|사은품|증정/i.test(String(x?.item||''))}
+ function isKimchi50(x){return typeof window.isKimchi8==='function'?window.isKimchi8(x):/김치|깍두기|총각|열무|파김치|백김치|배추김치/i.test(String(x?.item||''))}
+ function option50(item){const s=String(item||'');const p=s.match(/[\(（]([^\)）]+)[\)）]/);if(p)return p[1];if(s.includes('/'))return s.split('/').slice(1).join('/').trim();return '-'}
+ function calc50(x){
+   const q=Math.max(0,Number(x?.qty)||0),r=ruleFor50(x);
+   if(!r)return {orderQty:q,saleUnit:'개',componentQty:1,componentUnit:'개',actualUnit:'개',actualQty:q,componentTotal:q,rule:null};
+   const cq=Math.max(1,Number(r.componentQty)||1),sale=r.saleUnit||'개',cu=r.componentUnit||sale,au=r.actualUnit||cu;
+   let per=1;
+   if(au===cu)per=cq;
+   else if(au===sale)per=1;
+   else per=1;
+   return {orderQty:q,saleUnit:sale,componentQty:cq,componentUnit:cu,actualUnit:au,actualQty:q*per,componentTotal:q*cq,rule:r};
+ }
+ window.packCalcV750=calc50;
+ function explain50(c){if(!c.rule)return '';if(c.saleUnit===c.actualUnit&&c.componentQty===1)return `${c.orderQty}${c.saleUnit}`;return `${c.orderQty}${c.saleUnit} · 1${c.saleUnit}=${c.componentQty}${c.componentUnit}${c.actualUnit!==c.componentUnit?` · 실제포장=${c.actualUnit}`:''}`}
+ function currentProducts50(){
+   const seen=new Map();(state.orders||[]).forEach(x=>{const n=normNum(x.number||x.productNo);if(!n)return;const name=String(x.item||'').trim();if(!seen.has(n))seen.set(n,{number:n,name})});
+   return [...seen.values()].sort((a,b)=>(Number(a.number)||999999)-(Number(b.number)||999999)||a.number.localeCompare(b.number));
+ }
+ window.refreshPackingProductsV750=()=>{const s=$50('packRuleProduct');if(!s)return;const cur=s.value;s.innerHTML='<option value="">직접 입력</option>'+currentProducts50().map(x=>`<option value="${esc50(x.number)}">#${esc50(x.number)} ${esc50(x.name)}</option>`).join('');if([...s.options].some(o=>o.value===cur))s.value=cur};
+ window.pickPackingProductV750=n=>{n=normNum(n);if(!n)return;const p=currentProducts50().find(x=>x.number===n),r=rules50()[n];$50('packRuleNumber').value='#'+n;$50('packRuleName').value=r?.productName||p?.name||'';$50('packRuleSaleUnit').value=r?.saleUnit||'개';$50('packRuleComponentQty').value=r?.componentQty||1;$50('packRuleComponentUnit').value=r?.componentUnit||'개';$50('packRuleActualUnit').value=r?.actualUnit||'개'};
+ window.savePackingRuleV750=()=>{const n=normNum($50('packRuleNumber')?.value);if(!n)return alert('품번을 입력해 주세요.');rules50()[n]={number:n,productName:($50('packRuleName')?.value||'').trim(),saleUnit:$50('packRuleSaleUnit')?.value||'개',componentQty:Math.max(1,Number($50('packRuleComponentQty')?.value)||1),componentUnit:$50('packRuleComponentUnit')?.value||'개',actualUnit:$50('packRuleActualUnit')?.value||'개',updatedAt:new Date().toISOString()};saveSilently();renderPackingRulesV750();alert('#'+n+' 포장구성을 저장했습니다.')};
+ window.deletePackingRuleV750=n=>{delete rules50()[normNum(n)];saveSilently();renderPackingRulesV750()};
+ window.renderPackingRulesV750=()=>{const b=$50('packingRulesListV750');if(!b)return;refreshPackingProductsV750();const a=Object.values(rules50()).sort((x,y)=>(Number(x.number)||999999)-(Number(y.number)||999999));b.innerHTML=a.length?`<div class="scroll"><table class="pack-rule-table"><thead><tr><th>품번</th><th>상품명</th><th>판매단위</th><th>구성</th><th>실제 포장단위</th><th></th></tr></thead><tbody>${a.map(r=>`<tr><td><b>#${esc50(r.number)}</b></td><td>${esc50(r.productName||'-')}</td><td>${esc50(r.saleUnit)}</td><td>1${esc50(r.saleUnit)} = ${Number(r.componentQty)||1}${esc50(r.componentUnit)}</td><td class="v750-pack-preview">${esc50(r.actualUnit)}</td><td><button class="btn secondary" onclick="pickPackingProductV750('${esc50(r.number)}')">수정</button> <button class="btn bad" onclick="deletePackingRuleV750('${esc50(r.number)}')">삭제</button></td></tr>`).join('')}</tbody></table></div>`:'<div class="muted">등록된 포장구성이 없습니다. 포장단위가 필요한 상품부터 한 번씩 등록해 주세요.</div>'};
+ // 누락건: 고객을 선택 입력할 수 있게 확장
+ window.addShippingOmissionV748=()=>{const o={id:crypto.randomUUID(),at:new Date().toISOString(),number:normNum($50('omitNumber')?.value),item:($50('omitItem')?.value||'').trim(),qty:Math.max(1,Number($50('omitQty')?.value)||1),note:($50('omitNote')?.value||'').trim(),customer:($50('omitCustomer')?.value||'').trim()};if(!o.item)return alert('누락 품명을 입력해 주세요.');state.shippingOmissions=Array.isArray(state.shippingOmissions)?state.shippingOmissions:[];state.shippingOmissions.push(o);saveSilently();window.renderShippingOmissionsV748?.();['omitNumber','omitItem','omitNote','omitCustomer'].forEach(id=>{if($50(id))$50(id).value=''});if($50('omitQty'))$50('omitQty').value=1};
+ const oldOmitRender=window.renderShippingOmissionsV748;window.renderShippingOmissionsV748=()=>{const b=$50('shippingOmissionList');if(!b)return;const a=Array.isArray(state.shippingOmissions)?state.shippingOmissions:[];b.innerHTML=a.length?'<div class="scroll"><table class="v748-omission-table"><thead><tr><th>품번</th><th>품명/옵션</th><th>수량</th><th>고객</th><th>메모</th><th></th></tr></thead><tbody>'+a.map(x=>`<tr class="v748-omission-row"><td>#${esc50(x.number||'-')}</td><td>${esc50(x.item)}</td><td>${x.qty}</td><td>${esc50(x.customer||'전체')}</td><td>${esc50(x.note||'')}</td><td><button class="btn bad" onclick="removeShippingOmissionV748('${esc50(x.id)}')">삭제</button></td></tr>`).join('')+'</tbody></table></div>':'<div class="muted">등록된 누락건 없음</div>'};
+ function omissionFor50(g){const a=Array.isArray(state.shippingOmissions)?state.shippingOmissions:[];const keys=[g.name,g.nick,g.code].map(v=>String(v||'').trim()).filter(Boolean);return a.filter(o=>o.customer&&keys.some(k=>String(o.customer).includes(k)||k.includes(String(o.customer))))}
+ function theme50(g){const k=(g.items||[]).some(isKimchi50),o=omissionFor50(g).length>0;return o&&k?'purple':o?'red':k?'orange':'black'}
+ function label50(t){return t==='purple'?'🟣 김치 + 누락':t==='red'?'🚨 누락 재발송':t==='orange'?'🥬 김치 주문':'일반 주문'}
+ function totalPack50(items){const rows=(items||[]).map(x=>({...calc50(x),service:isService50(x)}));return {n:rows.reduce((a,c)=>a+c.actualQty,0),breakdown:rows.map(c=>`${c.actualQty}${c.actualUnit}${c.service?'(서비스)':''}`).join(' + ')}}
+ function skuSummary50(arr){const mp=new Map();arr.forEach(g=>(g.items||[]).forEach((x,i)=>{const c=calc50(x),num=normNum(x.number||i+1),opt=option50(x.item),key=[num,String(x.item||''),opt,c.actualUnit].join('|');if(!mp.has(key))mp.set(key,{number:num,item:x.item,option:opt,unit:Number(x.unit)||0,orderQty:0,saleUnit:c.saleUnit,actualQty:0,actualUnit:c.actualUnit,componentTotal:0,componentUnit:c.componentUnit,componentQty:c.componentQty});const z=mp.get(key);z.orderQty+=c.orderQty;z.actualQty+=c.actualQty;z.componentTotal+=c.componentTotal}));return [...mp.values()].sort((a,b)=>(Number(a.number)||999999)-(Number(b.number)||999999)||String(a.item).localeCompare(String(b.item)))}
+ function packingPrint50(arr,title){
+   if(!arr.length)return alert('출력할 택배 대상이 없습니다.');const company=window.__tenantCompany||state.settings?.company||'땡라이브',tc=window.__tenantCode||'FIRST-0001',sku=skuSummary50(arr),omis=Array.isArray(state.shippingOmissions)?state.shippingOmissions:[];
+   const summary=`<section class="sheet summary"><h1>${esc50(company)} 상품 준비 총괄표</h1><div class="date">${new Date().toLocaleString('ko-KR')}</div><div class="bigbar">택배팀은 <b>준비수량</b>만 보고 준비하세요</div><table><thead><tr><th>품번</th><th>상품 / 옵션</th><th>주문합계</th><th>포장구성</th><th>준비수량</th><th>총 구성수량</th></tr></thead><tbody>${sku.map(x=>`<tr><td><b>#${esc50(x.number)}</b></td><td>${esc50(x.item)}<small>${esc50(x.option&&x.option!=='-'?x.option:'')}</small></td><td>${x.orderQty}${esc50(x.saleUnit)}</td><td>1${esc50(x.saleUnit)}=${x.componentQty}${esc50(x.componentUnit)}</td><td class="ready">${x.actualQty}${esc50(x.actualUnit)}</td><td>${x.componentTotal}${esc50(x.componentUnit)}</td></tr>`).join('')}</tbody></table>${omis.length?`<h2 class="omitTitle">🚨 누락건</h2><table class="omit"><thead><tr><th>품번</th><th>상품</th><th>수량</th><th>고객</th><th>메모</th></tr></thead><tbody>${omis.map(o=>`<tr><td>#${esc50(o.number||'-')}</td><td>${esc50(o.item)}</td><td>${o.qty}</td><td>${esc50(o.customer||'전체')}</td><td>${esc50(o.note||'')}</td></tr>`).join('')}</tbody></table>`:''}</section>`;
+   const qrData=[];const pages=arr.map((g,i)=>{const t=theme50(g),pack=totalPack50(g.items),services=(g.items||[]).filter(isService50),normal=(g.items||[]).filter(x=>!isService50(x)),om=omissionFor50(g);qrData.push({id:'qr50-'+i,url:location.origin+'/packing.html?tenant='+encodeURIComponent(tc)+'&code='+encodeURIComponent(g.code)});const rows=normal.map(x=>{const c=calc50(x);return `<tr class="${isKimchi50(x)?'kimchi':''}"><td><b>#${esc50(x.number||'')}</b> ${esc50(x.item)}</td><td>${esc50(option50(x.item))}</td><td class="put">${c.actualQty}${esc50(c.actualUnit)} 넣기<small>${esc50(explain50(c))}</small></td></tr>`}).join('');const sr=services.length?`<div class="service"><b>🎁 서비스 상품 (꼭 같이 넣어주세요!)</b>${services.map(x=>{const c=calc50(x);return `<div><span>#${esc50(x.number||'S')} ${esc50(x.item)}</span><strong>${c.actualQty}${esc50(c.actualUnit)}</strong><small>${esc50(explain50(c))}</small></div>`}).join('')}</div>`:'';const warn=om.length?`<div class="customerOmit">🚨 누락 재발송 주문입니다!<br>기존 주문과 합포장하지 마세요.<div>${om.map(o=>`#${esc50(o.number||'-')} ${esc50(o.item)} ×${o.qty}`).join(' · ')}</div></div>`:'';return `<section class="sheet customer theme-${t}"><div class="head"><div><div class="jobno">${esc50(g.code||String(i+1).padStart(3,'0'))}</div><div class="who">${esc50(g.nick||g.name)} 님</div><div class="badge">${label50(t)}</div></div><div id="qr50-${i}" class="qr"></div></div><div class="totalbar">📦 실제 포장 총 ${pack.n}단위 <small>${esc50(pack.breakdown)}</small></div><table><thead><tr><th>상품</th><th>옵션</th><th>실제로 넣을 수량</th></tr></thead><tbody>${rows}</tbody></table>${sr}${warn}<div class="foot"><span>${esc50(g.name||'')} · ${esc50(g.phone||'')}</span><b>CJ대한통운 송장 부착</b></div></section>`}).join('');
+   const w=window.open('','_blank');if(!w)return alert('팝업 차단을 해제해 주세요.');w.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>${esc50(title)}</title><script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"><\/script><style>*{box-sizing:border-box}body{margin:0;font-family:Arial,'Noto Sans KR',sans-serif;color:#111}.sheet{width:210mm;min-height:297mm;padding:12mm;page-break-after:always}.sheet:last-child{page-break-after:auto}h1{font-size:28px;margin:0}.date{color:#666;margin:6px 0 15px}.bigbar,.totalbar{background:#111;color:#fff;padding:12px 15px;font-size:21px;font-weight:900;margin:12px 0}.bigbar b,.totalbar b{font-size:26px}.totalbar small{float:right;font-size:12px;font-weight:600;padding-top:7px}table{width:100%;border-collapse:collapse;table-layout:fixed}th,td{border:1px solid #aaa;padding:9px 8px;vertical-align:middle}th{background:#f3f4f6}.summary td:nth-child(2){text-align:left}.summary small{display:block;color:#666}.ready{font-size:23px;font-weight:950}.omitTitle{color:#d10b0b}.omit th,.omit td{border-color:#e22;color:#b00}.head{display:flex;justify-content:space-between;align-items:start;border-bottom:3px solid currentColor;padding-bottom:8px}.jobno{font-size:48px;font-weight:950;display:inline-block}.who{display:inline-block;font-size:25px;font-weight:900;margin-left:15px}.badge{display:inline-block;margin-left:12px;padding:7px 10px;border-radius:9px;font-weight:900}.qr img,.qr canvas{width:100px!important;height:100px!important}.customer table{font-size:17px}.customer td:first-child{font-weight:800}.put{font-size:24px;font-weight:950;text-align:center}.put small,.service small{display:block;font-size:12px;font-weight:600;color:#555;margin-top:3px}.service{margin-top:12px;border:2px solid #5b8bd8;background:#eff6ff;padding:10px;color:#174b9a}.service>div{display:grid;grid-template-columns:1fr auto;gap:8px;border-top:1px solid #adc6ef;padding:8px 0}.service strong{font-size:20px}.customerOmit{margin-top:12px;border:2px solid #e11;background:#fff2f2;color:#c00;padding:13px;text-align:center;font-size:21px;font-weight:950}.customerOmit div{font-size:13px;margin-top:6px}.foot{display:flex;justify-content:space-between;align-items:center;margin-top:15px;border-top:2px solid currentColor;padding-top:12px}.theme-black{color:#111}.theme-orange{color:#e76700}.theme-red{color:#d60000}.theme-purple{color:#6f2da8}.theme-black .badge{background:#eee}.theme-orange .badge{background:#fff0df}.theme-red .badge{background:#ffe1e1}.theme-purple .badge{background:#f0dcff}.kimchi td{color:#d94c00;font-weight:850}@page{size:A4 portrait;margin:0}</style></head><body>${summary+pages}<script>const q=${JSON.stringify(qrData)};window.onload=()=>{q.forEach(x=>new QRCode(document.getElementById(x.id),{text:x.url,width:180,height:180}));setTimeout(()=>window.print(),750)};<\/script></body></html>`);w.document.close();
+ }
+ window.printPackingSummaryV748=()=>{renderShipping();packingPrint50([...(window.currentShipping||[])],'상품 준비 총괄표 + 고객별 포장표')};
+ window.printShipping=()=>{renderShipping();packingPrint50([...(window.currentShipping||[])],'고객별 포장표')};
+ window.printShippingSelectedV747=()=>{const codes=new Set([...document.querySelectorAll('.v747-ship-check:checked')].map(c=>c.closest('tr')?.querySelector('.shipping-code')?.textContent?.trim()).filter(Boolean));const a=(window.currentShipping||[]).filter(g=>codes.has(g.code));if(!a.length)return alert('출력할 고객을 체크해 주세요.');packingPrint50(a,'선택 고객 포장표')};
+ window.printKimchiListV748=()=>{renderShipping();const a=(window.currentShipping||[]).map(g=>({...g,items:(g.items||[]).filter(isKimchi50)})).filter(g=>g.items.length);if(!a.length)return alert('김치 주문이 없습니다.');packingPrint50(a,'김치 전용 포장표')};
+ // 색상구분 정산서: 금액 정산서는 유지하되 김치/누락/서비스를 시각적으로 구분하고 QR을 함께 출력.
+ window.printClassifiedReceiptsV750=()=>{const keys=[...document.querySelectorAll('.v7474-receipt-check:checked')].map(x=>x.dataset.key);const rs=getReceipts().filter(r=>keys.includes(r.key));if(!rs.length)return alert('출력할 고객을 체크해 주세요.');const tc=window.__tenantCode||'FIRST-0001',company=window.__tenantCompany||'땡라이브',q=[];const body=rs.map((r,i)=>{const g={key:r.key,name:r.customer?.name||'',nick:r.nick,code:typeof shippingCodeFor==='function'?shippingCodeFor({key:r.key,nick:r.nick,name:r.customer?.name||''}):r.key,items:r.items};const t=theme50(g);q.push({id:'rqr50-'+i,url:location.origin+'/packing.html?tenant='+encodeURIComponent(tc)+'&code='+encodeURIComponent(g.code)});return `<section class="rpage ${t}"><div class="rtop"><div><h1>${esc50(company)} 정산서</h1><h2>${esc50(r.nick)} 님</h2><span class="tag">${label50(t)}</span></div><div id="rqr50-${i}" class="qr"></div></div><table><thead><tr><th>#</th><th>상품</th><th>수량</th><th>단가</th><th>금액</th></tr></thead><tbody>${r.items.map((x,j)=>`<tr class="${isService50(x)?'serviceRow':isKimchi50(x)?'kimchiRow':''}"><td>${esc50(x.number||j+1)}</td><td>${esc50(x.item)}</td><td>${Number(x.qty)||0}</td><td>${Number(x.unit||0).toLocaleString()}원</td><td>${Number(x.amount||0).toLocaleString()}원</td></tr>`).join('')}</tbody></table><div class="sum">상품 ${Number(r.subtotal||0).toLocaleString()}원 · 배송비 ${Number(r.fee||0).toLocaleString()}원<br><b>총 ${Number(r.total||0).toLocaleString()}원</b></div></section>`}).join('');const w=window.open('','_blank');w.document.write(`<!doctype html><html><head><meta charset="utf-8"><script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"><\/script><style>*{box-sizing:border-box}body{margin:0;font-family:Arial,'Noto Sans KR',sans-serif}.rpage{width:210mm;min-height:297mm;padding:14mm;page-break-after:always;border-top:12px solid #111}.rpage:last-child{page-break-after:auto}.rtop{display:flex;justify-content:space-between;align-items:start}.rtop h1{margin:0;font-size:28px}.rtop h2{font-size:34px;margin:10px 0}.tag{font-weight:900;padding:7px 11px;border-radius:9px;background:#eee}.qr img,.qr canvas{width:105px!important;height:105px!important}table{width:100%;border-collapse:collapse;margin-top:20px}th,td{border:1px solid #999;padding:12px 9px}th{background:#111;color:white}.kimchiRow td{color:#e45b00;font-weight:850}.serviceRow td{color:#185bb5;background:#eef6ff;font-weight:850}.sum{text-align:right;margin-top:18px;font-size:18px}.sum b{font-size:28px}.orange{border-color:#ef6c00}.orange .tag{background:#fff0df;color:#d65b00}.red{border-color:#e00000}.red .tag{background:#ffe1e1;color:#c00}.purple{border-color:#7531a8}.purple .tag{background:#f1e2ff;color:#632394}@page{size:A4;margin:0}</style></head><body>${body}<script>const q=${JSON.stringify(q)};window.onload=()=>{q.forEach(x=>new QRCode(document.getElementById(x.id),{text:x.url,width:180,height:180}));setTimeout(()=>window.print(),700)};<\/script></body></html>`);w.document.close()};
+ // 관리자에서 안전한 택배팀 접속링크를 발급. 로그인은 하지 않지만 이 기기에 접근키가 저장됨.
+ window.openPackingTeamV750=async()=>{try{const r=await fetch('/api/packing/access-link',{cache:'no-store'}),d=await r.json();if(!r.ok||!d.ok)throw new Error(d.error||'포장팀 링크 생성 실패');window.open(d.url,'_blank')}catch(e){alert(e.message)}};
+ // 화면 안정화: 백그라운드 동기화는 상태만 갱신하고 현재 화면 DOM을 강제로 다시 그리지 않음.
+ window.syncServerCustomers=async function(showMessage=false){try{const r=await fetch('/api/customers?ts='+Date.now(),{cache:'no-store'});if(!r.ok)throw new Error('HTTP '+r.status);const list=await r.json();const before=JSON.stringify((state.customers||[]).map(c=>[c.id,c.name,c.nickname||c.nick,c.phone,c.address,c.detailAddress,c.memo]));const after=JSON.stringify((list||[]).map(c=>[c.id,c.name,c.nickname||c.nick,c.phone,c.address,c.detailAddress,c.memo]));if(before!==after){state.customers=(list||[]).map(c=>({...c,nickname:c.nickname||c.nick||'',nick:c.nickname||c.nick||''}));try{localStorage.setItem(KEY,JSON.stringify(state))}catch(e){}toast50('고객DB 변경사항을 서버에서 받았습니다.')}if(showMessage)alert(`고객DB ${state.customers?.length||0}명을 확인했습니다.`);return true}catch(e){if(showMessage)alert('고객DB 동기화 실패: '+e.message);return false}};
+ function patchShippingRows50(){const table=$50('shippingTable');if(!table)return;(window.currentShipping||[]).forEach(g=>{const row=[...table.querySelectorAll('tbody tr')].find(tr=>tr.querySelector('.shipping-code')?.textContent?.trim()===g.code);if(!row)return;const s=state.shippingScans?.[g.code]||{};const cells=row.children;if(cells[0])cells[0].innerHTML=s.shipmentScanAt?'<span class="v749-ship-ready">🚚 출고준비완료</span>':(s.packingCompletedAt||s.at)?'<span class="v749-ship-packed">🟢 포장완료</span>':'<span class="v749-ship-wait">⏳ 포장대기</span>';});}
+ window.syncShippingScans=async function(){try{const r=await fetch('/api/packing/scans?ts='+Date.now(),{cache:'no-store'}),d=await r.json();if(!r.ok||!d.ok)throw new Error(d.error||'조회 실패');const b=JSON.stringify(state.shippingScans||{}),a=JSON.stringify(d.shippingScans||{});if(b!==a){state.shippingScans=d.shippingScans||{};try{localStorage.setItem(KEY,JSON.stringify(state))}catch(e){}patchShippingRows50();toast50('택배 상태가 실시간 반영되었습니다.')}return true}catch(e){return false}};
+ const baseRender50=window.renderShipping;window.renderShipping=function(){const r=baseRender50.apply(this,arguments);setTimeout(()=>{renderPackingRulesV750();window.renderShippingOmissionsV748?.()},0);return r};
+ setTimeout(()=>{renderPackingRulesV750();refreshPackingProductsV750()},700);
 })();
 </script>
 </body>

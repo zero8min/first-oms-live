@@ -3,25 +3,114 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>땡라이브 포장리스트</title>
+<title>땡라이브 택배팀 포장</title>
+<script src="https://unpkg.com/@zxing/library@0.21.3/umd/index.min.js"></script>
 <style>
-*{box-sizing:border-box}body{font-family:-apple-system,BlinkMacSystemFont,"Noto Sans KR",sans-serif;margin:0;background:#f5f5f7;color:#171717}.wrap{max-width:680px;margin:auto;padding:16px}.card{background:#fff;border-radius:18px;padding:20px;box-shadow:0 8px 30px #0001}.nick{font-size:29px;font-weight:900}.meta{line-height:1.7;margin:12px 0;word-break:keep-all}.item{display:grid;grid-template-columns:30px 1fr auto;gap:10px;align-items:center;padding:15px 0;border-bottom:1px solid #eee;font-size:17px}.item input{width:25px;height:25px}.item-detail{font-size:13px;color:#666;margin-top:4px}.qty{font-weight:900}.totals{margin-top:18px;padding:15px;background:#f6f2ed;border-radius:14px;line-height:1.9;text-align:right}.grand{font-size:22px;border-top:1px solid #999;padding-top:7px}.btn{width:100%;padding:15px;border:0;border-radius:14px;background:#222;color:#fff;font-size:17px;font-weight:800;margin-top:12px}.btn.secondary{background:#ececf0;color:#171717}.btn.good{background:#16723a}.done{background:#e7f8ed;color:#16723a;padding:16px;border-radius:14px;font-weight:800}.err{color:#b00020}.tracking{margin:18px 0;padding:16px;border:1px solid #ddd;border-radius:14px;background:#fafafa}.tracking h3{margin:0 0 10px}.tracking-row{display:flex;gap:8px}.tracking-row input{min-width:0;flex:1;padding:13px;border:1px solid #bbb;border-radius:12px;font-size:16px}.tracking-row button{width:auto;margin:0;padding:12px 15px}.saved{margin-top:8px;color:#16723a;font-weight:800;word-break:break-all}.camera{display:none;margin-top:12px}.camera.show{display:block}.camera video{width:100%;max-height:330px;background:#000;border-radius:14px}.camera-help{font-size:13px;color:#666;margin-top:7px}.status{font-size:13px;margin-top:8px;color:#555}
+*{box-sizing:border-box}html{background:#f5f5f7}body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Noto Sans KR",sans-serif;color:#171717;background:#f5f5f7;overflow-anchor:none}.wrap{max-width:720px;margin:auto;padding:14px}.card{background:#fff;border-radius:22px;padding:20px;box-shadow:0 8px 28px #00000012}.top{display:flex;justify-content:space-between;gap:10px;align-items:center;margin-bottom:16px}.worker{font-size:18px;font-weight:900}.change{border:0;background:#ececf1;padding:9px 12px;border-radius:12px;font-weight:800}.job{font-size:30px;font-weight:950;letter-spacing:-1px}.count{margin:14px 0;background:#101010;color:white;padding:16px 18px;border-radius:18px;font-size:26px;font-weight:950;text-align:center}.items{margin-top:8px}.item{display:grid;grid-template-columns:1fr auto;gap:12px;padding:15px 3px;border-bottom:1px solid #eee;font-size:18px}.item .name{font-weight:850}.item .qty{font-size:22px;font-weight:950}.service{background:#eaf7ff;color:#075985;border-radius:14px;padding:12px 14px;margin-top:10px;font-weight:900}.btn{width:100%;border:0;border-radius:17px;padding:18px;font-size:20px;font-weight:950;margin-top:16px}.primary{background:#171717;color:white}.good{background:#16723a;color:white}.muted{background:#ececf1;color:#222}.scan-screen{display:none;text-align:center}.scan-screen.show{display:block}.scan-title{font-size:34px;font-weight:950;margin:8px 0}.scan-sub{font-size:18px;line-height:1.6}.camera{margin:14px 0;background:#000;border-radius:18px;overflow:hidden;min-height:260px;display:flex;align-items:center;justify-content:center}.camera video{width:100%;max-height:420px}.scan-line{position:relative}.notice{padding:15px;border-radius:15px;margin-top:12px;font-weight:850;line-height:1.55}.warn{background:#fff0f0;color:#b42318;border:2px solid #ffb4b4}.ok{background:#eaf8ef;color:#146c36}.smsfail{background:#fff8e5;color:#805700}.done{font-size:36px;font-weight:950;color:#16723a}.small{font-size:13px;color:#666;margin-top:10px}.hidden{display:none!important}.empty{text-align:center;padding:48px 10px;color:#666}.loader{text-align:center;padding:40px 0;font-weight:850}.pill{display:inline-block;padding:5px 9px;border-radius:999px;background:#eef0f4;font-size:12px;font-weight:850}
 </style>
 </head>
 <body>
-<div class="wrap"><div class="card" id="app">포장정보를 불러오는 중입니다.</div></div>
+<div class="wrap">
+  <div class="card" id="app"><div class="loader">포장 주문을 불러오는 중입니다.</div></div>
+</div>
 <script>
-const code=new URLSearchParams(location.search).get('code')||'';
-let job=null,stream=null,scanTimer=null;
-const money=n=>Number(n||0).toLocaleString('ko-KR')+'원';
-const esc=v=>String(v??'').replace(/[&<>"']/g,s=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[s]));
-async function load(){const app=document.getElementById('app');if(!code){app.innerHTML='<div class="err">QR 코드가 없습니다.</div>';return}try{const r=await fetch('/api/public/packing?code='+encodeURIComponent(code),{cache:'no-store'}),d=await r.json();if(!r.ok||!d.ok)throw new Error(d.error||'조회 실패');job=d.job;render()}catch(e){app.innerHTML='<div class="err">'+esc(e.message)+'</div>'}}
-function render(){const app=document.getElementById('app');const completed=job.completedAt?`<div class="done">포장완료 · ${new Date(job.completedAt).toLocaleString('ko-KR')}</div>`:'';app.innerHTML=`${completed}<div class="nick">${esc(job.nick||'')}</div><div class="meta"><b>${esc(job.name||'')}</b><br>${esc(job.phone||'')}<br>${esc(job.address||'')}<br>방송일 ${esc((job.dates||[]).join(', '))}</div><h3>포장리스트</h3>${job.items.map((x,i)=>`<label class="item"><input type="checkbox" data-i="${i}" ${job.completedAt?'checked disabled':''}><span><b>#${esc(x.number||i+1)} ${esc(x.item)}</b><div class="item-detail">단가 ${money(x.unit)} · 금액 ${money(x.amount)}</div></span><span class="qty">${x.qty}개</span></label>`).join('')}<div class="totals"><div>상품 합계 <b>${money(job.subtotal)}</b></div><div>택배비 <b>${money(job.fee)}</b></div><div class="grand">토탈 금액 <b>${money(job.total)}</b></div></div><section class="tracking"><h3>송장 바코드</h3><div class="tracking-row"><input id="trackingInput" inputmode="numeric" autocomplete="off" placeholder="송장번호 직접 입력" value="${esc(job.trackingNumber||'')}"><button class="btn secondary" onclick="saveTracking()">저장</button></div><button class="btn secondary" onclick="startBarcodeScan()">카메라로 송장 바코드 스캔</button><div id="cameraBox" class="camera"><video id="barcodeVideo" playsinline muted></video><div class="camera-help">송장 바코드를 화면 중앙에 맞춰주세요. 인식이 어려우면 위 칸에 직접 입력하세요.</div><button class="btn secondary" onclick="stopBarcodeScan()">카메라 닫기</button></div><div id="trackingStatus" class="status">${job.trackingNumber?`<span class="saved">저장된 송장번호: ${esc(job.trackingNumber)}</span>`:'송장번호를 스캔하거나 직접 입력해 저장하세요.'}</div></section>${job.completedAt?'':'<button class="btn good" onclick="completeJob()">전체 확인 · 포장 완료</button>'}`}
-async function saveTracking(value){const input=document.getElementById('trackingInput'),status=document.getElementById('trackingStatus');const trackingNumber=String(value||input?.value||'').replace(/\s+/g,'').trim();if(!trackingNumber)return alert('송장번호를 입력하거나 스캔해 주세요.');status.textContent='송장번호 저장 중...';try{const r=await fetch('/api/public/packing/tracking',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({code,tenantCode:job.tenantCode,trackingNumber})}),d=await r.json();if(!r.ok||!d.ok)throw new Error(d.error||'송장번호 저장 실패');job.trackingNumber=d.trackingNumber;if(input)input.value=d.trackingNumber;status.innerHTML='<span class="saved">송장번호 저장 완료: '+esc(d.trackingNumber)+'</span>';stopBarcodeScan()}catch(e){status.innerHTML='<span class="err">'+esc(e.message)+'</span>'}}
-async function startBarcodeScan(){const status=document.getElementById('trackingStatus'),box=document.getElementById('cameraBox'),video=document.getElementById('barcodeVideo');if(!('BarcodeDetector' in window)){status.innerHTML='<span class="err">이 휴대폰 브라우저는 자동 바코드 인식을 지원하지 않습니다. 송장번호를 직접 입력해 주세요.</span>';return}try{stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:'environment'}},audio:false});video.srcObject=stream;await video.play();box.classList.add('show');const detector=new BarcodeDetector({formats:['code_128','code_39','ean_13','ean_8','itf','codabar','qr_code']});status.textContent='송장 바코드를 카메라에 맞춰주세요.';const scan=async()=>{if(!stream)return;try{const codes=await detector.detect(video);if(codes.length){const raw=String(codes[0].rawValue||'').trim();if(raw){document.getElementById('trackingInput').value=raw;await saveTracking(raw);return}}}catch(e){}scanTimer=setTimeout(scan,350)};scan()}catch(e){status.innerHTML='<span class="err">카메라를 열 수 없습니다. 권한을 허용하거나 송장번호를 직접 입력해 주세요.</span>';stopBarcodeScan()}}
-function stopBarcodeScan(){if(scanTimer){clearTimeout(scanTimer);scanTimer=null}if(stream){stream.getTracks().forEach(t=>t.stop());stream=null}document.getElementById('cameraBox')?.classList.remove('show')}
-async function completeJob(){const boxes=[...document.querySelectorAll('input[type=checkbox]')];if(boxes.some(x=>!x.checked)){alert('모든 품목과 수량을 확인하고 체크해 주세요.');return}if(!confirm('모든 품목의 상품명과 수량, 토탈 금액을 확인하셨나요?'))return;const worker=prompt('작업자 이름을 입력해 주세요. (선택사항)','')||'';const r=await fetch('/api/public/packing/complete',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({code,tenantCode:job.tenantCode,worker})}),d=await r.json();if(!r.ok||!d.ok)return alert(d.error||'완료 처리 실패');job.completedAt=d.completedAt;stopBarcodeScan();render()}
-window.addEventListener('pagehide',stopBarcodeScan);load();
+const qs=new URLSearchParams(location.search);
+const tenant=qs.get('tenant')||'FIRST-0001';
+const fixedCode=(qs.get('code')||'').trim().toUpperCase();
+let worker=localStorage.getItem('FIRST_OMS_PACKER_NAME')||'';
+let job=null,stream=null,scanTimer=null,zxingReader=null,locked=false;
+const esc=v=>String(v??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+const totalQty=items=>(items||[]).reduce((a,x)=>a+(Number(x.qty)||0),0);
+function askWorker(force=false){
+ if(worker&&!force)return true;
+ const v=prompt('포장자 이름을 입력해주세요',worker||'');
+ if(!v||!v.trim())return false;
+ worker=v.trim();localStorage.setItem('FIRST_OMS_PACKER_NAME',worker);return true;
+}
+async function loadJob(){
+ if(!askWorker()){document.getElementById('app').innerHTML='<div class="empty">포장자 이름을 입력해야 작업을 시작할 수 있습니다.<button class="btn primary" onclick="loadJob()">이름 입력</button></div>';return}
+ stopScan();locked=false;
+ try{
+  let url=fixedCode?'/api/public/packing?code='+encodeURIComponent(fixedCode):'/api/public/packing/next?tenant='+encodeURIComponent(tenant)+'&worker='+encodeURIComponent(worker);
+  const r=await fetch(url,{cache:'no-store'}),d=await r.json();if(!r.ok||!d.ok)throw new Error(d.error||'조회 실패');
+  job=d.job||null;if(job&&!job.tenantCode)job.tenantCode=tenant;
+  renderJob();
+ }catch(e){document.getElementById('app').innerHTML='<div class="notice warn">'+esc(e.message)+'</div><button class="btn muted" onclick="loadJob()">다시 불러오기</button>'}
+}
+function renderJob(){
+ const app=document.getElementById('app');
+ if(!job){app.innerHTML=`<div class="top"><div class="worker">${esc(worker)}님</div><button class="change" onclick="changeWorker()">포장자 변경</button></div><div class="empty"><div style="font-size:30px;font-weight:950">🎉 포장할 주문이 없습니다</div><p>현재 출고준비가 필요한 주문을 모두 처리했습니다.</p><button class="btn muted" onclick="loadJob()">새로고침</button></div>`;return}
+ if(job.status==='packed'||job.completedAt){return showScanner()}
+ const normal=(job.items||[]).filter(x=>!x.service),services=(job.items||[]).filter(x=>x.service);
+ app.innerHTML=`<div class="top"><div class="worker">${esc(worker)}님 <span class="pill">자동 저장됨</span></div><button class="change" onclick="changeWorker()">포장자 변경</button></div>
+ <div class="job">${esc(job.jobNo||'')}번 / ${esc(job.name||job.nick||'고객')}</div>
+ <div class="count">📦 총 ${totalQty(job.items)}개 넣으세요</div>
+ <div class="items">${normal.map(x=>`<div class="item"><div class="name">#${esc(x.number)} ${esc(x.item)}</div><div class="qty">×${Number(x.qty)||0}</div></div>`).join('')}</div>
+ ${services.length?`<div class="service">🩵 🎁 서비스<br>${services.map(x=>`#${esc(x.number)} ${esc(x.item)} ×${Number(x.qty)||0}`).join('<br>')}</div>`:''}
+ <button class="btn good" onclick="packed()">다 넣었어요</button>
+ <div class="small">이 버튼을 누르면 관리자 택배리스트에 즉시 포장완료로 기록됩니다. 이후 송장스캔이 끝날 때까지 다음 주문으로 넘어갈 수 없습니다.</div>`;
+}
+async function packed(){
+ if(locked)return;locked=true;
+ try{
+  const r=await fetch('/api/public/packing/packed',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({tenantCode:job.tenantCode||tenant,code:job.code,worker})}),d=await r.json();
+  if(!r.ok||!d.ok)throw new Error(d.error||'포장완료 처리 실패');
+  job.status='packed';job.completedAt=d.packingCompletedAt;showScanner();
+ }catch(e){alert(e.message);locked=false}
+}
+function showScanner(){
+ const app=document.getElementById('app');
+ app.innerHTML=`<div class="top"><div class="worker">${esc(worker)}님</div><button class="change" onclick="changeWorker()" disabled>포장 진행중</button></div>
+ <div class="scan-screen show">
+   <div class="scan-title">📷 송장을 스캔해주세요</div>
+   <div class="scan-sub"><b>${esc(job.jobNo||'')}번 / ${esc(job.name||job.nick||'')}</b><br>CJ대한통운 송장 바코드를 카메라에 맞춰주세요.</div>
+   <div class="camera"><video id="video" playsinline muted></video></div>
+   <div id="scanStatus" class="notice ok">카메라를 준비하는 중입니다.</div>
+   <button class="btn muted" onclick="restartScan()">카메라 다시 열기</button>
+ </div>`;
+ locked=false;startScan();
+}
+async function startScan(){
+ stopScan();
+ const status=document.getElementById('scanStatus'),video=document.getElementById('video');if(!video)return;
+ try{
+  stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:'environment'}},audio:false});video.srcObject=stream;await video.play();
+  if('BarcodeDetector' in window){
+   const det=new BarcodeDetector({formats:['code_128','code_39','ean_13','ean_8','itf','codabar']});
+   const loop=async()=>{if(!stream)return;try{const arr=await det.detect(video);if(arr?.length&&arr[0].rawValue){await finalScan(arr[0].rawValue);return}}catch(e){}scanTimer=setTimeout(loop,250)};loop();status.textContent='송장 바코드를 화면 중앙에 맞춰주세요.';return
+  }
+  if(window.ZXing&&window.ZXing.BrowserMultiFormatReader){
+   zxingReader=new ZXing.BrowserMultiFormatReader();status.textContent='송장 바코드를 화면 중앙에 맞춰주세요.';
+   zxingReader.decodeFromVideoElementContinuously(video,(result,err)=>{if(result&&!locked)finalScan(result.getText())});return
+  }
+  throw new Error('이 브라우저에서 바코드 인식을 시작할 수 없습니다. Chrome 또는 Safari 최신 버전으로 열어주세요.');
+ }catch(e){if(status)status.innerHTML='<b>카메라 오류</b><br>'+esc(e.message)}
+}
+async function finalScan(raw){
+ if(locked)return;locked=true;const tracking=String(raw||'').replace(/\s+/g,'').trim();const status=document.getElementById('scanStatus');
+ if(!tracking){locked=false;return}
+ if(status)status.textContent='송장을 확인하는 중입니다...';
+ stopScan();
+ try{
+  const r=await fetch('/api/public/packing/scan-final',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({tenantCode:job.tenantCode||tenant,code:job.code,worker,trackingNumber:tracking})}),d=await r.json();
+  if(!r.ok||!d.ok){
+   if(d.reason==='WRONG_LABEL'){document.getElementById('app').innerHTML=`<div class="notice warn" style="font-size:24px;text-align:center"><div style="font-size:42px">🚨</div><b>잘못된 송장입니다</b><br><br>이 송장을 붙이면 안 됩니다.<br>현재 고객의 송장을 다시 스캔해주세요.</div><button class="btn primary" onclick="showScanner()">현재 고객 송장 다시 스캔</button>`;locked=false;return}
+   throw new Error(d.error||'송장 확인 실패')
+  }
+  const msg=d.smsFailed?`<div class="notice smsfail">⚠️ 배송문자 발송실패<br>포장과 송장 확인은 정상 완료되었습니다. 관리자가 재발송할 수 있습니다.</div>`:`<div class="notice ok">문자까지 발송되었습니다.</div>`;
+  document.getElementById('app').innerHTML=`<div style="text-align:center;padding:28px 6px"><div class="done">✅ 완료!</div><p style="font-size:20px"><b>${esc(job.name||job.nick)}</b><br>송장번호 ${esc(d.trackingNumber)}<br>CJ대한통운</p>${msg}<div class="small">잠시 후 다음 포장 주문이 자동으로 표시됩니다.</div></div>`;
+  setTimeout(()=>{job=null;loadJob()},1400);
+ }catch(e){document.getElementById('app').innerHTML=`<div class="notice warn"><b>송장 처리 실패</b><br>${esc(e.message)}</div><button class="btn primary" onclick="showScanner()">다시 스캔</button>`;locked=false}
+}
+function stopScan(){
+ if(scanTimer){clearTimeout(scanTimer);scanTimer=null}
+ if(zxingReader){try{zxingReader.reset()}catch(e){}zxingReader=null}
+ if(stream){stream.getTracks().forEach(t=>t.stop());stream=null}
+}
+function restartScan(){locked=false;startScan()}
+function changeWorker(){stopScan();if(askWorker(true))loadJob()}
+window.addEventListener('pagehide',stopScan);
+loadJob();
 </script>
 </body>
 </html>
