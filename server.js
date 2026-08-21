@@ -461,12 +461,21 @@ async function sendSolapiSms(to,text,tenantCode){
 }
 
 
+function validSolapiCredential(v){
+ const x=String(v||'').trim();
+ // 솔라피 Key/Secret은 HTTP Authorization 헤더에 들어가므로 ASCII만 허용한다.
+ // 화면 마스킹 문자(•)가 저장된 과거 오류값은 무효 처리한다.
+ return !!x && /^[\x21-\x7E]+$/.test(x) && !/[•…*]{3,}/.test(x)
+}
 function solapiConfig(tenantCode){
  const f=tenantCode?tenantReadIntegrations(tenantCode):readIntegrations();
- if(tenantCode)return {apiKey:f.apiKey||'',apiSecret:f.apiSecret||'',sender:onlyDigits(f.sender),pfId:f.pfId||'',templateId:f.templateId||''};
+ const storedKey=validSolapiCredential(f.apiKey)?String(f.apiKey).trim():'';
+ const storedSecret=validSolapiCredential(f.apiSecret)?String(f.apiSecret).trim():'';
+ const envKey=validSolapiCredential(process.env.SOLAPI_API_KEY)?String(process.env.SOLAPI_API_KEY).trim():'';
+ const envSecret=validSolapiCredential(process.env.SOLAPI_API_SECRET)?String(process.env.SOLAPI_API_SECRET).trim():'';
  return {
-  apiKey:f.apiKey||process.env.SOLAPI_API_KEY||'',
-  apiSecret:f.apiSecret||process.env.SOLAPI_API_SECRET||'',
+  apiKey:storedKey||envKey,
+  apiSecret:storedSecret||envSecret,
   sender:onlyDigits(f.sender||process.env.SOLAPI_SENDER),
   pfId:f.pfId||process.env.SOLAPI_KAKAO_PF_ID||process.env.SOLAPI_PF_ID||'',
   templateId:f.templateId||process.env.SOLAPI_KAKAO_TEMPLATE_ID||process.env.SOLAPI_TEMPLATE_ID||''
@@ -741,14 +750,18 @@ const server=http.createServer((req,res)=>{
  }
 
  if(u.pathname==='/api/solapi/config'&&req.method==='GET'){
-  const cfg=solapiConfig(tenantCode);
-  return json(res,200,{ok:true,configured:!!(cfg.apiKey&&cfg.apiSecret&&cfg.sender),apiKey:cfg.apiKey?cfg.apiKey.slice(0,4)+'••••••':'',sender:cfg.sender||'',pfId:cfg.pfId||'',templateId:cfg.templateId||'',hasSecret:!!cfg.apiSecret});
+  const cfg=solapiConfig(tenantCode), raw=tenantReadIntegrations(tenantCode);
+  const storedKeyOk=validSolapiCredential(raw.apiKey),storedSecretOk=validSolapiCredential(raw.apiSecret);
+  return json(res,200,{ok:true,configured:!!(cfg.apiKey&&cfg.apiSecret&&cfg.sender),apiKey:'',hasApiKey:!!cfg.apiKey,hasSecret:!!cfg.apiSecret,sender:cfg.sender||'',pfId:cfg.pfId||'',templateId:cfg.templateId||'',recoveredFromEnv:(!storedKeyOk&&!!cfg.apiKey)||(!storedSecretOk&&!!cfg.apiSecret),needsApiKeyRepair:!cfg.apiKey});
  }
  if(u.pathname==='/api/solapi/config'&&req.method==='POST'){
   return readBody(req).then(body=>{try{
-   const d=JSON.parse(body||'{}'), old=tenantReadIntegrations(tenantCode);
-   const next={apiKey:String(d.apiKey||old.apiKey||'').trim(),apiSecret:String(d.apiSecret||old.apiSecret||'').trim(),sender:onlyDigits(d.sender||old.sender),pfId:String(d.pfId||old.pfId||'').trim(),templateId:String(d.templateId||old.templateId||'').trim()};
-   if(!next.apiKey||!next.apiSecret||!next.sender)return json(res,400,{ok:false,error:'API Key, API Secret, 승인 발신번호를 모두 입력해 주세요.'});
+   const d=JSON.parse(body||'{}'), old=tenantReadIntegrations(tenantCode), current=solapiConfig(tenantCode);
+   const incomingKey=String(d.apiKey||'').trim(), incomingSecret=String(d.apiSecret||'').trim();
+   const apiKey=validSolapiCredential(incomingKey)?incomingKey:(validSolapiCredential(old.apiKey)?String(old.apiKey).trim():current.apiKey);
+   const apiSecret=validSolapiCredential(incomingSecret)?incomingSecret:(validSolapiCredential(old.apiSecret)?String(old.apiSecret).trim():current.apiSecret);
+   const next={apiKey,apiSecret,sender:onlyDigits(d.sender||old.sender||current.sender),pfId:String(d.pfId||old.pfId||current.pfId||'').trim(),templateId:String(d.templateId||old.templateId||current.templateId||'').trim()};
+   if(!next.apiKey||!next.apiSecret||!next.sender)return json(res,400,{ok:false,error:'솔라피 API Key/Secret/승인 발신번호가 필요합니다. 가려진 •••••• 값은 저장되지 않습니다.'});
    tenantSaveIntegrations(tenantCode,next);return json(res,200,{ok:true,configured:true,sender:next.sender});
   }catch(e){return json(res,400,{ok:false,error:e.message})}});
  }
