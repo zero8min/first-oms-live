@@ -1,0 +1,38 @@
+땡라이브서버 v6.2 로그인·버튼복구
+
+[최고관리자 초기 로그인]
+아이디: firstadmin
+비밀번호: FirstOms!2026
+
+Render Environment에서 아래 값을 등록하면 초기 계정을 다른 값으로 생성할 수 있습니다.
+FIRST_ADMIN_ID=원하는아이디
+FIRST_ADMIN_PASSWORD=강한비밀번호
+
+중요: Persistent Disk에 accounts.json이 이미 생성된 뒤에는 환경변수만 바꿔도 기존 계정은 자동 변경되지 않습니다.
+
+[링크]
+로그인: https://first-oms-live.onrender.com/login.html
+거래처 회원가입: https://first-oms-live.onrender.com/signup.html
+고객정보 가입폼: https://first-oms-live.onrender.com/join.html
+
+[적용 기능]
+- 관리자 페이지 및 관리자 API 로그인 보호
+- 거래처 회원가입 후 FIRST-0001 형식 코드 자동 발급
+- 최고관리자 거래처 승인·대기·정지 관리
+- 로그아웃
+- FIRST OMS 로그인 애니메이션
+- 관리자 상단 기능점검 버튼
+- 고객DB·판매리스트 Persistent Disk 보존 구조 유지
+- 기존 index.html 자바스크립트 문법 오류 수정(버튼 전체가 멈추던 원인)
+
+[점검 완료]
+- server.js 문법
+- index/login/signup/superadmin/join 자바스크립트 문법
+- index.html onclick 주요 버튼 함수 41개 연결 확인
+- 미로그인 접속 → 로그인 화면 이동
+- 정상/실패 로그인
+- 로그인 후 index.html 접근
+- 상태 API, 고객DB API, 최고관리자 계정 API
+- 거래처 가입 및 코드 발급
+
+솔라피 실제 발송과 YouTube 실제 댓글 송수신은 해당 API 키·승인 발신번호·유튜브 OAuth가 연결된 Render 운영환경에서 최종 확인해야 합니다.

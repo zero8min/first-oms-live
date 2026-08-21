@@ -1,0 +1,5 @@
+v7.33 긴급 수정
+- 정산서 이미지 전송 실패 원인인 Tainted canvas 제거
+- 외부 QR/이미지를 포함한 SVG foreignObject 캡처 비활성화
+- 브라우저 내부 순수 Canvas 정산서 생성 방식으로 전환
+- 기존 데이터/설정/data 폴더 보존
