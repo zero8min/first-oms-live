@@ -380,8 +380,8 @@ restoreBundledDdaengCustomersIfNewerOnce();
 function restoreUserProvidedAug13BackupsOnce(){
  try{
   const recDir=path.join(ROOT,'data','recovery-v7.47.3');
-  const customerSrc=path.join(recDir,'8.13일_고객321명.json');
-  const stateSrc=path.join(recDir,'8월13_전체백업.json');
+  const customerSrc=path.join(recDir,'customers_321.json');
+  const stateSrc=path.join(recDir,'state_aug13.json');
   if(!fs.existsSync(customerSrc)&&!fs.existsSync(stateSrc))return;
   const marker=path.join(DATA_ROOT,'.v7473-aug13-two-backups-restored');
   if(fs.existsSync(marker))return;
