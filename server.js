@@ -656,6 +656,9 @@ const server=http.createServer((req,res)=>{
   if(!user)return json(res,401,{ok:false,error:'관리자 로그인이 필요합니다.'});const v=tenantPackingAccessV750(tenantCode);
   return json(res,200,{ok:true,url:`/packing.html?tenant=${encodeURIComponent(tenantCode)}&token=${encodeURIComponent(v.token)}`})
  }
+ if(u.pathname==='/api/packing/access-reset'&&req.method==='POST'){
+  if(!user)return json(res,401,{ok:false,error:'관리자 로그인이 필요합니다.'});const file=tenantFile(tenantCode,'packing-access.json'),v={token:crypto.randomBytes(24).toString('hex'),createdAt:new Date().toISOString(),rotatedBy:user.username||user.id||'admin'};atomicWrite(file,JSON.stringify(v,null,2));return json(res,200,{ok:true})
+ }
 
  if(u.pathname==='/api/youtube/status'&&req.method==='GET'){
   const cfg=youtubeConfig(),auth=readJsonObject(tenantFile(tenantCode,'youtube-auth.json'),{});
