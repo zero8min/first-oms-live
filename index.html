@@ -3256,5 +3256,92 @@ html,body,.page,.scroll,table,tbody,tr{overflow-anchor:none!important}
  setTimeout(()=>{renderPackingRulesV750();refreshPackingProductsV750()},700);
 })();
 </script>
+
+<!-- v7.52 FINAL SCREEN LOCK: no automatic re-render while user is working -->
+<style id="v752-screen-lock">
+html,body,.page,.scroll,table,tbody,tr{overflow-anchor:none!important;scroll-behavior:auto!important}
+</style>
+<script id="v752-screen-lock-script">
+(()=>{
+  const custSig=(list)=>JSON.stringify((list||[]).map(c=>[
+    c.id,c.name,c.nickname||c.nick,c.phone,c.postalCode,c.address,c.detailAddress,c.memo,c.active
+  ]).sort((a,b)=>String(a[0]||'').localeCompare(String(b[0]||''))));
+  const shipSig=(o)=>JSON.stringify(o||{});
+
+  // 실시간 SSE가 고객 화면을 재렌더링하며 위치를 튀게 만들 수 있어 완전히 끕니다.
+  try{ if(window.customerEventSource) window.customerEventSource.close(); }catch(e){}
+  window.startCustomerRealtime=function(){
+    try{ if(window.customerEventSource) window.customerEventSource.close(); }catch(e){}
+    window.customerEventSource=null;
+    return false;
+  };
+
+  // 서버 고객정보는 백그라운드로만 동기화. 화면은 절대 자동 재렌더링하지 않음.
+  window.syncServerCustomers=async function(showMessage=false){
+    try{
+      const r=await fetch('/api/customers?ts='+Date.now(),{cache:'no-store'});
+      if(!r.ok) throw new Error('HTTP '+r.status);
+      const list=await r.json();
+      if(custSig(state.customers||[])!==custSig(list||[])){
+        state.customers=(list||[]).map(c=>({...c,nickname:c.nickname||c.nick||'',nick:c.nickname||c.nick||''}));
+        try{ if(typeof dedupeCustomers==='function')dedupeCustomers(); if(typeof autoMatchAll==='function')autoMatchAll(); localStorage.setItem(KEY,JSON.stringify(state)); }catch(e){}
+      }
+      if(showMessage){
+        // 사용자가 직접 '새로고침/확인'을 눌렀을 때만 현재 고객화면을 갱신
+        if(document.getElementById('customers')?.classList.contains('active') && typeof renderCustomers==='function') renderCustomers();
+        alert(`고객DB ${state.customers?.length||0}명을 확인했습니다.`);
+      }
+      return true;
+    }catch(e){
+      console.warn('고객DB 백그라운드 동기화 실패',e);
+      if(showMessage) alert('고객DB 동기화 실패: '+e.message);
+      return false;
+    }
+  };
+
+  // 택배 스캔 상태도 백그라운드 저장만 하고 3초마다 화면을 다시 그리지 않음.
+  // 사용자가 택배실을 다시 열거나 작업 버튼을 누르면 최신 상태가 표시됩니다.
+  window.syncShippingScans=async function(renderAfter=false){
+    try{
+      const r=await fetch('/api/packing/scans?ts='+Date.now(),{cache:'no-store'});
+      const d=await r.json();
+      if(!r.ok||!d.ok) throw new Error(d.error||'조회 실패');
+      if(shipSig(state.shippingScans||{})!==shipSig(d.shippingScans||{})){
+        state.shippingScans=d.shippingScans||{};
+        try{localStorage.setItem(KEY,JSON.stringify(state))}catch(e){}
+      }
+      // renderAfter가 명시적으로 true이고, 사용자가 현재 입력/스크롤 중이 아닐 때만 갱신
+      if(renderAfter && document.getElementById('shipping')?.classList.contains('active')){
+        const ae=document.activeElement;
+        const busy=ae && /^(INPUT|TEXTAREA|SELECT)$/.test(ae.tagName);
+        if(!busy && typeof renderShipping==='function'){
+          const y=window.scrollY,x=window.scrollX;
+          renderShipping();
+          requestAnimationFrame(()=>window.scrollTo(x,y));
+        }
+      }
+      return true;
+    }catch(e){console.warn('택배 상태 동기화 실패',e);return false}
+  };
+
+  // 페이지 이동 시에만 해당 페이지를 새로 그리도록 go()를 감쌉니다.
+  if(typeof window.go==='function' && !window.__v752GoWrapped){
+    const oldGo=window.go;
+    window.go=function(id){
+      const r=oldGo.apply(this,arguments);
+      // 페이지 전환 자체는 사용자의 명시적 동작이므로 최신 데이터 표시 허용
+      requestAnimationFrame(()=>{
+        if(id==='customers' && typeof renderCustomers==='function')renderCustomers();
+        if(id==='shipping' && typeof renderShipping==='function')renderShipping();
+      });
+      return r;
+    };
+    window.__v752GoWrapped=true;
+  }
+
+  // 브라우저 자체 스크롤 앵커링도 한 번 더 차단
+  try{document.documentElement.style.overflowAnchor='none';document.body.style.overflowAnchor='none'}catch(e){}
+})();
+</script>
 </body>
 </html>
